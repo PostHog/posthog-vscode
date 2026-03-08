@@ -4,6 +4,11 @@ import { PostHogApiError, PaginatedResponse, Project, FeatureFlag, ErrorTracking
 export class PostHogService {
     constructor(private readonly authService: AuthService) {}
 
+    private escapeHogQLString(value: string): string {
+        // Escape backslashes first, then single quotes for safe embedding in HogQL string literals
+        return value.replace(/\\/g, '\\\\').replace(/'/g, "''");
+    }
+
     private async request<T>(path: string, options?: { method?: string; body?: unknown }): Promise<T> {
         const apiKey = await this.authService.getApiKey();
         if (!apiKey) {
@@ -186,8 +191,8 @@ export class PostHogService {
     }
 
     async getPropertyValues(projectId: number, eventName: string, propertyName: string): Promise<{ value: string; count: number }[]> {
-        const safeEvent = eventName.replace(/'/g, "\\'");
-        const safeProp = propertyName.replace(/'/g, "\\'");
+        const safeEvent = this.escapeHogQLString(eventName);
+        const safeProp = this.escapeHogQLString(propertyName);
         const query = `SELECT properties.'${safeProp}' as val, count() as cnt FROM events WHERE event = '${safeEvent}' AND properties.'${safeProp}' IS NOT NULL GROUP BY val ORDER BY cnt DESC LIMIT 20`;
 
         try {

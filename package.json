@@ -1,0 +1,90 @@
+{
+  "name": "@posthog/posthog-vscode",
+  "displayName": "PostHog for VSCode",
+  "description": "PostHog extension for VSCode",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.109.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codehog-explorer",
+          "title": "CodeHog",
+          "icon": "resources/icons/codehog.svg"
+        }
+      ]
+    },
+    "views": {
+      "codehog-explorer": [
+        {
+          "type": "webview",
+          "id": "codehog-sidebar",
+          "name": "CodeHog"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "codehog.signIn",
+        "title": "CodeHog: Sign In to PostHog"
+      },
+      {
+        "command": "codehog.signOut",
+        "title": "CodeHog: Sign Out"
+      },
+      {
+        "command": "codehog.selectProject",
+        "title": "CodeHog: Select Project"
+      },
+      {
+        "command": "codehog.refreshFeatureFlags",
+        "title": "CodeHog: Refresh Feature Flags"
+      },
+      {
+        "command": "codehog.copyFlagKey",
+        "title": "CodeHog: Copy Flag Key"
+      },
+      {
+        "command": "codehog.openFlagInBrowser",
+        "title": "CodeHog: Open in PostHog"
+      },
+      {
+        "command": "codehog.createFlag",
+        "title": "CodeHog: Create Feature Flag"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "pnpm run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "pnpm run compile-tests && pnpm run compile && pnpm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.109.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "typescript-eslint": "^8.56.1",
+    "eslint": "^9.39.3",
+    "typescript": "^5.9.3",
+    "ts-loader": "^9.5.4",
+    "webpack": "^5.105.3",
+    "webpack-cli": "^6.0.1",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}

@@ -1,8 +1,13 @@
 import { AuthService } from './authService';
-import { PostHogApiError, PaginatedResponse, Project, FeatureFlag, ErrorTrackingIssue, Experiment, EventDefinition, ExceptionEntry, HogQLQueryResponse } from '../models/types';
+import { PostHogApiError, PaginatedResponse, Project, FeatureFlag, ErrorTrackingIssue, Experiment, EventDefinition, ExceptionEntry, HogQLQueryResponse, ExperimentResults, Insight, EventProperty } from '../models/types';
 
 export class PostHogService {
     constructor(private readonly authService: AuthService) {}
+
+    private escapeHogQLString(value: string): string {
+        // Escape backslashes first, then single quotes for safe embedding in HogQL string literals
+        return value.replace(/\\/g, '\\\\').replace(/'/g, "''");
+    }
 
     private async request<T>(path: string, options?: { method?: string; body?: unknown }): Promise<T> {
         const apiKey = await this.authService.getApiKey();
@@ -54,14 +59,22 @@ export class PostHogService {
         return flags;
     }
 
-    async createFeatureFlag(projectId: number, key: string, name?: string): Promise<FeatureFlag> {
+    async createFeatureFlag(projectId: number, key: string, name?: string, active?: boolean): Promise<FeatureFlag> {
         return this.request<FeatureFlag>(`/api/projects/${projectId}/feature_flags/`, {
             method: 'POST',
             body: {
                 key,
                 name: name ?? key,
-                filters: {},
+                active: active ?? false,
+                filters: { groups: [{ properties: [], rollout_percentage: 100 }] },
             },
+        });
+    }
+
+    async updateFeatureFlag(projectId: number, flagId: number, patch: Record<string, unknown>): Promise<FeatureFlag> {
+        return this.request<FeatureFlag>(`/api/projects/${projectId}/feature_flags/${flagId}/`, {
+            method: 'PATCH',
+            body: patch,
         });
     }
 
@@ -154,5 +167,59 @@ export class PostHogService {
             `/api/projects/${projectId}/experiments/?limit=50`
         );
         return data.results;
+    }
+
+    async getInsights(projectId: number): Promise<Insight[]> {
+        const data = await this.request<PaginatedResponse<Insight>>(
+            `/api/projects/${projectId}/insights/?limit=50&saved=true`
+        );
+        return data.results;
+    }
+
+    async refreshInsight(projectId: number, insightId: number): Promise<Insight> {
+        return this.request<Insight>(
+            `/api/projects/${projectId}/insights/${insightId}/?refresh=blocking`
+        );
+    }
+
+    async getEventProperties(projectId: number, eventName: string): Promise<EventProperty[]> {
+        const encoded = encodeURIComponent(JSON.stringify([eventName]));
+        const data = await this.request<PaginatedResponse<EventProperty>>(
+            `/api/projects/${projectId}/property_definitions/?type=event&event_names=${encoded}&filter_by_event_names=true&limit=100`
+        );
+        return data.results;
+    }
+
+    async getPropertyValues(projectId: number, eventName: string, propertyName: string): Promise<{ value: string; count: number }[]> {
+        const safeEvent = this.escapeHogQLString(eventName);
+        const safeProp = this.escapeHogQLString(propertyName);
+        const query = `SELECT properties.'${safeProp}' as val, count() as cnt FROM events WHERE event = '${safeEvent}' AND properties.'${safeProp}' IS NOT NULL GROUP BY val ORDER BY cnt DESC LIMIT 20`;
+
+        try {
+            const data = await this.request<HogQLQueryResponse>(
+                `/api/environments/${projectId}/query/`,
+                { method: 'POST', body: { query: { kind: 'HogQLQuery', query } } },
+            );
+            return data.results
+                .filter(row => row[0] != null && String(row[0]).length > 0)
+                .map(row => ({ value: String(row[0]), count: row[1] as number }));
+        } catch {
+            return [];
+        }
+    }
+
+    async getExperimentResults(projectId: number, experimentId: number): Promise<ExperimentResults | null> {
+        // Try /api/projects/ first, then /api/environments/
+        for (const prefix of [`/api/projects/${projectId}`, `/api/environments/${projectId}`]) {
+            try {
+                const data = await this.request<{ metrics: ExperimentResults }>(
+                    `${prefix}/experiments/${experimentId}/results/`
+                );
+                return data.metrics;
+            } catch {
+                // Try next prefix
+            }
+        }
+        return null;
     }
 }

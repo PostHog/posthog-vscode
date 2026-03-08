@@ -3,7 +3,7 @@ import { getStyles } from './webview/styles';
 import { getLayout } from './webview/layout';
 import { getScript } from './webview/script';
 
-export function getWebviewHtml(webview: vscode.Webview, logoUri: vscode.Uri, initialAuth = false): string {
+export function getWebviewHtml(webview: vscode.Webview, logoUri: vscode.Uri): string {
     const nonce = getNonce();
 
     return /*html*/ `<!DOCTYPE html>
@@ -15,7 +15,7 @@ export function getWebviewHtml(webview: vscode.Webview, logoUri: vscode.Uri, ini
 <style nonce="${nonce}">${getStyles()}</style>
 </head>
 <body>
-${getLayout(logoUri, initialAuth)}
+${getLayout(logoUri)}
 <script nonce="${nonce}">${getScript()}</script>
 </body>
 </html>`;

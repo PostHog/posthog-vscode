@@ -60,6 +60,14 @@
       {
         "command": "codehog.createFlag",
         "title": "CodeHog: Create Feature Flag"
+      },
+      {
+        "command": "codehog.showFlagDetail",
+        "title": "CodeHog: Show Flag Detail"
+      },
+      {
+        "command": "codehog.showExperimentDetail",
+        "title": "CodeHog: Show Experiment Detail"
       }
     ]
   },

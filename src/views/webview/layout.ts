@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 
-export function getLayout(logoUri: vscode.Uri, initialAuth: boolean): string {
+export function getLayout(logoUri: vscode.Uri): string {
     return /*html*/ `
 <!-- Welcome screen (unauthenticated) -->
-<div id="welcome-screen" class="welcome" style="display:${initialAuth ? 'none' : ''};">
+<div id="welcome-screen" class="welcome" style="display:none;">
     <img src="${logoUri}" alt="PostHog" />
     <h2>Welcome to CodeHog</h2>
     <p>Your PostHog command center.<br>Connect your account to get started.</p>
@@ -11,7 +11,7 @@ export function getLayout(logoUri: vscode.Uri, initialAuth: boolean): string {
 </div>
 
 <!-- Main app (authenticated) -->
-<div id="main-app" style="display:${initialAuth ? '' : 'none'};">
+<div id="main-app" style="display:none;">
     <div class="header">
         <img src="${logoUri}" alt="PostHog" />
         <span class="title">CodeHog</span>
@@ -22,7 +22,8 @@ export function getLayout(logoUri: vscode.Uri, initialAuth: boolean): string {
     </div>
 
     <div class="nav">
-        <button class="nav-tab active" data-tab="flags">Flags</button>
+        <button class="nav-tab active" data-tab="analytics">Analytics</button>
+        <button class="nav-tab" data-tab="flags">Flags</button>
         <button class="nav-tab" data-tab="errors">Errors</button>
         <button class="nav-tab" data-tab="experiments">Experiments</button>
     </div>
@@ -32,8 +33,18 @@ export function getLayout(logoUri: vscode.Uri, initialAuth: boolean): string {
     </div>
 
     <div class="scroll-area">
+        <!-- Analytics -->
+        <div id="section-analytics" class="section active">
+            <div class="loading" id="analytics-loading">Loading insights...</div>
+            <div class="insight-grid" id="analytics-list" style="display:none;"></div>
+            <div class="empty-state" id="analytics-empty" style="display:none;">
+                <div class="icon">&#x1F4CA;</div>
+                <p>No saved insights found</p>
+            </div>
+        </div>
+
         <!-- Feature Flags -->
-        <div id="section-flags" class="section active">
+        <div id="section-flags" class="section">
             <div class="loading" id="flags-loading">Loading flags...</div>
             <div class="item-list" id="flags-list" style="display:none;"></div>
             <div class="empty-state" id="flags-empty" style="display:none;">

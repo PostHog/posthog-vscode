@@ -2,9 +2,11 @@ import * as vscode from 'vscode';
 import { AuthService } from '../services/authService';
 import { PostHogService } from '../services/postHogService';
 import { FlagCacheService } from '../services/flagCacheService';
+import { ExperimentCacheService } from '../services/experimentCacheService';
 import { StackFrame } from '../models/types';
 import { Commands } from '../constants';
 import { getWebviewHtml } from './getWebviewHtml';
+import { DetailPanelProvider } from './DetailPanelProvider';
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
     private view?: vscode.WebviewView;
@@ -14,6 +16,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         private readonly authService: AuthService,
         private readonly postHogService: PostHogService,
         private readonly flagCache: FlagCacheService,
+        private readonly experimentCache?: ExperimentCacheService,
+        private readonly detailPanel?: DetailPanelProvider,
     ) {}
 
     resolveWebviewView(webviewView: vscode.WebviewView) {
@@ -30,13 +34,55 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             vscode.Uri.joinPath(this.extensionUri, 'resources', 'icons', 'posthog-logo-white.svg')
         );
 
-        const initialAuth = this.authService.isAuthenticated();
-        webviewView.webview.html = getWebviewHtml(webviewView.webview, logoUri, initialAuth);
+        webviewView.webview.html = getWebviewHtml(webviewView.webview, logoUri);
         webviewView.webview.onDidReceiveMessage(msg => this.handleMessage(msg));
     }
 
     async refresh() {
         await this.sendAuthState();
+    }
+
+    async navigateToFlag(flagKey: string) {
+        if (this.detailPanel) {
+            const flag = this.flagCache.getFlag(flagKey);
+            if (flag) {
+                this.detailPanel.showFlag(flag);
+                return;
+            }
+            // Flag not in cache – fetch and try again
+            const projectId = this.authService.getProjectId();
+            if (projectId) {
+                const flags = await this.postHogService.getFeatureFlags(projectId);
+                this.flagCache.update(flags);
+                const found = this.flagCache.getFlag(flagKey);
+                if (found) { this.detailPanel.showFlag(found); return; }
+            }
+        }
+        // Fallback to sidebar navigation
+        await this.loadFlags();
+        this.postMessage({ type: 'navigateToFlag', key: flagKey });
+    }
+
+    async navigateToExperiment(flagKey: string) {
+        if (this.detailPanel && this.experimentCache) {
+            let exp = this.experimentCache.getByFlagKey(flagKey);
+            if (!exp) {
+                const projectId = this.authService.getProjectId();
+                if (projectId) {
+                    const exps = await this.postHogService.getExperiments(projectId);
+                    this.experimentCache.update(exps);
+                    exp = this.experimentCache.getByFlagKey(flagKey);
+                }
+            }
+            if (exp) {
+                const results = this.experimentCache.getResults(exp.id);
+                this.detailPanel.showExperiment(exp, results);
+                return;
+            }
+        }
+        // Fallback to sidebar navigation
+        await this.loadExperiments();
+        this.postMessage({ type: 'navigateToExperiment', flagKey });
     }
 
     // ── Message routing ──
@@ -77,6 +123,20 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                     filesToInclude: '',
                     filesToExclude: '**/node_modules/**',
                 });
+            case 'loadInsights':
+                return this.loadInsights();
+            case 'refreshInsight':
+                return this.refreshInsight(msg.insightId as number);
+            case 'updateFlag':
+                return this.updateFlag(msg.flagId as number, msg.active as boolean, msg.filters as Record<string, unknown>);
+            case 'openFlagPanel':
+                return this.openFlagPanel(msg.key as string);
+            case 'openErrorPanel':
+                return this.openErrorPanel(msg.id as string);
+            case 'openExperimentPanel':
+                return this.openExperimentPanel(msg.id as number);
+            case 'openInsightPanel':
+                return this.openInsightPanel(msg.id as number);
             case 'openExternal': {
                 const host = this.authService.getHost().replace(/\/+$/, '');
                 return vscode.env.openExternal(vscode.Uri.parse(`${host}${msg.path}`));
@@ -97,7 +157,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         }
         this.postMessage({ type: 'authState', authenticated: authed });
         if (authed) {
-            await this.loadFlags();
+            await this.loadInsights();
         }
     }
 
@@ -142,10 +202,129 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         this.postMessage({ type: 'loading', section: 'experiments' });
         try {
             const experiments = await this.postHogService.getExperiments(projectId);
-            this.postMessage({ type: 'experiments', data: experiments, projectId });
+            // Build results map from cache (prefetched on startup)
+            const resultsMap: Record<number, unknown> = {};
+            if (this.experimentCache) {
+                for (const exp of experiments) {
+                    const r = this.experimentCache.getResults(exp.id);
+                    if (r) { resultsMap[exp.id] = r; }
+                }
+            }
+            this.postMessage({ type: 'experiments', data: experiments, results: resultsMap, projectId });
         } catch {
             this.postMessage({ type: 'error', section: 'experiments', message: 'Failed to load experiments' });
         }
+    }
+
+    private async loadInsights() {
+        const projectId = this.authService.getProjectId();
+        if (!projectId) { return; }
+
+        this.postMessage({ type: 'loading', section: 'analytics' });
+        try {
+            const insights = await this.postHogService.getInsights(projectId);
+            this.insightsCache = insights;
+            // Send whatever we have immediately
+            this.postMessage({ type: 'insights', data: insights, projectId });
+
+            // Refresh insights that have no cached results
+            const stale = insights.filter(i => !i.result || i.result.length === 0);
+            if (stale.length > 0) {
+                const refreshed = await Promise.allSettled(
+                    stale.map(i => this.postHogService.refreshInsight(projectId, i.id))
+                );
+                let changed = false;
+                for (let idx = 0; idx < stale.length; idx++) {
+                    const r = refreshed[idx];
+                    if (r.status === 'fulfilled' && r.value.result) {
+                        const i = insights.findIndex(x => x.id === stale[idx].id);
+                        if (i >= 0) { insights[i] = r.value; changed = true; }
+                    }
+                }
+                if (changed) {
+                    this.postMessage({ type: 'insights', data: insights, projectId });
+                }
+            }
+        } catch {
+            this.postMessage({ type: 'error', section: 'analytics', message: 'Failed to load insights' });
+        }
+    }
+
+    private async refreshInsight(insightId: number) {
+        const projectId = this.authService.getProjectId();
+        if (!projectId) { return; }
+
+        try {
+            const insight = await this.postHogService.refreshInsight(projectId, insightId);
+            this.postMessage({ type: 'insightRefreshed', data: insight });
+        } catch {
+            vscode.window.showErrorMessage('Failed to refresh insight.');
+        }
+    }
+
+    // ── Flag update ──
+
+    private async updateFlag(flagId: number, active: boolean, filters: Record<string, unknown>) {
+        const projectId = this.authService.getProjectId();
+        if (!projectId) { return; }
+
+        try {
+            const updated = await this.postHogService.updateFeatureFlag(projectId, flagId, { active, filters });
+            // Refresh cache so inline decorations update
+            const flags = await this.postHogService.getFeatureFlags(projectId);
+            this.flagCache.update(flags);
+            this.postMessage({ type: 'flagUpdated', data: updated });
+        } catch (err) {
+            const detail = err instanceof Error ? err.message : String(err);
+            this.postMessage({ type: 'flagUpdateError', message: detail });
+        }
+    }
+
+    // ── Detail panels ──
+
+    private async openFlagPanel(key: string) {
+        if (!this.detailPanel) { return; }
+        const flag = this.flagCache.getFlag(key);
+        if (flag) { this.detailPanel.showFlag(flag); }
+    }
+
+    private async openErrorPanel(id: string) {
+        if (!this.detailPanel) { return; }
+        const projectId = this.authService.getProjectId();
+        if (!projectId) { return; }
+        try {
+            const issues = await this.postHogService.getErrorTrackingIssues(projectId);
+            const error = issues.find(e => e.id === id);
+            if (error) { this.detailPanel.showError(error); }
+        } catch { /* ignore */ }
+    }
+
+    private async openExperimentPanel(id: number) {
+        if (!this.detailPanel || !this.experimentCache) { return; }
+        const exps = this.experimentCache.getExperiments();
+        const exp = exps.find(e => e.id === id);
+        if (exp) {
+            const results = this.experimentCache.getResults(exp.id);
+            this.detailPanel.showExperiment(exp, results);
+        }
+    }
+
+    private async openInsightPanel(id: number) {
+        if (!this.detailPanel) { return; }
+        const ins = (await this.getCachedInsights())?.find(i => i.id === id);
+        if (ins) { this.detailPanel.showInsight(ins); }
+    }
+
+    private insightsCache: import('../models/types').Insight[] | null = null;
+
+    private async getCachedInsights() {
+        if (this.insightsCache) { return this.insightsCache; }
+        const projectId = this.authService.getProjectId();
+        if (!projectId) { return []; }
+        try {
+            this.insightsCache = await this.postHogService.getInsights(projectId);
+            return this.insightsCache;
+        } catch { return []; }
     }
 
     // ── Error navigation ──

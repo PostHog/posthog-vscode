@@ -13,9 +13,13 @@ export default function App() {
   // Track page views
   posthog.capture('$pageview');
 
+  posthog.capture('paid_bill')
+
   // Feature flag usage — test CodeHog autocomplete & decorations here
   const flag = posthog.getFeatureFlag('onboarding-reverse-proxy');
-  const enabled = posthog.isFeatureEnabled('onboarding-v2-demo');
+  const enabled = posthog.isFeatureEnabled('onboarding-v2');
+
+  const test = posthog.isFeatureEnabled('file-engagement-v2');
 
   const demos: Record<string, { label: string; description: string; component: React.ReactNode }> = {
     buggyCounter: {

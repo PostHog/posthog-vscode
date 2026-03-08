@@ -9,10 +9,13 @@ import { EventCompletionProvider } from './providers/eventCompletionProvider';
 import { FlagCodeActionProvider } from './providers/flagCodeActionProvider';
 import { FlagDecorationProvider } from './providers/flagDecorationProvider';
 import { EventDecorationProvider } from './providers/eventDecorationProvider';
+import { EventPropertyCompletionProvider } from './providers/eventPropertyCompletionProvider';
 import { ExperimentCacheService } from './services/experimentCacheService';
 import { registerAuthCommands } from './commands/authCommands';
+import { FlagLinkProvider } from './providers/flagLinkProvider';
 import { registerFeatureFlagCommands } from './commands/featureFlagCommands';
-import { Views, ContextKeys } from './constants';
+import { DetailPanelProvider } from './views/DetailPanelProvider';
+import { Views, Commands, ContextKeys } from './constants';
 
 const SUPPORTED_LANGUAGES = [
     'javascript',
@@ -28,12 +31,22 @@ export function activate(context: vscode.ExtensionContext) {
     const eventCache = new EventCacheService();
     const experimentCache = new ExperimentCacheService();
 
+    // Detail panels (full editor tabs)
+    const detailPanel = new DetailPanelProvider(
+        context.extensionUri,
+        authService,
+        postHogService,
+        flagCache,
+    );
+
     // Sidebar webview
     const sidebarProvider = new SidebarProvider(
         context.extensionUri,
         authService,
         postHogService,
         flagCache,
+        experimentCache,
+        detailPanel,
     );
 
     // Autocomplete, code actions & inline decorations
@@ -41,7 +54,9 @@ export function activate(context: vscode.ExtensionContext) {
     const eventCompletionProvider = new EventCompletionProvider(eventCache);
     const codeActionProvider = new FlagCodeActionProvider(flagCache);
     const flagDecorationProvider = new FlagDecorationProvider(flagCache, experimentCache);
+    const eventPropertyCompletionProvider = new EventPropertyCompletionProvider(eventCache, postHogService, authService);
     const eventDecorationProvider = new EventDecorationProvider(eventCache);
+    const flagLinkProvider = new FlagLinkProvider(flagCache, experimentCache);
     const languageSelector = SUPPORTED_LANGUAGES.map(lang => ({ language: lang, scheme: 'file' }));
 
     // Set initial auth context
@@ -59,7 +74,17 @@ export function activate(context: vscode.ExtensionContext) {
                 const volumes = await postHogService.getEventVolumes(projectId, names);
                 eventCache.updateVolumes(volumes);
             }).catch(() => {});
-            postHogService.getExperiments(projectId).then(exps => experimentCache.update(exps)).catch(() => {});
+            postHogService.getExperiments(projectId).then(async exps => {
+                experimentCache.update(exps);
+                // Prefetch results for running/completed experiments
+                const active = exps.filter(e => e.start_date);
+                await Promise.allSettled(
+                    active.map(async e => {
+                        const results = await postHogService.getExperimentResults(projectId, e.id);
+                        if (results) { experimentCache.updateResults(e.id, results); }
+                    })
+                );
+            }).catch(() => {});
         }
     }
 
@@ -67,11 +92,30 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.registerWebviewViewProvider(Views.SIDEBAR, sidebarProvider),
         vscode.languages.registerCompletionItemProvider(languageSelector, completionProvider, "'", '"', '`'),
         vscode.languages.registerCompletionItemProvider(languageSelector, eventCompletionProvider, "'", '"', '`'),
+        vscode.languages.registerCompletionItemProvider(languageSelector, eventPropertyCompletionProvider, "'", '"', '`', '{', ',', ' '),
         vscode.languages.registerCodeActionsProvider(languageSelector, codeActionProvider, {
             providedCodeActionKinds: FlagCodeActionProvider.providedCodeActionKinds,
         }),
+        vscode.languages.registerDocumentLinkProvider(languageSelector, flagLinkProvider),
+        vscode.commands.registerCommand(Commands.SHOW_FLAG_DETAIL, async (flagKey: string) => {
+            const flag = flagCache.getFlag(flagKey);
+            if (flag) {
+                detailPanel.showFlag(flag);
+            } else {
+                sidebarProvider.navigateToFlag(flagKey);
+            }
+        }),
+        vscode.commands.registerCommand(Commands.SHOW_EXPERIMENT_DETAIL, async (flagKey: string) => {
+            const exp = experimentCache.getByFlagKey(flagKey);
+            if (exp) {
+                const results = experimentCache.getResults(exp.id);
+                detailPanel.showExperiment(exp, results);
+            } else {
+                sidebarProvider.navigateToExperiment(flagKey);
+            }
+        }),
         ...registerAuthCommands(authService, postHogService, sidebarProvider),
-        ...registerFeatureFlagCommands(authService, postHogService, sidebarProvider),
+        ...registerFeatureFlagCommands(authService, postHogService, sidebarProvider, flagCache),
         ...flagDecorationProvider.register(),
         ...eventDecorationProvider.register(),
     );

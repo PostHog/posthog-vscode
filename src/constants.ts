@@ -6,6 +6,8 @@ export const Commands = {
     COPY_FLAG_KEY: 'codehog.copyFlagKey',
     OPEN_FLAG_IN_BROWSER: 'codehog.openFlagInBrowser',
     CREATE_FLAG: 'codehog.createFlag',
+    SHOW_FLAG_DETAIL: 'codehog.showFlagDetail',
+    SHOW_EXPERIMENT_DETAIL: 'codehog.showExperimentDetail',
 } as const;
 
 export const Views = {

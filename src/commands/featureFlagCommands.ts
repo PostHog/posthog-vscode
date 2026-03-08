@@ -1,14 +1,19 @@
 import * as vscode from 'vscode';
 import { AuthService } from '../services/authService';
 import { PostHogService } from '../services/postHogService';
+import { FlagCacheService } from '../services/flagCacheService';
 import { Commands } from '../constants';
 
-interface Refreshable { refresh(): void; }
+interface Refreshable {
+    refresh(): void;
+    navigateToFlag(flagKey: string): void;
+}
 
 export function registerFeatureFlagCommands(
     authService: AuthService,
     postHogService: PostHogService,
-    sidebar: Refreshable
+    sidebar: Refreshable,
+    flagCache?: FlagCacheService,
 ): vscode.Disposable[] {
     const refresh = vscode.commands.registerCommand(Commands.REFRESH_FEATURE_FLAGS, () => {
         sidebar.refresh();
@@ -47,12 +52,34 @@ export function registerFeatureFlagCommands(
             return;
         }
 
+        const name = await vscode.window.showInputBox({
+            prompt: 'Display name for this flag',
+            value: key.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+            placeHolder: 'My New Flag',
+        });
+        if (name === undefined) { return; }
+
+        const activeChoice = await vscode.window.showQuickPick(
+            [
+                { label: '$(circle-slash) Inactive', description: 'Create as inactive (default)', value: false },
+                { label: '$(pass) Active', description: 'Enable immediately for all users', value: true },
+            ],
+            { placeHolder: 'Should the flag be active right away?' },
+        );
+        if (!activeChoice) { return; }
+
         try {
-            const flag = await postHogService.createFeatureFlag(projectId, key);
-            sidebar.refresh();
+            const flag = await postHogService.createFeatureFlag(projectId, key, name || key, activeChoice.value);
+            // Refresh the flag cache so decorations & code actions update immediately
+            if (flagCache) {
+                const flags = await postHogService.getFeatureFlags(projectId);
+                flagCache.update(flags);
+            }
+            sidebar.navigateToFlag(flag.key);
             vscode.window.showInformationMessage(`CodeHog: Created feature flag "${flag.key}"`);
-        } catch {
-            vscode.window.showErrorMessage(`CodeHog: Failed to create feature flag "${key}".`);
+        } catch (err) {
+            const detail = err instanceof Error ? err.message : String(err);
+            vscode.window.showErrorMessage(`CodeHog: Failed to create flag "${key}": ${detail}`);
         }
     });
 

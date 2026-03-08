@@ -1,8 +1,10 @@
-import { EventDefinition } from '../models/types';
+import { EventDefinition, EventProperty } from '../models/types';
 
 export class EventCacheService {
     private events: EventDefinition[] = [];
     private volumes: Map<string, { count: number; days: number }> = new Map();
+    private properties: Map<string, EventProperty[]> = new Map();
+    private propertyValues: Map<string, { value: string; count: number }[]> = new Map();
     private listeners: Array<() => void> = [];
 
     getEvents(): EventDefinition[] {
@@ -33,6 +35,22 @@ export class EventCacheService {
 
     onChange(listener: () => void): void {
         this.listeners.push(listener);
+    }
+
+    getProperties(eventName: string): EventProperty[] | undefined {
+        return this.properties.get(eventName);
+    }
+
+    setProperties(eventName: string, props: EventProperty[]): void {
+        this.properties.set(eventName, props);
+    }
+
+    getPropertyValues(eventName: string, propertyName: string): { value: string; count: number }[] | undefined {
+        return this.propertyValues.get(`${eventName}::${propertyName}`);
+    }
+
+    setPropertyValues(eventName: string, propertyName: string, values: { value: string; count: number }[]): void {
+        this.propertyValues.set(`${eventName}::${propertyName}`, values);
     }
 
     private notify(): void {

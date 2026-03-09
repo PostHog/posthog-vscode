@@ -227,7 +227,7 @@ export class PostHogService {
         const result = new Map<string, number[]>();
         if (eventNames.length === 0) { return result; }
 
-        const escaped = eventNames.map(n => `'${n.replace(/'/g, "\\'")}'`).join(', ');
+        const escaped = eventNames.map(n => `'${this.escapeHogQLString(n)}'`).join(', ');
         const query = `SELECT event, toDate(timestamp) as day, count() as cnt FROM events WHERE event IN (${escaped}) AND timestamp >= toDate(now()) - INTERVAL 6 DAY GROUP BY event, day ORDER BY event, day`;
 
         try {

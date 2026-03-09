@@ -63,7 +63,7 @@ export function registerAuthCommands(
         try {
             const projects = await postHogService.getProjects();
             if (projects.length === 0) {
-                vscode.window.showErrorMessage('CodeHog: No projects found for this API key.');
+                vscode.window.showErrorMessage('PostHog: No projects found for this API key.');
                 await authService.deleteApiKey();
                 return;
             }
@@ -87,9 +87,9 @@ export function registerAuthCommands(
             await authService.setAuthenticated(true);
             await vscode.commands.executeCommand('setContext', ContextKeys.IS_AUTHENTICATED, true);
             sidebar.refresh();
-            vscode.window.showInformationMessage(`CodeHog: Signed in to ${selectedProject.name}`);
+            vscode.window.showInformationMessage(`PostHog: Signed in to ${selectedProject.name}`);
         } catch {
-            vscode.window.showErrorMessage('CodeHog: Failed to connect. Check your API key and host.');
+            vscode.window.showErrorMessage('PostHog: Failed to connect. Check your API key and host.');
             await authService.deleteApiKey();
         }
     });
@@ -100,7 +100,7 @@ export function registerAuthCommands(
         await authService.setAuthenticated(false);
         await vscode.commands.executeCommand('setContext', ContextKeys.IS_AUTHENTICATED, false);
         sidebar.refresh();
-        vscode.window.showInformationMessage('CodeHog: Signed out.');
+        vscode.window.showInformationMessage('PostHog: Signed out.');
     });
 
     const selectProject = vscode.commands.registerCommand(Commands.SELECT_PROJECT, async () => {
@@ -115,9 +115,9 @@ export function registerAuthCommands(
             }
             await authService.setProjectId(pick.project.id);
             sidebar.refresh();
-            vscode.window.showInformationMessage(`CodeHog: Switched to ${pick.label}`);
+            vscode.window.showInformationMessage(`PostHog: Switched to ${pick.label}`);
         } catch {
-            vscode.window.showErrorMessage('CodeHog: Failed to fetch projects.');
+            vscode.window.showErrorMessage('PostHog: Failed to fetch projects.');
         }
     });
 

@@ -45,10 +45,10 @@ export class FlagLinkProvider implements vscode.DocumentLinkProvider {
                 let tooltip: string;
                 if (experiment) {
                     command = Commands.SHOW_EXPERIMENT_DETAIL;
-                    tooltip = `Open experiment "${experiment.name}" in CodeHog`;
+                    tooltip = `Open experiment "${experiment.name}" in PostHog`;
                 } else if (exists) {
                     command = Commands.SHOW_FLAG_DETAIL;
-                    tooltip = `Open "${flagKey}" in CodeHog`;
+                    tooltip = `Open "${flagKey}" in PostHog`;
                 } else {
                     command = Commands.CREATE_FLAG;
                     tooltip = `Create "${flagKey}" in PostHog`;

@@ -3,6 +3,7 @@ import { EventDefinition, EventProperty } from '../models/types';
 export class EventCacheService {
     private events: EventDefinition[] = [];
     private volumes: Map<string, { count: number; days: number }> = new Map();
+    private sparklines: Map<string, number[]> = new Map();
     private properties: Map<string, EventProperty[]> = new Map();
     private propertyValues: Map<string, { value: string; count: number }[]> = new Map();
     private listeners: Array<() => void> = [];
@@ -21,6 +22,15 @@ export class EventCacheService {
 
     getVolume(name: string): { count: number; days: number } | undefined {
         return this.volumes.get(name);
+    }
+
+    getSparkline(name: string): number[] | undefined {
+        return this.sparklines.get(name);
+    }
+
+    updateSparklines(sparklines: Map<string, number[]>): void {
+        this.sparklines = sparklines;
+        this.notify();
     }
 
     update(events: EventDefinition[]): void {

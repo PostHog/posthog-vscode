@@ -40,7 +40,7 @@ export function registerFeatureFlagCommands(
     const createFlag = vscode.commands.registerCommand(Commands.CREATE_FLAG, async (flagKey?: string) => {
         const projectId = authService.getProjectId();
         if (!projectId) {
-            vscode.window.showErrorMessage('CodeHog: Please sign in first.');
+            vscode.window.showErrorMessage('PostHog: Please sign in first.');
             return;
         }
 
@@ -76,10 +76,10 @@ export function registerFeatureFlagCommands(
                 flagCache.update(flags);
             }
             sidebar.navigateToFlag(flag.key);
-            vscode.window.showInformationMessage(`CodeHog: Created feature flag "${flag.key}"`);
+            vscode.window.showInformationMessage(`PostHog: Created feature flag "${flag.key}"`);
         } catch (err) {
             const detail = err instanceof Error ? err.message : String(err);
-            vscode.window.showErrorMessage(`CodeHog: Failed to create flag "${key}": ${detail}`);
+            vscode.window.showErrorMessage(`PostHog: Failed to create flag "${key}": ${detail}`);
         }
     });
 

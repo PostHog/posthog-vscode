@@ -2,11 +2,18 @@ import * as vscode from 'vscode';
 import { EventCacheService } from '../services/eventCacheService';
 
 const CAPTURE_PATTERN = /(?:posthog|client|ph)\.capture\s*\(\s*(['"`])([^'"`]+)\1/g;
+const SPARK_CHARS = '▁▂▃▄▅▆▇█';
 
 function formatCount(n: number): string {
     if (n >= 1_000_000) { return `${(n / 1_000_000).toFixed(1)}M`; }
     if (n >= 1_000) { return `${(n / 1_000).toFixed(1)}K`; }
     return String(n);
+}
+
+function buildSparkline(counts: number[]): string {
+    const max = Math.max(...counts);
+    if (max === 0) { return SPARK_CHARS[0].repeat(counts.length); }
+    return counts.map(v => SPARK_CHARS[Math.min(7, Math.floor((v / max) * 7.99))]).join('');
 }
 
 export class EventDecorationProvider {
@@ -67,7 +74,9 @@ export class EventDecorationProvider {
                 let color: string;
 
                 if (volume && volume.count > 0) {
-                    text = `${formatCount(volume.count)} events in last ${volume.days}d`;
+                    const sparkline = this.eventCache.getSparkline(eventName);
+                    const spark = sparkline ? `${buildSparkline(sparkline)} ` : '';
+                    text = `${spark}${formatCount(volume.count)} in ${volume.days}d`;
                     color = '#4CBB17';
                 } else if (event) {
                     const lastSeen = event.last_seen_at;

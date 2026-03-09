@@ -61,7 +61,7 @@ export class DetailPanelProvider {
         }
 
         const panel = vscode.window.createWebviewPanel(
-            'codehog.detail',
+            'posthog.detail',
             `${title}`,
             vscode.ViewColumn.One,
             {
@@ -71,7 +71,7 @@ export class DetailPanelProvider {
             },
         );
 
-        const iconPath = vscode.Uri.joinPath(this.extensionUri, 'resources', 'icons', 'codehog.svg');
+        const iconPath = vscode.Uri.joinPath(this.extensionUri, 'resources', 'icons', 'posthog.svg');
         panel.iconPath = iconPath;
 
         this.panels.set(id, panel);

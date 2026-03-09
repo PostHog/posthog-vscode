@@ -1,0 +1,2 @@
+SELECT count()
+FROM events WHERE timestamp > now() - INTERVAL 12 DAY

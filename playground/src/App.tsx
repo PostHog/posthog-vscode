@@ -10,17 +10,6 @@ import { ErrorBoundary } from './errors/ErrorBoundary';
 export default function App() {
   const [activeDemo, setActiveDemo] = useState<string | null>(null);
 
-  // Track page views
-  posthog.capture('$pageview');
-
-  posthog.capture('paid_bill')
-
-  // Feature flag usage — test CodeHog autocomplete & decorations here
-  const flag = posthog.getFeatureFlag('onboarding-reverse-proxy');
-  const enabled = posthog.isFeatureEnabled('onboarding-v2');
-
-  const test = posthog.isFeatureEnabled('file-engagement-v2');
-
   const demos: Record<string, { label: string; description: string; component: React.ReactNode }> = {
     buggyCounter: {
       label: 'Render Crash',
@@ -52,7 +41,7 @@ export default function App() {
   return (
     <div style={styles.app}>
       <header style={styles.header}>
-        <h1 style={styles.title}>CodeHog Playground</h1>
+        <h1 style={styles.title}>PostHog Playground</h1>
         <p style={styles.subtitle}>
           Click a scenario below to trigger exceptions that PostHog will capture.
         </p>
@@ -172,3 +161,5 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center',
   },
 };
+
+

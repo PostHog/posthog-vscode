@@ -17,57 +17,128 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "codehog-explorer",
-          "title": "CodeHog",
+          "id": "posthog-explorer",
+          "title": "PostHog",
           "icon": "resources/icons/codehog.svg"
         }
       ]
     },
     "views": {
-      "codehog-explorer": [
+      "posthog-explorer": [
         {
           "type": "webview",
-          "id": "codehog-sidebar",
-          "name": "CodeHog"
+          "id": "posthog-sidebar",
+          "name": "PostHog"
+        },
+        {
+          "id": "posthog-stale-flags",
+          "name": "Stale Flags",
+          "when": "posthog.isAuthenticated"
         }
       ]
     },
     "commands": [
       {
-        "command": "codehog.signIn",
-        "title": "CodeHog: Sign In to PostHog"
+        "command": "posthog.signIn",
+        "title": "PostHog: Sign In"
       },
       {
-        "command": "codehog.signOut",
-        "title": "CodeHog: Sign Out"
+        "command": "posthog.signOut",
+        "title": "PostHog: Sign Out"
       },
       {
-        "command": "codehog.selectProject",
-        "title": "CodeHog: Select Project"
+        "command": "posthog.selectProject",
+        "title": "PostHog: Select Project"
       },
       {
-        "command": "codehog.refreshFeatureFlags",
-        "title": "CodeHog: Refresh Feature Flags"
+        "command": "posthog.refreshFeatureFlags",
+        "title": "PostHog: Refresh Feature Flags"
       },
       {
-        "command": "codehog.copyFlagKey",
-        "title": "CodeHog: Copy Flag Key"
+        "command": "posthog.copyFlagKey",
+        "title": "PostHog: Copy Flag Key"
       },
       {
-        "command": "codehog.openFlagInBrowser",
-        "title": "CodeHog: Open in PostHog"
+        "command": "posthog.openFlagInBrowser",
+        "title": "PostHog: Open in PostHog"
       },
       {
-        "command": "codehog.createFlag",
-        "title": "CodeHog: Create Feature Flag"
+        "command": "posthog.createFlag",
+        "title": "PostHog: Create Feature Flag"
       },
       {
-        "command": "codehog.showFlagDetail",
-        "title": "CodeHog: Show Flag Detail"
+        "command": "posthog.showFlagDetail",
+        "title": "PostHog: Show Flag Detail"
       },
       {
-        "command": "codehog.showExperimentDetail",
-        "title": "CodeHog: Show Experiment Detail"
+        "command": "posthog.showExperimentDetail",
+        "title": "PostHog: Show Experiment Detail"
+      },
+      {
+        "command": "posthog.openHogQLEditor",
+        "title": "PostHog: Open HogQL Editor",
+        "icon": "$(play)"
+      },
+      {
+        "command": "posthog.runHogQLFile",
+        "title": "PostHog: Run HogQL File",
+        "icon": "$(play)"
+      },
+      {
+        "command": "posthog.scanStaleFlags",
+        "title": "PostHog: Scan for Stale Flags",
+        "icon": "$(search)"
+      },
+      {
+        "command": "posthog.cleanupStaleFlag",
+        "title": "PostHog: Clean Up Stale Flag",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "posthog.insertCapture",
+        "title": "PostHog: Track Function with PostHog"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "posthog.runHogQLFile",
+          "when": "resourceLangId == hogql",
+          "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "posthog.scanStaleFlags",
+          "when": "view == posthog-stale-flags",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "posthog.cleanupStaleFlag",
+          "when": "view == posthog-stale-flags && viewItem == staleFlag",
+          "group": "inline"
+        }
+      ]
+    },
+    "languages": [
+      {
+        "id": "hogql",
+        "aliases": ["HogQL", "hogql"],
+        "extensions": [".hogql"],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./resources/icons/codehog.svg",
+          "dark": "./resources/icons/codehog.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "hogql",
+        "scopeName": "source.hogql",
+        "path": "./syntaxes/hogql.tmLanguage.json"
       }
     ]
   },

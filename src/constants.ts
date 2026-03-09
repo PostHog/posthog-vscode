@@ -1,28 +1,34 @@
 export const Commands = {
-    SIGN_IN: 'codehog.signIn',
-    SIGN_OUT: 'codehog.signOut',
-    SELECT_PROJECT: 'codehog.selectProject',
-    REFRESH_FEATURE_FLAGS: 'codehog.refreshFeatureFlags',
-    COPY_FLAG_KEY: 'codehog.copyFlagKey',
-    OPEN_FLAG_IN_BROWSER: 'codehog.openFlagInBrowser',
-    CREATE_FLAG: 'codehog.createFlag',
-    SHOW_FLAG_DETAIL: 'codehog.showFlagDetail',
-    SHOW_EXPERIMENT_DETAIL: 'codehog.showExperimentDetail',
+    SIGN_IN: 'posthog.signIn',
+    SIGN_OUT: 'posthog.signOut',
+    SELECT_PROJECT: 'posthog.selectProject',
+    REFRESH_FEATURE_FLAGS: 'posthog.refreshFeatureFlags',
+    COPY_FLAG_KEY: 'posthog.copyFlagKey',
+    OPEN_FLAG_IN_BROWSER: 'posthog.openFlagInBrowser',
+    CREATE_FLAG: 'posthog.createFlag',
+    SHOW_FLAG_DETAIL: 'posthog.showFlagDetail',
+    SHOW_EXPERIMENT_DETAIL: 'posthog.showExperimentDetail',
+    OPEN_HOGQL_EDITOR: 'posthog.openHogQLEditor',
+    RUN_HOGQL_FILE: 'posthog.runHogQLFile',
+    SCAN_STALE_FLAGS: 'posthog.scanStaleFlags',
+    CLEANUP_STALE_FLAG: 'posthog.cleanupStaleFlag',
+    INSERT_CAPTURE: 'posthog.insertCapture',
 } as const;
 
 export const Views = {
-    SIDEBAR: 'codehog-sidebar',
+    SIDEBAR: 'posthog-sidebar',
+    STALE_FLAGS: 'posthog-stale-flags',
 } as const;
 
 export const ContextKeys = {
-    IS_AUTHENTICATED: 'codehog.isAuthenticated',
+    IS_AUTHENTICATED: 'posthog.isAuthenticated',
 } as const;
 
 export const StorageKeys = {
-    API_KEY: 'codehog.apiKey',
-    HOST: 'codehog.host',
-    PROJECT_ID: 'codehog.projectId',
-    IS_AUTHENTICATED: 'codehog.isAuthenticated',
+    API_KEY: 'posthog.apiKey',
+    HOST: 'posthog.host',
+    PROJECT_ID: 'posthog.projectId',
+    IS_AUTHENTICATED: 'posthog.isAuthenticated',
 } as const;
 
 export const Defaults = {

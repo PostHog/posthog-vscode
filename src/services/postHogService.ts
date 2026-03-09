@@ -222,4 +222,52 @@ export class PostHogService {
         }
         return null;
     }
+
+    async getEventSparklines(projectId: number, eventNames: string[]): Promise<Map<string, number[]>> {
+        const result = new Map<string, number[]>();
+        if (eventNames.length === 0) { return result; }
+
+        const escaped = eventNames.map(n => `'${this.escapeHogQLString(n)}'`).join(', ');
+        const query = `SELECT event, toDate(timestamp) as day, count() as cnt FROM events WHERE event IN (${escaped}) AND timestamp >= toDate(now()) - INTERVAL 6 DAY GROUP BY event, day ORDER BY event, day`;
+
+        try {
+            const data = await this.request<HogQLQueryResponse>(
+                `/api/environments/${projectId}/query/`,
+                { method: 'POST', body: { query: { kind: 'HogQLQuery', query } } },
+            );
+
+            // Build date index for the last 7 days
+            const today = new Date();
+            const days: string[] = [];
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date(today);
+                d.setDate(d.getDate() - i);
+                days.push(d.toISOString().slice(0, 10));
+            }
+
+            const byEvent = new Map<string, Map<string, number>>();
+            for (const row of data.results) {
+                const name = row[0] as string;
+                const day = String(row[1]).slice(0, 10);
+                const count = row[2] as number;
+                if (!byEvent.has(name)) { byEvent.set(name, new Map()); }
+                byEvent.get(name)!.set(day, count);
+            }
+
+            for (const [name, dayCounts] of byEvent) {
+                result.set(name, days.map(d => dayCounts.get(d) || 0));
+            }
+        } catch {
+            // Silently fail
+        }
+
+        return result;
+    }
+
+    async runHogQLQuery(projectId: number, query: string): Promise<HogQLQueryResponse> {
+        return this.request<HogQLQueryResponse>(
+            `/api/environments/${projectId}/query/`,
+            { method: 'POST', body: { query: { kind: 'HogQLQuery', query } } },
+        );
+    }
 }

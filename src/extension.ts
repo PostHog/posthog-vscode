@@ -14,7 +14,13 @@ import { ExperimentCacheService } from './services/experimentCacheService';
 import { registerAuthCommands } from './commands/authCommands';
 import { FlagLinkProvider } from './providers/flagLinkProvider';
 import { registerFeatureFlagCommands } from './commands/featureFlagCommands';
+import { registerStaleFlagCommands } from './commands/staleFlagCommands';
+import { CaptureCodeActionProvider, registerCaptureCommands } from './providers/captureCodeActionProvider';
+import { StaleFlagService } from './services/staleFlagService';
+import { StaleFlagTreeProvider } from './providers/staleFlagTreeProvider';
 import { DetailPanelProvider } from './views/DetailPanelProvider';
+import { HogQLEditorProvider } from './views/HogQLEditorProvider';
+import { VariantHighlightProvider } from './providers/variantHighlightProvider';
 import { Views, Commands, ContextKeys } from './constants';
 
 const SUPPORTED_LANGUAGES = [
@@ -30,6 +36,9 @@ export function activate(context: vscode.ExtensionContext) {
     const flagCache = new FlagCacheService();
     const eventCache = new EventCacheService();
     const experimentCache = new ExperimentCacheService();
+
+    // HogQL editor
+    const hogqlEditor = new HogQLEditorProvider(context.extensionUri, authService, postHogService);
 
     // Detail panels (full editor tabs)
     const detailPanel = new DetailPanelProvider(
@@ -56,7 +65,11 @@ export function activate(context: vscode.ExtensionContext) {
     const flagDecorationProvider = new FlagDecorationProvider(flagCache, experimentCache);
     const eventPropertyCompletionProvider = new EventPropertyCompletionProvider(eventCache, postHogService, authService);
     const eventDecorationProvider = new EventDecorationProvider(eventCache);
+    const variantHighlightProvider = new VariantHighlightProvider(flagCache, experimentCache);
     const flagLinkProvider = new FlagLinkProvider(flagCache, experimentCache);
+    const captureCodeActionProvider = new CaptureCodeActionProvider();
+    const staleFlagService = new StaleFlagService(flagCache, experimentCache);
+    const staleFlagTreeProvider = new StaleFlagTreeProvider(staleFlagService);
     const languageSelector = SUPPORTED_LANGUAGES.map(lang => ({ language: lang, scheme: 'file' }));
 
     // Set initial auth context
@@ -71,8 +84,12 @@ export function activate(context: vscode.ExtensionContext) {
             postHogService.getEventDefinitions(projectId).then(async events => {
                 eventCache.update(events);
                 const names = events.filter(e => !e.hidden && !e.name.startsWith('$')).map(e => e.name);
-                const volumes = await postHogService.getEventVolumes(projectId, names);
+                const [volumes, sparklines] = await Promise.all([
+                    postHogService.getEventVolumes(projectId, names),
+                    postHogService.getEventSparklines(projectId, names),
+                ]);
                 eventCache.updateVolumes(volumes);
+                eventCache.updateSparklines(sparklines);
             }).catch(() => {});
             postHogService.getExperiments(projectId).then(async exps => {
                 experimentCache.update(exps);
@@ -114,10 +131,22 @@ export function activate(context: vscode.ExtensionContext) {
                 sidebarProvider.navigateToExperiment(flagKey);
             }
         }),
+        vscode.languages.registerCodeActionsProvider(languageSelector, captureCodeActionProvider, {
+            providedCodeActionKinds: CaptureCodeActionProvider.providedCodeActionKinds,
+        }),
+        vscode.window.registerTreeDataProvider(Views.STALE_FLAGS, staleFlagTreeProvider),
         ...registerAuthCommands(authService, postHogService, sidebarProvider),
         ...registerFeatureFlagCommands(authService, postHogService, sidebarProvider, flagCache),
+        ...registerStaleFlagCommands(staleFlagService),
+        ...registerCaptureCommands(),
+        vscode.commands.registerCommand(Commands.OPEN_HOGQL_EDITOR, () => hogqlEditor.open()),
+        vscode.commands.registerCommand(Commands.RUN_HOGQL_FILE, () => {
+            const editor = vscode.window.activeTextEditor;
+            if (editor) { hogqlEditor.runFile(editor.document); }
+        }),
         ...flagDecorationProvider.register(),
         ...eventDecorationProvider.register(),
+        ...variantHighlightProvider.register(),
     );
 }
 

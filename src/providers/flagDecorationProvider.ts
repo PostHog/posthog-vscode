@@ -132,6 +132,22 @@ export class FlagDecorationProvider {
         }
 
         if (experiment) {
+            const results = this.experimentCache.getResults(experiment.id);
+            if (results?.primary?.results?.[0]?.data?.variant_results?.length) {
+                const variants = results.primary.results[0].data.variant_results;
+                const leader = variants.reduce((best, v) => v.chance_to_win > best.chance_to_win ? v : best);
+                const winPct = Math.round(leader.chance_to_win * 100);
+
+                if (experiment.end_date) {
+                    if (experiment.conclusion === 'won') {
+                        return { text: `⚗ won · ${leader.key} ${winPct}%`, color: '#4CBB17' };
+                    }
+                    return { text: `⚗ complete · ${leader.key} ${winPct}%`, color: '#1D4AFF' };
+                } else if (experiment.start_date) {
+                    return { text: `⚗ ${leader.key} leading ${winPct}%`, color: '#1D4AFF' };
+                }
+            }
+
             let expStatus: string;
             if (experiment.end_date) { expStatus = 'complete'; }
             else if (experiment.start_date) { expStatus = 'running'; }

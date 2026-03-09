@@ -5,7 +5,7 @@ export function getLayout(logoUri: vscode.Uri): string {
 <!-- Welcome screen (unauthenticated) -->
 <div id="welcome-screen" class="welcome" style="display:none;">
     <img src="${logoUri}" alt="PostHog" />
-    <h2>Welcome to CodeHog</h2>
+    <h2>Welcome to PostHog</h2>
     <p>Your PostHog command center.<br>Connect your account to get started.</p>
     <button class="sign-in-btn" id="btn-sign-in">Sign In with API Key</button>
 </div>
@@ -14,7 +14,7 @@ export function getLayout(logoUri: vscode.Uri): string {
 <div id="main-app" style="display:none;">
     <div class="header">
         <img src="${logoUri}" alt="PostHog" />
-        <span class="title">CodeHog</span>
+        <span class="title">PostHog</span>
         <div class="actions">
             <button id="btn-select-project" title="Switch project">&#x21C5;</button>
             <button id="btn-sign-out" title="Sign out">&#x23FB;</button>

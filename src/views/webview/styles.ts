@@ -62,16 +62,18 @@ html { height: 100vh; overflow: hidden; }
 /* ── Nav tabs ── */
 .nav {
     display: flex;
-    padding: 8px 12px 0;
-    gap: 2px;
+    padding: 8px 8px 0;
+    gap: 0;
     border-bottom: 1px solid var(--vscode-panel-border);
 }
 .nav-tab {
-    padding: 7px 12px;
-    font-size: 11px;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 7px 4px;
+    font-size: 10px;
     font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
     background: none;
     border: none;
     border-bottom: 2px solid transparent;
@@ -79,6 +81,10 @@ html { height: 100vh; overflow: hidden; }
     opacity: 0.55;
     cursor: pointer;
     transition: opacity 0.15s, border-color 0.15s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
 }
 .nav-tab:hover { opacity: 0.85; }
 .nav-tab.active {

@@ -1,14 +1,24 @@
 .vscode/**
 .vscode-test/**
 out/**
-node_modules/**
 src/**
+scripts/**
+grammars/**
+playground/**
 .gitignore
 .yarnrc
 webpack.config.js
 vsc-extension-quickstart.md
+pnpm-lock.yaml
+token.txt
 **/tsconfig.json
 **/eslint.config.mjs
 **/*.map
 **/*.ts
 **/.vscode-test.*
+
+# Exclude all node_modules
+node_modules/**
+
+# Include WASM grammars
+!wasm/**

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="resources/icons/codehog.svg" width="80" alt="CodeHog" />
+  <img src="resources/icons/posthog.png" width="400" alt="PostHog" />
 </p>
 
 <h1 align="center">PostHog for VS Code</h1>

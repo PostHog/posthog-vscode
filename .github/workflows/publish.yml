@@ -57,9 +57,10 @@ jobs:
           # Bump version locally (no commit to avoid branch protection issues)
           npm version "$NEW_VERSION" --no-git-tag-version
 
-          # Create tag via GitHub API (bypasses branch protection)
+          # Create or update tag via GitHub API (bypasses branch protection)
           SHA=$(git rev-parse HEAD)
-          gh api repos/${{ github.repository }}/git/refs -f ref="refs/tags/v${NEW_VERSION}" -f sha="$SHA"
+          gh api repos/${{ github.repository }}/git/refs -f ref="refs/tags/v${NEW_VERSION}" -f sha="$SHA" 2>/dev/null \
+            || gh api repos/${{ github.repository }}/git/refs/tags/v${NEW_VERSION} -X PATCH -f sha="$SHA"
 
           echo "Bumped $CURRENT_VERSION → $NEW_VERSION ($BUMP)"
 
@@ -67,6 +68,6 @@ jobs:
 
       - run: pnpm run fetch-grammars
 
-      - run: pnpm dlx @vscode/vsce publish --no-dependencies
+      - run: pnpm dlx @vscode/vsce publish --no-dependencies -p "$VSCE_PAT"
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}

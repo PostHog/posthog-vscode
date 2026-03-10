@@ -22,6 +22,10 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - uses: mymindstorm/setup-emsdk@v14
+
+      - run: pnpm run fetch-grammars
+
       - run: pnpm dlx @vscode/vsce publish --no-dependencies --packageManager pnpm
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}

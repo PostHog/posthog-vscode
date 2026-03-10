@@ -4,3 +4,6 @@ node_modules
 .vscode-test/
 *.vsix
 token.txt
+wasm/
+grammars/
+.grammar-build/

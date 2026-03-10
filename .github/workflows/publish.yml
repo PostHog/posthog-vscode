@@ -1,0 +1,27 @@
+name: Publish Extension
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm dlx @vscode/vsce publish --no-dependencies --packageManager pnpm
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}

@@ -67,6 +67,6 @@ jobs:
 
       - run: pnpm run fetch-grammars
 
-      - run: pnpm dlx @vscode/vsce publish --no-dependencies
+      - run: pnpm dlx @vscode/vsce publish --no-dependencies -p "$VSCE_PAT"
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}

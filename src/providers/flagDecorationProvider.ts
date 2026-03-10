@@ -2,21 +2,15 @@ import * as vscode from 'vscode';
 import { FlagCacheService } from '../services/flagCacheService';
 import { ExperimentCacheService } from '../services/experimentCacheService';
 import { FeatureFlag, Experiment, ExperimentResults, ExperimentVariantResult } from '../models/types';
+import { TreeSitterService } from '../services/treeSitterService';
 import { Commands } from '../constants';
 
-const POSTHOG_FLAG_METHODS = [
-    'getFeatureFlag',
-    'isFeatureEnabled',
-    'getFeatureFlagPayload',
-    'getFeatureFlagResult',
-    'isFeatureFlagEnabled',
-    'getRemoteConfig',
-];
-
-const FLAG_CALL_PATTERN = new RegExp(
-    `(?:posthog|client|ph)\\.(?:${POSTHOG_FLAG_METHODS.join('|')})\\s*\\(\\s*(['"\`])([^'"\`]+)\\1`,
-    'g',
-);
+const FLAG_METHODS = new Set([
+    'getFeatureFlag', 'isFeatureEnabled', 'getFeatureFlagPayload',
+    'getFeatureFlagResult', 'isFeatureFlagEnabled', 'getRemoteConfig',
+    'get_feature_flag', 'is_feature_enabled', 'get_feature_flag_payload', 'get_remote_config',
+    'GetFeatureFlag', 'IsFeatureEnabled', 'GetFeatureFlagPayload',
+]);
 
 interface Variant {
     key: string;
@@ -32,6 +26,7 @@ export class FlagDecorationProvider {
     constructor(
         private readonly flagCache: FlagCacheService,
         private readonly experimentCache: ExperimentCacheService,
+        private readonly treeSitter: TreeSitterService,
     ) {
         this.decoration = vscode.window.createTextEditorDecorationType({});
         this.unknownFlagDecoration = vscode.window.createTextEditorDecorationType({
@@ -65,54 +60,45 @@ export class FlagDecorationProvider {
         this.debounceTimer = setTimeout(() => this.updateDecorations(), 200);
     }
 
-    private updateDecorations() {
+    private async updateDecorations() {
         const editor = vscode.window.activeTextEditor;
-        if (!editor) {
-            return;
-        }
+        if (!editor) { return; }
 
         const doc = editor.document;
-        if (!['javascript', 'typescript', 'javascriptreact', 'typescriptreact'].includes(doc.languageId)) {
-            return;
-        }
+        if (!this.treeSitter.isSupported(doc.languageId)) { return; }
 
+        const calls = await this.treeSitter.findPostHogCalls(doc);
         const decorations: vscode.DecorationOptions[] = [];
         const unknownDecorations: vscode.DecorationOptions[] = [];
 
-        for (let i = 0; i < doc.lineCount; i++) {
-            const line = doc.lineAt(i);
-            FLAG_CALL_PATTERN.lastIndex = 0;
-            let match;
+        for (const call of calls) {
+            if (!FLAG_METHODS.has(call.method)) { continue; }
 
-            while ((match = FLAG_CALL_PATTERN.exec(line.text)) !== null) {
-                const flagKey = match[2];
-                const flag = this.flagCache.getFlag(flagKey);
-                const experiment = this.experimentCache.getByFlagKey(flagKey);
-                const { text, color } = this.buildLabel(flag, experiment);
-                const hover = this.buildHover(flagKey, flag, experiment);
+            const flagKey = call.key;
+            const flag = this.flagCache.getFlag(flagKey);
+            const experiment = this.experimentCache.getByFlagKey(flagKey);
+            const { text, color } = this.buildLabel(flag, experiment);
+            const hover = this.buildHover(flagKey, flag, experiment);
 
-                decorations.push({
-                    range: new vscode.Range(i, line.text.length, i, line.text.length),
-                    hoverMessage: hover,
-                    renderOptions: {
-                        after: {
-                            contentText: text,
-                            color,
-                            fontStyle: 'italic',
-                            margin: '0 0 0 1.5em',
-                        },
+            const line = doc.lineAt(call.line);
+            decorations.push({
+                range: new vscode.Range(call.line, line.text.length, call.line, line.text.length),
+                hoverMessage: hover,
+                renderOptions: {
+                    after: {
+                        contentText: text,
+                        color,
+                        fontStyle: 'italic',
+                        margin: '0 0 0 1.5em',
                     },
-                });
+                },
+            });
 
-                // Highlight the flag key string itself for unknown flags
-                if (!flag) {
-                    const keyStart = match.index + match[0].length - match[2].length - 1;
-                    const keyEnd = keyStart + match[2].length;
-                    unknownDecorations.push({
-                        range: new vscode.Range(i, keyStart, i, keyEnd),
-                        hoverMessage: hover,
-                    });
-                }
+            if (!flag) {
+                unknownDecorations.push({
+                    range: new vscode.Range(call.line, call.keyStartCol, call.line, call.keyEndCol),
+                    hoverMessage: hover,
+                });
             }
         }
 
@@ -191,17 +177,14 @@ export class FlagDecorationProvider {
             return md;
         }
 
-        // Header
         const statusIcon = flag.active ? '🟢' : '⚪';
         const statusText = flag.active ? 'Active' : 'Inactive';
         md.appendMarkdown(`#### ${statusIcon} \`${flagKey}\` · ${statusText}\n\n`);
 
-        // Experiment section
         if (experiment) {
             this.appendExperimentSection(md, experiment);
         }
 
-        // Variant / rollout visualization (only for non-experiment flags)
         if (!experiment) {
             const variants = this.extractVariants(flag);
             if (variants.length > 0) {
@@ -216,7 +199,6 @@ export class FlagDecorationProvider {
             }
         }
 
-        // Footer
         const conditions = this.extractConditionCount(flag);
         if (conditions > 0) {
             md.appendMarkdown(`\n🎯 ${conditions} release ${conditions === 1 ? 'condition' : 'conditions'}\n`);
@@ -242,7 +224,6 @@ export class FlagDecorationProvider {
 
         md.appendMarkdown(`${expIcon} **${experiment.name}** · *${expStatus}*\n\n`);
 
-        // Duration
         if (experiment.start_date) {
             const start = new Date(experiment.start_date);
             const end = experiment.end_date ? new Date(experiment.end_date) : new Date();
@@ -250,7 +231,6 @@ export class FlagDecorationProvider {
             md.appendMarkdown(`⏱ ${days} day${days !== 1 ? 's' : ''}${experiment.end_date ? '' : ' so far'}\n\n`);
         }
 
-        // Conclusion badge for completed experiments
         if (experiment.conclusion) {
             const cIcon = experiment.conclusion === 'won' ? '🏆' : '❌';
             const cText = experiment.conclusion === 'won' ? 'Winner declared' : 'No winner';
@@ -260,12 +240,10 @@ export class FlagDecorationProvider {
             }
         }
 
-        // Results
         const results = this.experimentCache.getResults(experiment.id);
         if (results) {
             this.appendResultsSection(md, experiment, results);
         } else {
-            // Show variant allocation from experiment parameters
             const variants = experiment.parameters?.feature_flag_variants;
             if (variants && variants.length > 0) {
                 md.appendMarkdown('---\n\n');
@@ -273,7 +251,6 @@ export class FlagDecorationProvider {
                 md.appendCodeblock(this.buildVariantChart(variants), 'text');
             }
 
-            // Show metrics list
             if (experiment.metrics && experiment.metrics.length > 0) {
                 md.appendMarkdown('\n📊 **Metrics**\n\n');
                 for (const m of experiment.metrics) {
@@ -312,17 +289,14 @@ export class FlagDecorationProvider {
         const all = [baseline, ...variantResults];
         const maxKeyLen = Math.max(...all.map(v => v.key.length));
 
-        // Find the winner (highest chance_to_win)
         const winner = variantResults.length > 0
             ? variantResults.reduce((best, v) => v.chance_to_win > best.chance_to_win ? v : best)
             : null;
 
         const lines: string[] = [];
 
-        // Baseline (control)
         lines.push(`  ${baseline.key.padEnd(maxKeyLen)}  n=${this.formatNum(baseline.number_of_samples)}`);
 
-        // Variant results
         for (let i = 0; i < variantResults.length; i++) {
             const v = variantResults[i];
             const isLast = i === variantResults.length - 1;

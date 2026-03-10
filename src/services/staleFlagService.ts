@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { FlagCacheService } from './flagCacheService';
 import { ExperimentCacheService } from './experimentCacheService';
+import { TreeSitterService } from './treeSitterService';
 import { FeatureFlag } from '../models/types';
 
 export type StalenessReason = 'fully_rolled_out' | 'inactive' | 'not_in_posthog' | 'experiment_complete';
@@ -21,19 +22,13 @@ export interface StaleFlag {
     references: StaleFlagReference[];
 }
 
-const POSTHOG_FLAG_METHODS = [
-    'getFeatureFlag',
-    'isFeatureEnabled',
-    'getFeatureFlagPayload',
-    'getFeatureFlagResult',
-    'isFeatureFlagEnabled',
-    'getRemoteConfig',
-];
-
-const FLAG_CALL_PATTERN = new RegExp(
-    `(?:posthog|client|ph)\\.(?<method>${POSTHOG_FLAG_METHODS.join('|')})\\s*\\(\\s*(['"\`])(?<key>[^'"\`]+)\\2`,
-    'g',
-);
+const FLAG_METHODS = new Set([
+    'getFeatureFlag', 'isFeatureEnabled', 'getFeatureFlagPayload',
+    'getFeatureFlagResult', 'isFeatureFlagEnabled', 'getRemoteConfig',
+    'get_feature_flag', 'is_feature_enabled', 'get_feature_flag_payload', 'get_remote_config',
+    'GetFeatureFlag', 'IsFeatureEnabled', 'GetFeatureFlagPayload',
+    'is_feature_enabled', 'get_feature_flag', 'get_feature_flag_payload',
+]);
 
 export class StaleFlagService {
     private _staleFlags: StaleFlag[] = [];
@@ -43,6 +38,7 @@ export class StaleFlagService {
     constructor(
         private readonly flagCache: FlagCacheService,
         private readonly experimentCache: ExperimentCacheService,
+        private readonly treeSitter: TreeSitterService,
     ) {}
 
     getStaleFlags(): StaleFlag[] {
@@ -60,26 +56,24 @@ export class StaleFlagService {
         await Promise.all(files.map(async (uri) => {
             try {
                 const doc = await vscode.workspace.openTextDocument(uri);
-                const text = doc.getText();
-                FLAG_CALL_PATTERN.lastIndex = 0;
-                let match;
-                while ((match = FLAG_CALL_PATTERN.exec(text)) !== null) {
-                    const key = match.groups!.key;
-                    const method = match.groups!.method;
-                    const pos = doc.positionAt(match.index);
+                if (!this.treeSitter.isSupported(doc.languageId)) { return; }
+
+                const calls = await this.treeSitter.findPostHogCalls(doc);
+                for (const call of calls) {
+                    if (!FLAG_METHODS.has(call.method)) { continue; }
 
                     const ref: StaleFlagReference = {
                         uri,
-                        line: pos.line,
-                        column: pos.character,
-                        lineText: doc.lineAt(pos.line).text.trim(),
-                        method,
-                        flagKey: key,
+                        line: call.line,
+                        column: call.keyStartCol,
+                        lineText: doc.lineAt(call.line).text.trim(),
+                        method: call.method,
+                        flagKey: call.key,
                     };
 
-                    const refs = refsByKey.get(key) || [];
+                    const refs = refsByKey.get(call.key) || [];
                     refs.push(ref);
-                    refsByKey.set(key, refs);
+                    refsByKey.set(call.key, refs);
                 }
             } catch {
                 // skip unreadable files
@@ -96,7 +90,6 @@ export class StaleFlagService {
             }
         }
 
-        // Sort: not_in_posthog first, then inactive, then experiment_complete, then fully_rolled_out
         const order: Record<StalenessReason, number> = {
             not_in_posthog: 0,
             inactive: 1,
@@ -119,13 +112,11 @@ export class StaleFlagService {
             return 'inactive';
         }
 
-        // Check if linked experiment is complete
         const experiment = this.experimentCache.getByFlagKey(key);
         if (experiment?.end_date) {
             return 'experiment_complete';
         }
 
-        // Check if 100% rolled out with no conditions
         if (this.isFullyRolledOut(flag)) {
             return 'fully_rolled_out';
         }
@@ -137,13 +128,11 @@ export class StaleFlagService {
         const filters = flag.filters as Record<string, unknown> | undefined;
         if (!filters) { return false; }
 
-        // Has multivariate? Not a simple boolean flag
         if (filters.multivariate && typeof filters.multivariate === 'object') {
             const mv = filters.multivariate as { variants?: unknown[] };
             if (mv.variants && mv.variants.length > 0) { return false; }
         }
 
-        // Check groups for 100% rollout with no conditions
         if (filters.groups && Array.isArray(filters.groups)) {
             const groups = filters.groups as Array<Record<string, unknown>>;
             if (groups.length === 0) { return false; }
@@ -156,7 +145,6 @@ export class StaleFlagService {
             });
         }
 
-        // Simple rollout_percentage on the flag itself
         if (flag.rollout_percentage === 100) {
             return true;
         }
@@ -164,17 +152,15 @@ export class StaleFlagService {
         return false;
     }
 
-    /**
-     * Generate a WorkspaceEdit that removes the flag check and keeps the "enabled" branch.
-     * For isFeatureEnabled: removes the if-wrapper, keeps the truthy block.
-     * For getFeatureFlag: replaces the call with the string literal of the winning variant or 'true'.
-     */
     buildCleanupEdit(ref: StaleFlagReference): vscode.WorkspaceEdit | null {
-        // We need to read the document to find the surrounding if-block
-        // This is best done asynchronously, so we return null here and handle it in the command
         return null;
     }
 }
+
+const POSTHOG_FLAG_METHODS = [
+    'getFeatureFlag', 'isFeatureEnabled', 'getFeatureFlagPayload',
+    'getFeatureFlagResult', 'isFeatureFlagEnabled', 'getRemoteConfig',
+];
 
 /**
  * Analyze a document around a flag reference and produce a cleanup edit.
@@ -190,7 +176,6 @@ export async function buildCleanupEditForRef(
     const doc = await vscode.workspace.openTextDocument(ref.uri);
     const text = doc.getText();
 
-    // Find the flag call in context
     const lineText = doc.lineAt(ref.line).text;
 
     // Pattern 1: Ternary — expr ? a : b
@@ -210,29 +195,24 @@ export async function buildCleanupEditForRef(
         return edit;
     }
 
-    // Pattern 2: if-statement — find the if block
-    // Walk backwards from the flag call to find "if ("
+    // Pattern 2: if-statement
     const beforeFlag = text.substring(0, doc.offsetAt(new vscode.Position(ref.line, ref.column)));
     const ifMatch = beforeFlag.match(/if\s*\(\s*!?\s*$/);
     if (!ifMatch) {
-        // Try on the same line
         const sameLineMatch = lineText.match(/^(\s*)if\s*\(/);
         if (!sameLineMatch) {
             return null;
         }
     }
 
-    // Find the full if-else block by brace matching
     const ifLineMatch = lineText.match(/^(\s*)if\s*\(/);
     if (!ifLineMatch && ref.line > 0) {
-        // if might be on a previous line
         return null;
     }
 
     const indent = ifLineMatch ? ifLineMatch[1] : '';
     const negated = lineText.includes('!') && lineText.indexOf('!') < lineText.indexOf(POSTHOG_FLAG_METHODS.find(m => lineText.includes(m)) || '');
 
-    // Find opening brace
     let braceStart = -1;
     let searchLine = ref.line;
     for (let i = searchLine; i < Math.min(searchLine + 3, doc.lineCount); i++) {
@@ -244,11 +224,9 @@ export async function buildCleanupEditForRef(
     }
     if (braceStart === -1) { return null; }
 
-    // Match braces to find end of if-block
     const ifBlockEnd = findMatchingBrace(text, braceStart);
     if (ifBlockEnd === -1) { return null; }
 
-    // Check for else block
     const afterIfBlock = text.substring(ifBlockEnd + 1).match(/^\s*else\s*\{/);
     let elseBlockEnd = -1;
     if (afterIfBlock) {
@@ -256,19 +234,16 @@ export async function buildCleanupEditForRef(
         elseBlockEnd = findMatchingBrace(text, elseOpenBrace);
     }
 
-    // Extract the if-body (between braces, dedented)
     const ifBody = text.substring(braceStart + 1, ifBlockEnd).trim();
     const elseBody = elseBlockEnd !== -1
         ? text.substring(text.indexOf('{', ifBlockEnd + 1) + 1, elseBlockEnd).trim()
         : null;
 
-    // Decide which body to keep
     const effectiveKeep = negated ? !keepEnabled : keepEnabled;
     const bodyToKeep = effectiveKeep ? ifBody : (elseBody || '');
 
     if (!bodyToKeep) { return null; }
 
-    // Dedent the body
     const dedented = dedentBlock(bodyToKeep, indent);
 
     const edit = new vscode.WorkspaceEdit();
@@ -277,7 +252,6 @@ export async function buildCleanupEditForRef(
 
     const endOffset = elseBlockEnd !== -1 ? elseBlockEnd + 1 : ifBlockEnd + 1;
     const endPos = doc.positionAt(endOffset);
-    // Include trailing newline
     const endLine = endPos.line < doc.lineCount - 1 ? endPos.line + 1 : endPos.line;
 
     edit.replace(
@@ -303,7 +277,6 @@ function findMatchingBrace(text: string, openIndex: number): number {
 
 function dedentBlock(block: string, baseIndent: string): string {
     const lines = block.split('\n');
-    // Find minimum indent
     let minIndent = Infinity;
     for (const line of lines) {
         if (line.trim().length === 0) { continue; }

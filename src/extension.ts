@@ -3,6 +3,7 @@ import { AuthService } from './services/authService';
 import { PostHogService } from './services/postHogService';
 import { FlagCacheService } from './services/flagCacheService';
 import { EventCacheService } from './services/eventCacheService';
+import { TreeSitterService } from './services/treeSitterService';
 import { SidebarProvider } from './views/SidebarProvider';
 import { FlagCompletionProvider } from './providers/flagCompletionProvider';
 import { EventCompletionProvider } from './providers/eventCompletionProvider';
@@ -23,19 +24,18 @@ import { HogQLEditorProvider } from './views/HogQLEditorProvider';
 import { VariantHighlightProvider } from './providers/variantHighlightProvider';
 import { Views, Commands, ContextKeys } from './constants';
 
-const SUPPORTED_LANGUAGES = [
-    'javascript',
-    'typescript',
-    'javascriptreact',
-    'typescriptreact',
-];
-
 export function activate(context: vscode.ExtensionContext) {
     const authService = new AuthService(context.secrets, context.globalState);
     const postHogService = new PostHogService(authService);
     const flagCache = new FlagCacheService();
     const eventCache = new EventCacheService();
     const experimentCache = new ExperimentCacheService();
+
+    // Tree-sitter powered code intelligence
+    const treeSitter = new TreeSitterService();
+    treeSitter.initialize(context.extensionPath).catch(err => {
+        console.warn('[PostHog] Tree-sitter initialization failed:', err);
+    });
 
     // HogQL editor
     const hogqlEditor = new HogQLEditorProvider(context.extensionUri, authService, postHogService);
@@ -58,19 +58,21 @@ export function activate(context: vscode.ExtensionContext) {
         detailPanel,
     );
 
-    // Autocomplete, code actions & inline decorations
-    const completionProvider = new FlagCompletionProvider(flagCache);
-    const eventCompletionProvider = new EventCompletionProvider(eventCache);
-    const codeActionProvider = new FlagCodeActionProvider(flagCache);
-    const flagDecorationProvider = new FlagDecorationProvider(flagCache, experimentCache);
-    const eventPropertyCompletionProvider = new EventPropertyCompletionProvider(eventCache, postHogService, authService);
-    const eventDecorationProvider = new EventDecorationProvider(eventCache);
-    const variantHighlightProvider = new VariantHighlightProvider(flagCache, experimentCache);
-    const flagLinkProvider = new FlagLinkProvider(flagCache, experimentCache);
-    const captureCodeActionProvider = new CaptureCodeActionProvider();
-    const staleFlagService = new StaleFlagService(flagCache, experimentCache);
+    // Autocomplete, code actions & inline decorations — all powered by tree-sitter
+    const completionProvider = new FlagCompletionProvider(flagCache, treeSitter);
+    const eventCompletionProvider = new EventCompletionProvider(eventCache, treeSitter);
+    const codeActionProvider = new FlagCodeActionProvider(flagCache, treeSitter);
+    const flagDecorationProvider = new FlagDecorationProvider(flagCache, experimentCache, treeSitter);
+    const eventPropertyCompletionProvider = new EventPropertyCompletionProvider(eventCache, postHogService, authService, treeSitter);
+    const eventDecorationProvider = new EventDecorationProvider(eventCache, treeSitter);
+    const variantHighlightProvider = new VariantHighlightProvider(flagCache, experimentCache, treeSitter);
+    const flagLinkProvider = new FlagLinkProvider(flagCache, experimentCache, treeSitter);
+    const captureCodeActionProvider = new CaptureCodeActionProvider(treeSitter);
+    const staleFlagService = new StaleFlagService(flagCache, experimentCache, treeSitter);
     const staleFlagTreeProvider = new StaleFlagTreeProvider(staleFlagService);
-    const languageSelector = SUPPORTED_LANGUAGES.map(lang => ({ language: lang, scheme: 'file' }));
+
+    // All languages supported by tree-sitter grammars
+    const languageSelector = treeSitter.supportedLanguages.map(lang => ({ language: lang, scheme: 'file' }));
 
     // Set initial auth context
     const authed = authService.isAuthenticated();
@@ -93,7 +95,6 @@ export function activate(context: vscode.ExtensionContext) {
             }).catch(() => {});
             postHogService.getExperiments(projectId).then(async exps => {
                 experimentCache.update(exps);
-                // Prefetch results for running/completed experiments
                 const active = exps.filter(e => e.start_date);
                 await Promise.allSettled(
                     active.map(async e => {
@@ -147,6 +148,7 @@ export function activate(context: vscode.ExtensionContext) {
         ...flagDecorationProvider.register(),
         ...eventDecorationProvider.register(),
         ...variantHighlightProvider.register(),
+        { dispose: () => treeSitter.dispose() },
     );
 }
 

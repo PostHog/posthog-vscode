@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { FlagCacheService } from '../services/flagCacheService';
 import { ExperimentCacheService } from '../services/experimentCacheService';
 import { FeatureFlag, Experiment } from '../models/types';
+import { TreeSitterService } from '../services/treeSitterService';
 
 const PALETTE = [
     { bg: 'rgba(29, 74, 255, 0.07)', border: '#1D4AFF', text: '#6B9BFF' },
@@ -12,18 +13,6 @@ const PALETTE = [
     { bg: 'rgba(249, 189, 43, 0.07)', border: '#F9BD2B', text: '#FCD462' },
 ];
 
-interface VariantBlock {
-    flagKey: string;
-    variantKey: string;
-    conditionLine: number;
-    startLine: number;
-    endLine: number;
-}
-
-function escapeRegex(s: string): string {
-    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 export class VariantHighlightProvider {
     private readonly blockDecorations: vscode.TextEditorDecorationType[];
     private readonly labelDecoration: vscode.TextEditorDecorationType;
@@ -32,6 +21,7 @@ export class VariantHighlightProvider {
     constructor(
         private readonly flagCache: FlagCacheService,
         private readonly experimentCache: ExperimentCacheService,
+        private readonly treeSitter: TreeSitterService,
     ) {
         this.blockDecorations = PALETTE.map(c => vscode.window.createTextEditorDecorationType({
             backgroundColor: c.bg,
@@ -68,164 +58,26 @@ export class VariantHighlightProvider {
         this.debounceTimer = setTimeout(() => this.update(), 300);
     }
 
-    private update() {
+    private async update() {
         const editor = vscode.window.activeTextEditor;
         if (!editor) { return; }
 
         const doc = editor.document;
-        if (!['javascript', 'typescript', 'javascriptreact', 'typescriptreact'].includes(doc.languageId)) {
+        if (!this.treeSitter.isSupported(doc.languageId)) {
             for (const dt of this.blockDecorations) { editor.setDecorations(dt, []); }
             editor.setDecorations(this.labelDecoration, []);
             return;
         }
 
-        const blocks = this.detect(doc);
-        this.apply(editor, doc, blocks);
+        const branches = await this.treeSitter.findVariantBranches(doc);
+        this.apply(editor, doc, branches);
     }
 
-    // ── Detection ──
-
-    private detect(doc: vscode.TextDocument): VariantBlock[] {
-        const blocks: VariantBlock[] = [];
-        const lines: string[] = [];
-        for (let i = 0; i < doc.lineCount; i++) { lines.push(doc.lineAt(i).text); }
-
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-
-            // const x = posthog.getFeatureFlag('key')
-            const assign = /(?:const|let|var)\s+(\w+)\s*=\s*(?:posthog|client|ph)\.getFeatureFlag\s*\(\s*(['"`])([^'"`]+)\2/.exec(line);
-            if (assign) {
-                blocks.push(...this.findVarIfChain(lines, i + 1, assign[1], assign[3]));
-                blocks.push(...this.findVarSwitch(lines, i + 1, assign[1], assign[3]));
-            }
-
-            // if (posthog.getFeatureFlag('key') === 'variant')
-            const inline = /if\s*\(\s*(?:posthog|client|ph)\.getFeatureFlag\s*\(\s*(['"`])([^'"`]+)\1\s*\)\s*===?\s*(['"`])([^'"`]+)\3/.exec(line);
-            if (inline) {
-                const flagKey = inline[2];
-                const end = this.findBlockEnd(lines, i);
-                blocks.push({ flagKey, variantKey: inline[4], conditionLine: i, startLine: i, endLine: end });
-                blocks.push(...this.findElseChain(lines, end, flagKey, null, [inline[4]]));
-            }
-
-            // if (posthog.isFeatureEnabled('key'))
-            const enabled = /if\s*\(\s*(?:posthog|client|ph)\.isFeatureEnabled\s*\(\s*(['"`])([^'"`]+)\1\s*\)\s*\)/.exec(line);
-            if (enabled) {
-                const flagKey = enabled[2];
-                const end = this.findBlockEnd(lines, i);
-                blocks.push({ flagKey, variantKey: 'true', conditionLine: i, startLine: i, endLine: end });
-                const elseBlocks = this.findElseChain(lines, end, flagKey, null, ['true']);
-                for (const b of elseBlocks) { if (b.variantKey === 'else') { b.variantKey = 'false'; } }
-                blocks.push(...elseBlocks);
-            }
-        }
-
-        return blocks;
-    }
-
-    private findVarIfChain(lines: string[], from: number, varName: string, flagKey: string): VariantBlock[] {
-        const blocks: VariantBlock[] = [];
-        const re = new RegExp(`(?:if|else\\s+if)\\s*\\(\\s*${escapeRegex(varName)}\\s*===?\\s*(['"\`])([^'"\`]+)\\1\\s*\\)`);
-
-        for (let i = from; i < Math.min(from + 30, lines.length); i++) {
-            const m = re.exec(lines[i]);
-            if (m) {
-                const end = this.findBlockEnd(lines, i);
-                const seen = [m[2]];
-                blocks.push({ flagKey, variantKey: m[2], conditionLine: i, startLine: i, endLine: end });
-                const more = this.findElseChain(lines, end, flagKey, varName, seen);
-                blocks.push(...more);
-                const last = more.length > 0 ? more[more.length - 1] : blocks[blocks.length - 1];
-                i = last.endLine;
-            }
-        }
-        return blocks;
-    }
-
-    private findElseChain(lines: string[], afterEnd: number, flagKey: string, varName: string | null, seen: string[]): VariantBlock[] {
-        const blocks: VariantBlock[] = [];
-
-        for (let check = afterEnd; check <= Math.min(afterEnd + 1, lines.length - 1); check++) {
-            const text = lines[check];
-
-            // else if (varName === 'value')
-            if (varName) {
-                const re = new RegExp(`else\\s+if\\s*\\(\\s*${escapeRegex(varName)}\\s*===?\\s*(['"\`])([^'"\`]+)\\1\\s*\\)`);
-                const m = re.exec(text);
-                if (m) {
-                    const end = this.findBlockEnd(lines, check);
-                    seen.push(m[2]);
-                    blocks.push({ flagKey, variantKey: m[2], conditionLine: check, startLine: check, endLine: end });
-                    blocks.push(...this.findElseChain(lines, end, flagKey, varName, seen));
-                    return blocks;
-                }
-            }
-
-            // plain else
-            if (/\belse\s*\{/.test(text)) {
-                const end = this.findBlockEnd(lines, check);
-                // Infer variant if only one remains
-                const all = this.getAllVariantKeys(flagKey);
-                const remaining = all.filter(v => !seen.includes(v));
-                const key = remaining.length === 1 ? remaining[0] : 'else';
-                blocks.push({ flagKey, variantKey: key, conditionLine: check, startLine: check, endLine: end });
-                return blocks;
-            }
-        }
-
-        return blocks;
-    }
-
-    private findVarSwitch(lines: string[], from: number, varName: string, flagKey: string): VariantBlock[] {
-        const blocks: VariantBlock[] = [];
-        const re = new RegExp(`switch\\s*\\(\\s*${escapeRegex(varName)}\\s*\\)`);
-
-        for (let i = from; i < Math.min(from + 15, lines.length); i++) {
-            if (!re.test(lines[i])) { continue; }
-
-            const switchEnd = this.findBlockEnd(lines, i);
-            let caseStart = -1;
-            let caseVariant = '';
-
-            for (let j = i + 1; j < switchEnd; j++) {
-                const cm = /case\s+(['"`])([^'"`]+)\1\s*:/.exec(lines[j]);
-                const dm = /default\s*:/.test(lines[j]);
-
-                if (cm || dm) {
-                    if (caseStart >= 0) {
-                        blocks.push({ flagKey, variantKey: caseVariant, conditionLine: caseStart, startLine: caseStart, endLine: j - 1 });
-                    }
-                    caseStart = j;
-                    caseVariant = cm ? cm[2] : 'default';
-                }
-            }
-            if (caseStart >= 0) {
-                blocks.push({ flagKey, variantKey: caseVariant, conditionLine: caseStart, startLine: caseStart, endLine: switchEnd - 1 });
-            }
-            break;
-        }
-        return blocks;
-    }
-
-    private findBlockEnd(lines: string[], startLine: number): number {
-        let depth = 0;
-        let opened = false;
-        for (let i = startLine; i < lines.length; i++) {
-            for (const ch of lines[i]) {
-                if (ch === '{') { depth++; opened = true; }
-                else if (ch === '}' && opened) {
-                    depth--;
-                    if (depth === 0) { return i; }
-                }
-            }
-        }
-        return startLine;
-    }
-
-    // ── Rendering ──
-
-    private apply(editor: vscode.TextEditor, doc: vscode.TextDocument, blocks: VariantBlock[]) {
+    private apply(
+        editor: vscode.TextEditor,
+        doc: vscode.TextDocument,
+        blocks: { flagKey: string; variantKey: string; conditionLine: number; startLine: number; endLine: number }[],
+    ) {
         const byColor: Map<number, vscode.DecorationOptions[]> = new Map();
         const labels: vscode.DecorationOptions[] = [];
 
@@ -234,7 +86,20 @@ export class VariantHighlightProvider {
             const experiment = this.experimentCache.getByFlagKey(block.flagKey);
 
             const allVariants = this.getAllVariantKeys(block.flagKey);
-            let ci = allVariants.indexOf(block.variantKey);
+
+            // Infer variant for 'else'/'default' blocks if only one variant remains
+            let resolvedVariantKey = block.variantKey;
+            if (resolvedVariantKey === 'else' || resolvedVariantKey === 'default') {
+                const seen = blocks
+                    .filter(b => b.flagKey === block.flagKey && b.variantKey !== 'else' && b.variantKey !== 'default')
+                    .map(b => b.variantKey);
+                const remaining = allVariants.filter(v => !seen.includes(v));
+                if (remaining.length === 1) {
+                    resolvedVariantKey = remaining[0];
+                }
+            }
+
+            let ci = allVariants.indexOf(resolvedVariantKey);
             if (ci < 0) { ci = allVariants.length; }
             ci = ci % PALETTE.length;
 
@@ -243,7 +108,7 @@ export class VariantHighlightProvider {
                 byColor.get(ci)!.push({ range: new vscode.Range(line, 0, line, 0) });
             }
 
-            const label = this.buildLabel(block, flag, experiment);
+            const label = this.buildLabel(block.flagKey, resolvedVariantKey, flag, experiment);
             const condLine = doc.lineAt(block.conditionLine);
             labels.push({
                 range: new vscode.Range(block.conditionLine, condLine.text.length, block.conditionLine, condLine.text.length),
@@ -263,25 +128,24 @@ export class VariantHighlightProvider {
         editor.setDecorations(this.labelDecoration, labels);
     }
 
-    private buildLabel(block: VariantBlock, flag: FeatureFlag | undefined, experiment: Experiment | undefined): string {
-        const parts: string[] = [block.variantKey];
+    private buildLabel(flagKey: string, variantKey: string, flag: FeatureFlag | undefined, experiment: Experiment | undefined): string {
+        const parts: string[] = [variantKey];
 
         if (flag) {
-            const rollout = this.getVariantRollout(flag, block.variantKey);
+            const rollout = this.getVariantRollout(flag, variantKey);
             if (rollout !== null) { parts.push(`${rollout}%`); }
         }
 
         if (experiment) {
             const results = this.experimentCache.getResults(experiment.id);
             if (results?.primary?.results?.[0]?.data?.variant_results) {
-                const vr = results.primary.results[0].data.variant_results.find(v => v.key === block.variantKey);
+                const vr = results.primary.results[0].data.variant_results.find(v => v.key === variantKey);
                 if (vr) {
                     const pct = Math.round(vr.chance_to_win * 100);
                     parts.push(`${pct}% win`);
                     if (vr.significant) { parts.push('★'); }
                 }
-                // For control/baseline, show sample count
-                if (block.variantKey === results.primary.results[0].data.baseline.key) {
+                if (variantKey === results.primary.results[0].data.baseline.key) {
                     const n = results.primary.results[0].data.baseline.number_of_samples;
                     parts.push(`n=${this.fmtNum(n)}`);
                 }
@@ -290,8 +154,6 @@ export class VariantHighlightProvider {
 
         return parts.join(' · ');
     }
-
-    // ── Helpers ──
 
     private getAllVariantKeys(flagKey: string): string[] {
         const flag = this.flagCache.getFlag(flagKey);

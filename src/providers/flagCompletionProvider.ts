@@ -1,33 +1,21 @@
 import * as vscode from 'vscode';
 import { FlagCacheService } from '../services/flagCacheService';
-
-const POSTHOG_FLAG_METHODS = [
-    'getFeatureFlag',
-    'isFeatureEnabled',
-    'getFeatureFlagPayload',
-    'getFeatureFlagResult',
-    'isFeatureFlagEnabled',
-    'getRemoteConfig',
-];
-
-const METHOD_PATTERN = new RegExp(
-    `(?:posthog|client|ph)\\.(?:${POSTHOG_FLAG_METHODS.join('|')})\\s*\\(\\s*(['"\`])`,
-);
+import { TreeSitterService } from '../services/treeSitterService';
 
 export class FlagCompletionProvider implements vscode.CompletionItemProvider {
-    constructor(private readonly flagCache: FlagCacheService) {}
+    constructor(
+        private readonly flagCache: FlagCacheService,
+        private readonly treeSitter: TreeSitterService,
+    ) {}
 
-    provideCompletionItems(
+    async provideCompletionItems(
         document: vscode.TextDocument,
         position: vscode.Position,
-    ): vscode.CompletionItem[] | undefined {
-        const lineText = document.lineAt(position).text;
-        const textBeforeCursor = lineText.substring(0, position.character);
+    ): Promise<vscode.CompletionItem[] | undefined> {
+        if (!this.treeSitter.isSupported(document.languageId)) { return undefined; }
 
-        const match = METHOD_PATTERN.exec(textBeforeCursor);
-        if (!match) {
-            return undefined;
-        }
+        const ctx = await this.treeSitter.getCompletionContext(document, position);
+        if (!ctx || ctx.type !== 'flag_key') { return undefined; }
 
         const flags = this.flagCache.getFlags().filter(f => !f.deleted);
         return flags.map(flag => {

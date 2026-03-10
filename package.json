@@ -1,8 +1,15 @@
 {
-  "name": "@posthog/posthog-vscode",
+  "name": "posthog-vscode",
   "displayName": "PostHog for VSCode",
   "description": "PostHog extension for VSCode",
-  "version": "0.0.1",
+  "version": "0.0.4",
+  "license": "MIT",
+  "publisher": "PostHog",
+  "icon": "resources/icons/ph-logo.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PostHog/posthog-vscode"
+  },
   "engines": {
     "vscode": "^1.109.0"
   },
@@ -125,8 +132,13 @@
     "languages": [
       {
         "id": "hogql",
-        "aliases": ["HogQL", "hogql"],
-        "extensions": [".hogql"],
+        "aliases": [
+          "HogQL",
+          "hogql"
+        ],
+        "extensions": [
+          ".hogql"
+        ],
         "configuration": "./language-configuration.json",
         "icon": {
           "light": "./resources/icons/codehog.svg",
@@ -143,10 +155,11 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "pnpm run package",
+    "vscode:prepublish": "pnpm run fetch-grammars && pnpm run package",
     "compile": "webpack",
     "watch": "webpack --watch",
     "package": "webpack --mode production --devtool hidden-source-map",
+    "fetch-grammars": "node scripts/fetch-grammars.js",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "pnpm run compile-tests && pnpm run compile && pnpm run lint",
@@ -154,16 +167,26 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.109.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "22.x",
-    "typescript-eslint": "^8.56.1",
-    "eslint": "^9.39.3",
-    "typescript": "^5.9.3",
-    "ts-loader": "^9.5.4",
-    "webpack": "^5.105.3",
-    "webpack-cli": "^6.0.1",
+    "@types/vscode": "^1.109.0",
     "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2"
+    "@vscode/test-electron": "^2.5.2",
+    "copy-webpack-plugin": "^12.0.2",
+    "eslint": "^9.39.3",
+    "tree-sitter-cli": "^0.26.6",
+    "ts-loader": "^9.5.4",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1",
+    "webpack": "^5.105.3",
+    "webpack-cli": "^6.0.1"
+  },
+  "dependencies": {
+    "web-tree-sitter": "^0.24.7"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "tree-sitter-cli"
+    ]
   }
 }

@@ -1,28 +1,21 @@
 import * as vscode from 'vscode';
 import { EventCacheService } from '../services/eventCacheService';
-
-const CAPTURE_METHODS = [
-    'capture',
-];
-
-const METHOD_PATTERN = new RegExp(
-    `(?:posthog|client|ph)\\.(?:${CAPTURE_METHODS.join('|')})\\s*\\(\\s*(['"\`])`,
-);
+import { TreeSitterService } from '../services/treeSitterService';
 
 export class EventCompletionProvider implements vscode.CompletionItemProvider {
-    constructor(private readonly eventCache: EventCacheService) {}
+    constructor(
+        private readonly eventCache: EventCacheService,
+        private readonly treeSitter: TreeSitterService,
+    ) {}
 
-    provideCompletionItems(
+    async provideCompletionItems(
         document: vscode.TextDocument,
         position: vscode.Position,
-    ): vscode.CompletionItem[] | undefined {
-        const lineText = document.lineAt(position).text;
-        const textBeforeCursor = lineText.substring(0, position.character);
+    ): Promise<vscode.CompletionItem[] | undefined> {
+        if (!this.treeSitter.isSupported(document.languageId)) { return undefined; }
 
-        const match = METHOD_PATTERN.exec(textBeforeCursor);
-        if (!match) {
-            return undefined;
-        }
+        const ctx = await this.treeSitter.getCompletionContext(document, position);
+        if (!ctx || ctx.type !== 'capture_event') { return undefined; }
 
         const events = this.eventCache.getEvents().filter(e => !e.hidden);
         return events.map(event => {
@@ -35,7 +28,6 @@ export class EventCompletionProvider implements vscode.CompletionItemProvider {
                 (event.tags.length > 0 ? `Tags: ${event.tags.join(', ')}\n\n` : '') +
                 (event.last_seen_at ? `Last seen: ${new Date(event.last_seen_at).toLocaleDateString()}` : '')
             );
-            // Sort: verified first, then custom events, then PostHog internal events
             item.sortText = (event.verified ? '0' : '1') + (isCustom ? '0' : '1') + '-' + event.name;
             return item;
         });

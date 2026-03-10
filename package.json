@@ -5,7 +5,7 @@
   "version": "0.0.4",
   "license": "MIT",
   "publisher": "PostHog",
-  "icon": "resources/icons/ph-logo.png",
+  "icon": "resources/icons/ph-logo2.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/PostHog/posthog-vscode"

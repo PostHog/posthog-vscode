@@ -32,6 +32,12 @@ export function getLayout(logoUri: vscode.Uri): string {
         <input id="search" type="text" placeholder="Search..." />
     </div>
 
+    <div id="errors-filter" style="display:none;padding:4px 12px;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;opacity:0.7;cursor:pointer;user-select:none;">
+            <input type="checkbox" id="errors-local-only" /> This repo only
+        </label>
+    </div>
+
     <div class="scroll-area">
         <!-- Analytics -->
         <div id="section-analytics" class="section active">

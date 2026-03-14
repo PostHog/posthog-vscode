@@ -13,6 +13,7 @@ export const Commands = {
     SCAN_STALE_FLAGS: 'posthog.scanStaleFlags',
     CLEANUP_STALE_FLAG: 'posthog.cleanupStaleFlag',
     INSERT_CAPTURE: 'posthog.insertCapture',
+    SHOW_SESSIONS: 'posthog.showSessions',
 } as const;
 
 export const Views = {

@@ -34,6 +34,20 @@ export interface CompletionContext {
     propertyName?: string;
 }
 
+// ── Detection configuration ──
+
+export interface DetectionConfig {
+    additionalClientNames: string[];
+    additionalFlagFunctions: string[];
+    detectNestedClients: boolean;
+}
+
+const DEFAULT_CONFIG: DetectionConfig = {
+    additionalClientNames: [],
+    additionalFlagFunctions: [],
+    detectNestedClients: true,
+};
+
 // ── Language configuration ──
 
 const JS_CAPTURE_METHODS = new Set(['capture']);
@@ -87,13 +101,13 @@ const JS_QUERIES: QueryStrings = {
     postHogCalls: `
         (call_expression
             function: (member_expression
-                object: (identifier) @client
+                object: (_) @client
                 property: (property_identifier) @method)
             arguments: (arguments . (string (string_fragment) @key))) @call
 
         (call_expression
             function: (member_expression
-                object: (identifier) @client
+                object: (_) @client
                 property: (property_identifier) @method)
             arguments: (arguments . (template_string (string_fragment) @key))) @call
     `,
@@ -104,7 +118,7 @@ const JS_QUERIES: QueryStrings = {
                 name: (identifier) @var_name
                 value: (call_expression
                     function: (member_expression
-                        object: (identifier) @client
+                        object: (_) @client
                         property: (property_identifier) @method)
                     arguments: (arguments . (string (string_fragment) @flag_key))))) @assignment
 
@@ -113,7 +127,7 @@ const JS_QUERIES: QueryStrings = {
                 name: (identifier) @var_name
                 value: (call_expression
                     function: (member_expression
-                        object: (identifier) @client
+                        object: (_) @client
                         property: (property_identifier) @method)
                     arguments: (arguments . (string (string_fragment) @flag_key))))) @assignment
     `,
@@ -181,7 +195,7 @@ const PYTHON_QUERIES: QueryStrings = {
     postHogCalls: `
         (call
             function: (attribute
-                object: (identifier) @client
+                object: (_) @client
                 attribute: (identifier) @method)
             arguments: (argument_list
                 (string (string_content) @key))) @call
@@ -192,7 +206,7 @@ const PYTHON_QUERIES: QueryStrings = {
             left: (identifier) @var_name
             right: (call
                 function: (attribute
-                    object: (identifier) @client
+                    object: (_) @client
                     attribute: (identifier) @method)
                 arguments: (argument_list
                     (string (string_content) @flag_key))))
@@ -231,7 +245,7 @@ const GO_QUERIES: QueryStrings = {
     postHogCalls: `
         (call_expression
             function: (selector_expression
-                operand: (identifier) @client
+                operand: (_) @client
                 field: (field_identifier) @method)
             arguments: (argument_list
                 (interpreted_string_literal) @key)) @call
@@ -243,7 +257,7 @@ const GO_QUERIES: QueryStrings = {
             right: (expression_list
                 (call_expression
                     function: (selector_expression
-                        operand: (identifier) @client
+                        operand: (_) @client
                         field: (field_identifier) @method)
                     arguments: (argument_list
                         (interpreted_string_literal) @flag_key))))
@@ -275,7 +289,7 @@ const GO_QUERIES: QueryStrings = {
 const RUBY_QUERIES: QueryStrings = {
     postHogCalls: `
         (call
-            receiver: (identifier) @client
+            receiver: (_) @client
             method: (identifier) @method
             arguments: (argument_list
                 (string (string_content) @key))) @call
@@ -285,7 +299,7 @@ const RUBY_QUERIES: QueryStrings = {
         (assignment
             left: (identifier) @var_name
             right: (call
-                receiver: (identifier) @client
+                receiver: (_) @client
                 method: (identifier) @method
                 arguments: (argument_list
                     (string (string_content) @flag_key))))
@@ -334,6 +348,42 @@ export class TreeSitterService {
     private queryCache = new Map<string, Parser.Query>();
     private initPromise: Promise<void> | null = null;
     private wasmDir = '';
+    private config: DetectionConfig = DEFAULT_CONFIG;
+
+    updateConfig(config: DetectionConfig): void {
+        this.config = config;
+        this.queryCache.clear();
+    }
+
+    private getEffectiveClients(): Set<string> {
+        const clients = new Set(CLIENT_NAMES);
+        for (const name of this.config.additionalClientNames) {
+            clients.add(name);
+        }
+        return clients;
+    }
+
+    private extractClientName(node: Parser.SyntaxNode): string | null {
+        if (node.type === 'identifier') {
+            return node.text;
+        }
+        if (this.config.detectNestedClients) {
+            // member_expression: window.posthog → extract "posthog"
+            if (node.type === 'member_expression' || node.type === 'attribute') {
+                const prop = node.childForFieldName('property') || node.childForFieldName('attribute');
+                if (prop) { return prop.text; }
+            }
+            // optional_chain_expression wrapping member_expression
+            if (node.type === 'optional_chain_expression') {
+                const inner = node.namedChildren[0];
+                if (inner?.type === 'member_expression') {
+                    const prop = inner.childForFieldName('property');
+                    if (prop) { return prop.text; }
+                }
+            }
+        }
+        return null;
+    }
 
     async initialize(extensionPath: string): Promise<void> {
         this.wasmDir = path.join(extensionPath, 'wasm');
@@ -435,7 +485,7 @@ export class TreeSitterService {
             for (const match of matches) {
                 const aliasNode = match.captures.find(c => c.name === 'alias');
                 const sourceNode = match.captures.find(c => c.name === 'source');
-                if (aliasNode && sourceNode && CLIENT_NAMES.has(sourceNode.node.text)) {
+                if (aliasNode && sourceNode && this.getEffectiveClients().has(sourceNode.node.text)) {
                     clientAliases.add(aliasNode.node.text);
                 }
             }
@@ -449,7 +499,7 @@ export class TreeSitterService {
                 for (const match of matches) {
                     const methodNode = match.captures.find(c => c.name === 'method_name');
                     const sourceNode = match.captures.find(c => c.name === 'source');
-                    if (methodNode && sourceNode && CLIENT_NAMES.has(sourceNode.node.text)) {
+                    if (methodNode && sourceNode && this.getEffectiveClients().has(sourceNode.node.text)) {
                         const name = methodNode.node.text;
                         if (family.captureMethods.has(name)) {
                             destructuredCapture.add(name);
@@ -476,7 +526,7 @@ export class TreeSitterService {
         if (!tree) { return []; }
 
         const calls: PostHogCall[] = [];
-        const allClients = new Set(CLIENT_NAMES);
+        const allClients = this.getEffectiveClients();
 
         // Resolve aliases
         const { clientAliases, destructuredCapture, destructuredFlag } = this.findAliases(lang, tree, family);
@@ -493,10 +543,10 @@ export class TreeSitterService {
 
                 if (!clientNode || !methodNode || !keyNode) { continue; }
 
-                const clientName = clientNode.node.text;
+                const clientName = this.extractClientName(clientNode.node);
                 const method = methodNode.node.text;
 
-                if (!allClients.has(clientName)) { continue; }
+                if (!clientName || !allClients.has(clientName)) { continue; }
                 if (!family.allMethods.has(method)) { continue; }
 
                 calls.push({
@@ -523,6 +573,30 @@ export class TreeSitterService {
                     if (destructuredCapture.has(name) || destructuredFlag.has(name)) {
                         calls.push({
                             method: name,
+                            key: this.cleanStringValue(keyNode.node.text),
+                            line: keyNode.node.startPosition.row,
+                            keyStartCol: keyNode.node.startPosition.column,
+                            keyEndCol: keyNode.node.endPosition.column,
+                        });
+                    }
+                }
+            }
+        }
+
+        // Additional flag functions: useFeatureFlag("key"), etc.
+        if (this.config.additionalFlagFunctions.length > 0 && family.queries.bareFunctionCalls) {
+            const additionalFlagFuncs = new Set(this.config.additionalFlagFunctions);
+            const bareQuery = this.getQuery(lang, family.queries.bareFunctionCalls);
+            if (bareQuery) {
+                const matches = bareQuery.matches(tree.rootNode);
+                for (const match of matches) {
+                    const funcNode = match.captures.find(c => c.name === 'func_name');
+                    const keyNode = match.captures.find(c => c.name === 'key');
+                    if (!funcNode || !keyNode) { continue; }
+
+                    if (additionalFlagFuncs.has(funcNode.node.text)) {
+                        calls.push({
+                            method: funcNode.node.text,
                             key: this.cleanStringValue(keyNode.node.text),
                             line: keyNode.node.startPosition.row,
                             keyStartCol: keyNode.node.startPosition.column,
@@ -593,7 +667,7 @@ export class TreeSitterService {
         const tree = this.parse(doc.getText(), lang);
         if (!tree) { return []; }
 
-        const allClients = new Set(CLIENT_NAMES);
+        const allClients = this.getEffectiveClients();
         const { clientAliases } = this.findAliases(lang, tree, family);
         for (const a of clientAliases) { allClients.add(a); }
 
@@ -611,7 +685,8 @@ export class TreeSitterService {
                 const assignNode = match.captures.find(c => c.name === 'assignment');
 
                 if (!varNode || !clientNode || !methodNode || !keyNode) { continue; }
-                if (!allClients.has(clientNode.node.text)) { continue; }
+                const varClientName = this.extractClientName(clientNode.node);
+                if (!varClientName || !allClients.has(varClientName)) { continue; }
 
                 const method = methodNode.node.text;
                 if (!family.flagMethods.has(method)) { continue; }
@@ -643,7 +718,7 @@ export class TreeSitterService {
         const tree = this.parse(doc.getText(), lang);
         if (!tree) { return null; }
 
-        const allClients = new Set(CLIENT_NAMES);
+        const allClients = this.getEffectiveClients();
         const { clientAliases } = this.findAliases(lang, tree, family);
         for (const a of clientAliases) { allClients.add(a); }
 
@@ -669,7 +744,7 @@ export class TreeSitterService {
                 if (func.type === 'member_expression' || func.type === 'attribute' || func.type === 'selector_expression') {
                     const obj = func.childForFieldName('object') || func.childForFieldName('operand');
                     const prop = func.childForFieldName('property') || func.childForFieldName('attribute') || func.childForFieldName('field');
-                    clientName = obj?.text;
+                    clientName = obj ? (this.extractClientName(obj) ?? undefined) : undefined;
                     methodName = prop?.text;
                 }
 
@@ -710,6 +785,33 @@ export class TreeSitterService {
                 return null;
             }
             current = current.parent;
+        }
+
+        // Check for additional bare flag functions: useFeatureFlag("key"), etc.
+        if (this.config.additionalFlagFunctions.length > 0) {
+            const additionalFlagFuncs = new Set(this.config.additionalFlagFunctions);
+            let cur: Parser.SyntaxNode | null = node;
+            while (cur) {
+                if (cur.type === 'arguments' || cur.type === 'argument_list') {
+                    const callNode = cur.parent;
+                    if (!callNode) { cur = cur.parent; continue; }
+
+                    const func = callNode.childForFieldName('function');
+                    if (func?.type === 'identifier' && additionalFlagFuncs.has(func.text)) {
+                        const args = cur.namedChildren;
+                        const argIndex = args.findIndex(a =>
+                            position.line >= a.startPosition.row &&
+                            position.line <= a.endPosition.row &&
+                            (position.line > a.startPosition.row || position.character >= a.startPosition.column) &&
+                            (position.line < a.endPosition.row || position.character <= a.endPosition.column)
+                        );
+                        if (argIndex <= 0) {
+                            return { type: 'flag_key' };
+                        }
+                    }
+                }
+                cur = cur.parent;
+            }
         }
 
         return null;
@@ -991,7 +1093,8 @@ export class TreeSitterService {
         const obj = func.childForFieldName('object') || func.childForFieldName('operand');
         const prop = func.childForFieldName('property') || func.childForFieldName('attribute') || func.childForFieldName('field');
         if (!obj || !prop) { return null; }
-        if (!clients.has(obj.text)) { return null; }
+        const extractedClient = this.extractClientName(obj);
+        if (!extractedClient || !clients.has(extractedClient)) { return null; }
 
         const method = prop.text;
         // Only match getFeatureFlag-like methods (not isFeatureEnabled which returns bool)
@@ -1041,7 +1144,7 @@ export class TreeSitterService {
         if (func.type === 'member_expression' || func.type === 'attribute' || func.type === 'selector_expression') {
             const obj = func.childForFieldName('object') || func.childForFieldName('operand');
             const prop = func.childForFieldName('property') || func.childForFieldName('attribute') || func.childForFieldName('field');
-            clientName = obj?.text;
+            clientName = obj ? (this.extractClientName(obj) ?? undefined) : undefined;
             methodName = prop?.text;
         }
 

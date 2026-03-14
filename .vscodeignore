@@ -4,7 +4,7 @@ out/**
 src/**
 scripts/**
 grammars/**
-playground/**
+playgrounds/**
 .gitignore
 .yarnrc
 webpack.config.js

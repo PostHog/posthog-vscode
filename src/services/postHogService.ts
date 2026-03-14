@@ -1,5 +1,5 @@
 import { AuthService } from './authService';
-import { PostHogApiError, PaginatedResponse, Project, FeatureFlag, ErrorTrackingIssue, Experiment, EventDefinition, ExceptionEntry, HogQLQueryResponse, ExperimentResults, Insight, EventProperty } from '../models/types';
+import { PostHogApiError, PaginatedResponse, Project, FeatureFlag, ErrorTrackingIssue, Experiment, EventDefinition, ExceptionEntry, StackFrame, HogQLQueryResponse, ExperimentResults, Insight, EventProperty, ErrorOccurrence, SessionReplayEntry } from '../models/types';
 
 export class PostHogService {
     constructor(private readonly authService: AuthService) {}
@@ -79,17 +79,15 @@ export class PostHogService {
     }
 
     async getErrorTrackingIssues(projectId: number): Promise<ErrorTrackingIssue[]> {
-        // Try /api/environments/ first (newer PostHog), fall back to /api/projects/
+        // Error tracking issues are only on the environments router
         try {
             const data = await this.request<PaginatedResponse<ErrorTrackingIssue>>(
-                `/api/environments/${projectId}/error_tracking/issues/?limit=50`
+                `/api/environments/${projectId}/error_tracking/issues/?limit=50&status=active`
             );
             return data.results;
-        } catch {
-            const data = await this.request<PaginatedResponse<ErrorTrackingIssue>>(
-                `/api/projects/${projectId}/error_tracking/issues/?limit=50`
-            );
-            return data.results;
+        } catch (err) {
+            console.warn('[PostHog] Failed to load error tracking issues:', err instanceof Error ? err.message : err);
+            throw err;
         }
     }
 
@@ -256,6 +254,230 @@ export class PostHogService {
 
             for (const [name, dayCounts] of byEvent) {
                 result.set(name, days.map(d => dayCounts.get(d) || 0));
+            }
+        } catch {
+            // Silently fail
+        }
+
+        return result;
+    }
+
+    async getErrorOccurrences(projectId: number): Promise<ErrorOccurrence[]> {
+        const issues = await this.getErrorTrackingIssues(projectId);
+        const activeIssues = issues.filter(i => i.status === 'active');
+        if (activeIssues.length === 0) { return []; }
+
+        const occurrences: ErrorOccurrence[] = [];
+
+        // Fetch stack traces in parallel, bounded to avoid overwhelming the API
+        const BATCH_SIZE = 10;
+        for (let i = 0; i < activeIssues.length; i += BATCH_SIZE) {
+            const batch = activeIssues.slice(i, i + BATCH_SIZE);
+            const results = await Promise.allSettled(
+                batch.map(issue => this.getErrorStackTrace(projectId, issue.id))
+            );
+
+            for (let j = 0; j < batch.length; j++) {
+                const issue = batch[j];
+                const result = results[j];
+                if (result.status !== 'fulfilled' || result.value.length === 0) { continue; }
+
+                const frame = this.findFirstInAppFrame(result.value);
+                if (!frame) { continue; }
+
+                occurrences.push({
+                    issueId: issue.id,
+                    title: issue.name || result.value[0]?.type || 'Unknown error',
+                    description: issue.description || result.value[0]?.value || null,
+                    status: issue.status,
+                    occurrences: issue.occurrences ?? 0,
+                    firstSeen: issue.first_seen,
+                    lastSeen: issue.last_seen ?? null,
+                    filePath: frame.filename,
+                    line: frame.lineno,
+                    column: frame.colno || null,
+                    functionName: frame.function || null,
+                });
+            }
+        }
+
+        return occurrences;
+    }
+
+    private findFirstInAppFrame(exceptions: ExceptionEntry[]): StackFrame | null {
+        for (const ex of exceptions) {
+            const frames = ex.stack_trace?.frames;
+            if (!frames || frames.length === 0) { continue; }
+
+            // Frames are typically ordered bottom-to-top; the last in-app frame
+            // is the most relevant (closest to the throw site).
+            for (let i = frames.length - 1; i >= 0; i--) {
+                const f = frames[i];
+                if (f.in_app !== false && f.filename && f.lineno > 0) {
+                    return f;
+                }
+            }
+
+            // Fallback: any frame with a filename and line
+            for (let i = frames.length - 1; i >= 0; i--) {
+                const f = frames[i];
+                if (f.filename && f.lineno > 0) {
+                    return f;
+                }
+            }
+        }
+        return null;
+    }
+
+    async getRecentSessions(projectId: number, eventName: string): Promise<SessionReplayEntry[]> {
+        const safeEvent = this.escapeHogQLString(eventName);
+        const query = `SELECT
+            e.$session_id,
+            e.distinct_id,
+            max(e.timestamp) as latest_ts,
+            argMax(e.properties.$current_url, e.timestamp),
+            argMax(e.properties.$browser, e.timestamp),
+            argMax(e.properties.$os, e.timestamp),
+            argMax(e.properties.$device_type, e.timestamp)
+        FROM events e
+        INNER JOIN session_replay_events sr ON sr.session_id = e.$session_id
+        WHERE e.event = '${safeEvent}'
+            AND e.$session_id IS NOT NULL
+            AND e.$session_id != ''
+            AND e.timestamp > now() - INTERVAL 7 DAY
+        GROUP BY e.$session_id, e.distinct_id
+        ORDER BY latest_ts DESC
+        LIMIT 10`;
+
+        try {
+            const data = await this.request<HogQLQueryResponse>(
+                `/api/environments/${projectId}/query/`,
+                { method: 'POST', body: { query: { kind: 'HogQLQuery', query } } },
+            );
+
+            return data.results.map(row => ({
+                sessionId: String(row[0]),
+                distinctId: String(row[1]),
+                timestamp: String(row[2]),
+                currentUrl: row[3] ? String(row[3]) : null,
+                browser: row[4] ? String(row[4]) : null,
+                os: row[5] ? String(row[5]) : null,
+                deviceType: row[6] ? String(row[6]) : null,
+            }));
+        } catch {
+            return [];
+        }
+    }
+
+    async getRecentSessionsForFlag(projectId: number, flagKey: string): Promise<SessionReplayEntry[]> {
+        const safeKey = this.escapeHogQLString(flagKey);
+        const query = `SELECT
+            e.$session_id,
+            e.distinct_id,
+            max(e.timestamp) as latest_ts,
+            argMax(e.properties.$current_url, e.timestamp),
+            argMax(e.properties.$browser, e.timestamp),
+            argMax(e.properties.$os, e.timestamp),
+            argMax(e.properties.$device_type, e.timestamp)
+        FROM events e
+        INNER JOIN session_replay_events sr ON sr.session_id = e.$session_id
+        WHERE (
+            (e.event = '$feature_flag_called' AND e.properties.$feature_flag = '${safeKey}')
+            OR e.properties.$feature.${safeKey} IS NOT NULL
+        )
+            AND e.$session_id IS NOT NULL
+            AND e.$session_id != ''
+            AND e.timestamp > now() - INTERVAL 7 DAY
+        GROUP BY e.$session_id, e.distinct_id
+        ORDER BY latest_ts DESC
+        LIMIT 10`;
+
+        try {
+            const data = await this.request<HogQLQueryResponse>(
+                `/api/environments/${projectId}/query/`,
+                { method: 'POST', body: { query: { kind: 'HogQLQuery', query } } },
+            );
+
+            return data.results.map(row => ({
+                sessionId: String(row[0]),
+                distinctId: String(row[1]),
+                timestamp: String(row[2]),
+                currentUrl: row[3] ? String(row[3]) : null,
+                browser: row[4] ? String(row[4]) : null,
+                os: row[5] ? String(row[5]) : null,
+                deviceType: row[6] ? String(row[6]) : null,
+            }));
+        } catch {
+            return [];
+        }
+    }
+
+    async getSessionSharingUrl(projectId: number, sessionId: string): Promise<string | null> {
+        const host = this.authService.getHost().replace(/\/+$/, '');
+        const basePath = `/api/projects/${projectId}/session_recordings/${sessionId}/sharing`;
+        try {
+            // Enable sharing via PATCH (creates config if needed, or updates existing)
+            const result = await this.request<{ enabled: boolean; access_token: string }>(basePath, {
+                method: 'PATCH',
+                body: { enabled: true },
+            });
+            if (result.access_token) {
+                return `${host}/embedded/${result.access_token}`;
+            }
+        } catch {
+            // Sharing API may not be available (e.g., older self-hosted)
+        }
+        return null;
+    }
+
+    async getSessionCounts(projectId: number, eventNames: string[], flagKeys: string[]): Promise<Map<string, { sessions: number; users: number }>> {
+        const result = new Map<string, { sessions: number; users: number }>();
+        const parts: string[] = [];
+
+        if (eventNames.length > 0) {
+            const escaped = eventNames.map(n => `'${this.escapeHogQLString(n)}'`).join(', ');
+            parts.push(`SELECT
+                event as key,
+                count(DISTINCT $session_id) as sessions,
+                count(DISTINCT distinct_id) as users
+            FROM events
+            WHERE event IN (${escaped})
+                AND $session_id IS NOT NULL
+                AND $session_id != ''
+                AND timestamp > now() - INTERVAL 1 DAY
+            GROUP BY event`);
+        }
+
+        if (flagKeys.length > 0) {
+            const escaped = flagKeys.map(k => `'${this.escapeHogQLString(k)}'`).join(', ');
+            parts.push(`SELECT
+                properties.$feature_flag as key,
+                count(DISTINCT $session_id) as sessions,
+                count(DISTINCT distinct_id) as users
+            FROM events
+            WHERE event = '$feature_flag_called'
+                AND properties.$feature_flag IN (${escaped})
+                AND $session_id IS NOT NULL
+                AND $session_id != ''
+                AND timestamp > now() - INTERVAL 1 DAY
+            GROUP BY properties.$feature_flag`);
+        }
+
+        if (parts.length === 0) { return result; }
+
+        const query = parts.join(' UNION ALL ');
+
+        try {
+            const data = await this.request<HogQLQueryResponse>(
+                `/api/environments/${projectId}/query/`,
+                { method: 'POST', body: { query: { kind: 'HogQLQuery', query } } },
+            );
+
+            for (const row of data.results) {
+                result.set(String(row[0]), {
+                    sessions: row[1] as number,
+                    users: row[2] as number,
+                });
             }
         } catch {
             // Silently fail

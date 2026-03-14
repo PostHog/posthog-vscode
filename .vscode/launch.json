@@ -6,14 +6,83 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "Run Extension",
+			"name": "Playground: TypeScript",
 			"type": "extensionHost",
 			"request": "launch",
 			"args": [
 				"--extensionDevelopmentPath=${workspaceFolder}",
-				"${workspaceFolder}/playground",
-				"${workspaceFolder}/playground/src/App.tsx",
-				"${workspaceFolder}/playground/index.ts"
+				"${workspaceFolder}/playgrounds/typescript",
+				"${workspaceFolder}/playgrounds/typescript/src/App.tsx",
+				"${workspaceFolder}/playgrounds/typescript/index.ts"
+			],
+			"outFiles": [
+				"${workspaceFolder}/dist/**/*.js"
+			],
+			"preLaunchTask": "${defaultBuildTask}"
+		},
+		{
+			"name": "Playground: JavaScript",
+			"type": "extensionHost",
+			"request": "launch",
+			"args": [
+				"--extensionDevelopmentPath=${workspaceFolder}",
+				"${workspaceFolder}/playgrounds/javascript",
+				"${workspaceFolder}/playgrounds/javascript/index.js"
+			],
+			"outFiles": [
+				"${workspaceFolder}/dist/**/*.js"
+			],
+			"preLaunchTask": "${defaultBuildTask}"
+		},
+		{
+			"name": "Playground: Python",
+			"type": "extensionHost",
+			"request": "launch",
+			"args": [
+				"--extensionDevelopmentPath=${workspaceFolder}",
+				"${workspaceFolder}/playgrounds/python",
+				"${workspaceFolder}/playgrounds/python/app.py"
+			],
+			"outFiles": [
+				"${workspaceFolder}/dist/**/*.js"
+			],
+			"preLaunchTask": "${defaultBuildTask}"
+		},
+		{
+			"name": "Playground: Go",
+			"type": "extensionHost",
+			"request": "launch",
+			"args": [
+				"--extensionDevelopmentPath=${workspaceFolder}",
+				"${workspaceFolder}/playgrounds/go",
+				"${workspaceFolder}/playgrounds/go/main.go"
+			],
+			"outFiles": [
+				"${workspaceFolder}/dist/**/*.js"
+			],
+			"preLaunchTask": "${defaultBuildTask}"
+		},
+		{
+			"name": "Playground: Ruby",
+			"type": "extensionHost",
+			"request": "launch",
+			"args": [
+				"--extensionDevelopmentPath=${workspaceFolder}",
+				"${workspaceFolder}/playgrounds/ruby",
+				"${workspaceFolder}/playgrounds/ruby/app.rb"
+			],
+			"outFiles": [
+				"${workspaceFolder}/dist/**/*.js"
+			],
+			"preLaunchTask": "${defaultBuildTask}"
+		},
+		{
+			"name": "PostHog Repo",
+			"type": "extensionHost",
+			"request": "launch",
+			"args": [
+				"--extensionDevelopmentPath=${workspaceFolder}",
+				"/Users/fcgomes/posthog"
 			],
 			"outFiles": [
 				"${workspaceFolder}/dist/**/*.js"

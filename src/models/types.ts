@@ -162,6 +162,30 @@ export interface ExceptionEntry {
     stack_trace?: { frames: StackFrame[] };
 }
 
+export interface ErrorOccurrence {
+    issueId: string;
+    title: string;
+    description: string | null;
+    status: ErrorTrackingIssue['status'];
+    occurrences: number;
+    firstSeen: string;
+    lastSeen: string | null;
+    filePath: string;
+    line: number;
+    column: number | null;
+    functionName: string | null;
+}
+
+export interface SessionReplayEntry {
+    sessionId: string;
+    distinctId: string;
+    timestamp: string;
+    currentUrl: string | null;
+    browser: string | null;
+    os: string | null;
+    deviceType: string | null;
+}
+
 export interface HogQLQueryResponse {
     results: unknown[][];
     columns: string[];

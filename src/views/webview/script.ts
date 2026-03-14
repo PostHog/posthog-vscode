@@ -8,6 +8,7 @@ let loadedTabs = new Set();
 let allData = { flags: [], errors: [], experiments: [], analytics: [] };
 let experimentResults = {};
 let projectId = null;
+let localIssueIds = [];
 
 // ── Helpers ──
 
@@ -52,6 +53,8 @@ function switchTab(tab) {
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
     document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === 'section-' + tab));
     document.getElementById('search').value = '';
+    var errFilter = document.getElementById('errors-filter');
+    if (errFilter) { errFilter.style.display = (tab === 'errors' && localIssueIds.length > 0) ? '' : 'none'; }
 
     if (!loadedTabs.has(tab)) {
         loadedTabs.add(tab);
@@ -137,25 +140,42 @@ function renderFlags(flags) {
 
 function renderErrors(issues) {
     allData.errors = issues;
-    renderSection('errors', issues, (list, items) => {
+    const filterDiv = document.getElementById('errors-filter');
+    if (filterDiv) { filterDiv.style.display = localIssueIds.length > 0 ? '' : 'none'; }
+    const localOnly = document.getElementById('errors-local-only');
+    const filtered = localOnly && localOnly.checked
+        ? issues.filter(e => localIssueIds.includes(e.id))
+        : issues;
+    renderSection('errors', filtered, (list, items) => {
         list.innerHTML = items.map(e => {
             const dotClass = e.status === 'resolved' ? 'resolved' : 'error';
             const desc = e.description ? e.description.split('\\\\n')[0].substring(0, 120) : '';
             const badge = e.occurrences != null ? '<span class="badge count">' + e.occurrences + '</span>' : '';
             const issueId = e.short_id || e.id;
-            return '<div class="item" data-id="' + esc(e.id) + '" style="cursor:pointer;">'
+            const isLocal = localIssueIds.includes(e.id);
+            const jumpBtn = isLocal
+                ? '<button class="act-jump" data-issue-id="' + esc(e.id) + '" title="Jump to error in code" style="opacity:0.7;">&#x21B7;</button>'
+                : '';
+            return '<div class="item" data-id="' + esc(e.id) + '"' + (isLocal ? ' data-local="1"' : '') + ' style="cursor:pointer;">'
                 + '<div class="dot ' + dotClass + '"></div>'
                 + '<div class="info">'
-                + '<div class="primary">' + esc(e.name || 'Unknown error') + '</div>'
+                + '<div class="primary">' + (isLocal ? '<span title="Found in this repo" style="margin-right:4px;">&#x1F4C2;</span>' : '') + esc(e.name || 'Unknown error') + '</div>'
                 + '<div class="secondary">' + esc(desc) + '</div>'
                 + '</div>'
                 + badge
                 + '<div class="item-actions">'
+                + jumpBtn
                 + '<button class="act-open" data-path="/project/' + projectId + '/error_tracking/' + issueId + '" title="Open in PostHog">&#x2197;</button>'
                 + '</div>'
                 + '</div>';
         }).join('');
         bindListClicks(list, 'id', (id) => send({ type: 'openErrorPanel', id }));
+        list.querySelectorAll('.act-jump').forEach(btn => {
+            btn.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                send({ type: 'jumpToError', issueId: btn.getAttribute('data-issue-id') });
+            });
+        });
     });
 }
 
@@ -934,6 +954,9 @@ document.getElementById('btn-sign-in').addEventListener('click', () => send({ ty
 document.getElementById('btn-select-project').addEventListener('click', () => send({ type: 'selectProject' }));
 document.getElementById('btn-sign-out').addEventListener('click', () => send({ type: 'signOut' }));
 document.getElementById('search').addEventListener('input', filterItems);
+document.getElementById('errors-local-only').addEventListener('change', () => {
+    if (allData.errors.length) { renderErrors(allData.errors); }
+});
 document.getElementById('detail-back').addEventListener('click', hideDetail);
 document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.addEventListener('click', () => { hideDetail(); switchTab(tab.dataset.tab); });
@@ -967,6 +990,7 @@ window.addEventListener('message', e => {
             break;
         case 'errors':
             projectId = msg.projectId;
+            if (msg.localIssueIds) { localIssueIds = msg.localIssueIds; }
             renderErrors(msg.data);
             break;
         case 'experiments':

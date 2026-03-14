@@ -2,13 +2,17 @@ import * as vscode from 'vscode';
 import { AuthService } from '../services/authService';
 import { PostHogService } from '../services/postHogService';
 import { FlagCacheService } from '../services/flagCacheService';
-import { FeatureFlag, Experiment, ExperimentResults, ErrorTrackingIssue, Insight } from '../models/types';
+import { FeatureFlag, Experiment, ExperimentResults, ErrorTrackingIssue, Insight, SessionReplayEntry } from '../models/types';
 
 function getNonce(): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let nonce = '';
     for (let i = 0; i < 32; i++) { nonce += chars.charAt(Math.floor(Math.random() * chars.length)); }
     return nonce;
+}
+
+function escapeHtml(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 export class DetailPanelProvider {
@@ -51,6 +55,53 @@ export class DetailPanelProvider {
         this.bindInsightMessages(panel);
     }
 
+    async showReplay(session: SessionReplayEntry) {
+        const projectId = this.authService.getProjectId();
+        if (!projectId) { return; }
+        const host = this.getHost();
+        const panelId = `replay-${session.sessionId}`;
+        const label = session.distinctId.length > 16
+            ? session.distinctId.substring(0, 13) + '...'
+            : session.distinctId;
+        const panel = this.getOrCreatePanel(panelId, `Replay: ${label}`, 'Replay');
+
+        // Show loading state immediately
+        panel.webview.html = this.buildReplayHtml(panel.webview, host, projectId, session, undefined);
+        this.bindCommonMessages(panel);
+
+        // Fetch sharing URL
+        const sharingUrl = await this.postHogService.getSessionSharingUrl(projectId, session.sessionId);
+        panel.webview.html = this.buildReplayHtml(panel.webview, host, projectId, session, sharingUrl);
+        this.bindCommonMessages(panel);
+    }
+
+    async showSessions(key: string, type: 'event' | 'flag') {
+        const projectId = this.authService.getProjectId();
+        if (!projectId) { return; }
+
+        const panelId = `sessions-${type}-${key}`;
+        const title = type === 'event' ? `Sessions: ${key}` : `Sessions: ${key}`;
+        const panel = this.getOrCreatePanel(panelId, title, 'Sessions');
+
+        // Show loading state immediately
+        panel.webview.html = this.buildHtml(panel.webview, 'sessions', {
+            key, type, sessions: null,
+            host: this.getHost(), projectId,
+        });
+        this.bindSessionMessages(panel);
+
+        // Fetch sessions
+        const sessions = type === 'event'
+            ? await this.postHogService.getRecentSessions(projectId, key)
+            : await this.postHogService.getRecentSessionsForFlag(projectId, key);
+
+        panel.webview.html = this.buildHtml(panel.webview, 'sessions', {
+            key, type, sessions,
+            host: this.getHost(), projectId,
+        });
+        this.bindSessionMessages(panel);
+    }
+
     // ── Panel management ──
 
     private getOrCreatePanel(id: string, title: string, type: string): vscode.WebviewPanel {
@@ -84,6 +135,29 @@ export class DetailPanelProvider {
     }
 
     // ── Message handlers ──
+
+    private bindSessionMessages(panel: vscode.WebviewPanel) {
+        panel.webview.onDidReceiveMessage(async (msg: { type: string; [k: string]: unknown }) => {
+            switch (msg.type) {
+                case 'watchReplay':
+                    this.showReplay(msg.session as SessionReplayEntry);
+                    break;
+                case 'copy':
+                    await vscode.env.clipboard.writeText(msg.text as string);
+                    vscode.window.showInformationMessage(`Copied: ${msg.text}`);
+                    break;
+                case 'openExternal':
+                    vscode.env.openExternal(vscode.Uri.parse(msg.url as string));
+                    break;
+                case 'findReferences':
+                    vscode.commands.executeCommand('workbench.action.findInFiles', {
+                        query: msg.key as string, isRegex: false, isCaseSensitive: true,
+                        filesToExclude: '**/node_modules/**',
+                    });
+                    break;
+            }
+        });
+    }
 
     private bindCommonMessages(panel: vscode.WebviewPanel) {
         panel.webview.onDidReceiveMessage(async (msg: { type: string; [k: string]: unknown }) => {
@@ -193,6 +267,79 @@ export class DetailPanelProvider {
                 }
             }
         });
+    }
+
+    // ── Replay HTML ──
+
+    private buildReplayHtml(webview: vscode.Webview, host: string, projectId: number, session: SessionReplayEntry, sharingUrl: string | null | undefined): string {
+        const nonce = getNonce();
+        const replayUrl = `${host}/project/${projectId}/replay/${session.sessionId}`;
+        // Allow framing from the PostHog host
+        let frameHost: string;
+        try { frameHost = new URL(host).origin; } catch { frameHost = host; }
+
+        const isLoading = sharingUrl === undefined;
+
+        return /*html*/ `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src ${frameHost}; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
+<style nonce="${nonce}">
+html, body { margin:0; padding:0; height:100%; overflow:hidden; background:var(--vscode-editor-background); color:var(--vscode-editor-foreground); font-family:var(--vscode-font-family); }
+.toolbar { display:flex; align-items:center; gap:8px; padding:8px 16px; border-bottom:1px solid var(--vscode-panel-border); font-size:13px; }
+.toolbar .info { flex:1; display:flex; align-items:center; gap:8px; min-width:0; }
+.toolbar .info span { opacity:0.6; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.toolbar .title { font-weight:600; opacity:1 !important; }
+.btn { background:var(--vscode-button-background); color:var(--vscode-button-foreground); border:none; border-radius:4px; padding:4px 12px; cursor:pointer; font-size:12px; white-space:nowrap; }
+.btn:hover { opacity:0.9; }
+.btn-ghost { background:transparent; color:var(--vscode-foreground); border:1px solid var(--vscode-input-border); }
+iframe { width:100%; height:calc(100vh - 45px); border:none; }
+.center-msg { display:flex; position:absolute; inset:0; top:45px; align-items:center; justify-content:center; flex-direction:column; gap:12px; text-align:center; padding:40px; }
+.center-msg .icon { font-size:48px; margin-bottom:8px; }
+.center-msg p { opacity:0.6; font-size:13px; max-width:400px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner { width:24px; height:24px; border:3px solid var(--vscode-input-border); border-top-color:var(--vscode-button-background); border-radius:50%; animation:spin .8s linear infinite; }
+</style>
+</head>
+<body>
+<div class="toolbar">
+    <div class="info">
+        <span class="title">&#x25B6; ${escapeHtml(session.distinctId)}</span>
+        <span>${escapeHtml(session.currentUrl || '')}</span>
+    </div>
+    <button class="btn btn-ghost" id="btn-open-external">Open in PostHog &#x2197;</button>
+</div>
+${isLoading ? `
+<div class="center-msg">
+    <div class="spinner"></div>
+    <p>Generating sharing link...</p>
+</div>
+` : sharingUrl ? `
+<iframe id="replay-frame" src="${sharingUrl}" allow="clipboard-read; clipboard-write"></iframe>
+` : `
+<div class="center-msg">
+    <div class="icon">&#x1F3AC;</div>
+    <p>Could not generate an embeddable link for this replay.<br>The sharing API may not be available on this PostHog instance.</p>
+    <button class="btn" id="btn-fallback-open">Open in Browser Instead</button>
+</div>
+`}
+<script nonce="${nonce}">
+(function() {
+    var vscode = acquireVsCodeApi();
+    var replayUrl = ${JSON.stringify(replayUrl)};
+    document.getElementById('btn-open-external').addEventListener('click', function() {
+        vscode.postMessage({ type: 'openExternal', url: replayUrl });
+    });
+    var fb = document.getElementById('btn-fallback-open');
+    if (fb) { fb.addEventListener('click', function() {
+        vscode.postMessage({ type: 'openExternal', url: replayUrl });
+    }); }
+})();
+</script>
+</body>
+</html>`;
     }
 
     // ── HTML builder ──
@@ -495,6 +642,85 @@ body {
     min-height: 120px;
 }
 .viz-container svg { display: block; }
+
+/* ── Session replay cards ── */
+.session-card {
+    background: var(--vscode-textCodeBlock-background, rgba(255,255,255,0.04));
+    border: 1px solid var(--vscode-panel-border, rgba(255,255,255,0.06));
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+.session-card:hover {
+    border-color: var(--ph-blue);
+    background: rgba(29, 74, 255, 0.04);
+}
+.session-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+.session-user {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.session-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--ph-blue);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+.session-distinct-id {
+    font-size: 13px;
+    font-weight: 600;
+    font-family: var(--vscode-editor-font-family);
+}
+.session-time {
+    font-size: 11px;
+    opacity: 0.5;
+    white-space: nowrap;
+}
+.session-url {
+    font-size: 11px;
+    opacity: 0.5;
+    font-family: var(--vscode-editor-font-family);
+    margin-bottom: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.session-device {
+    font-size: 10px;
+    opacity: 0.35;
+    margin-bottom: 4px;
+}
+.session-play {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ph-blue);
+    margin-top: 6px;
+}
+.spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid rgba(255,255,255,0.1);
+    border-top-color: var(--ph-blue);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 `;
 }
 
@@ -507,6 +733,15 @@ function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.
 function fmtNum(n) { if (n >= 1e6) return (n/1e6).toFixed(1)+'M'; if (n >= 1e3) return (n/1e3).toFixed(1)+'K'; return String(n); }
 function fmtPct(n) { return (n*100).toFixed(1)+'%'; }
 function fmtVal(v, t) { if (v==null) return '-'; if (t==='funnel'||t==='retention') return fmtPct(v); return typeof v==='number' ? v.toFixed(2) : String(v); }
+function act(msg) { return ' data-action=\\'' + JSON.stringify(msg).replace(/'/g, '&#39;') + '\\''; }
+function bindClicks() {
+    document.querySelectorAll('[data-action]').forEach(function(el) {
+        el.addEventListener('click', function(e) {
+            e.stopPropagation();
+            try { send(JSON.parse(el.getAttribute('data-action'))); } catch(err) {}
+        });
+    });
+}
 `;
 
     switch (type) {
@@ -514,6 +749,7 @@ function fmtVal(v, t) { if (v==null) return '-'; if (t==='funnel'||t==='retentio
         case 'experiment': return common + getExperimentScript();
         case 'error': return common + getErrorScript();
         case 'insight': return common + getInsightScript();
+        case 'sessions': return common + getSessionsScript();
         default: return common;
     }
 }
@@ -544,9 +780,9 @@ function getFlagScript(): string {
         + (f.name && f.name !== f.key ? '<div class="hero-subtitle">' + esc(f.name) + '</div>' : '')
         + '<div class="hero-badges"><span class="badge ' + (f.active ? 'active' : 'inactive') + '">' + (f.active ? 'Active' : 'Inactive') + '</span></div>'
         + '</div><div class="hero-actions">'
-        + '<button class="btn btn-secondary" onclick="send({type:\\'findReferences\\',key:\\'' + esc(f.key) + '\\'})">Find References</button>'
-        + '<button class="btn btn-secondary" onclick="send({type:\\'copy\\',text:\\'' + esc(f.key) + '\\'})">Copy Key</button>'
-        + '<button class="btn btn-ghost" onclick="send({type:\\'openExternal\\',url:\\'' + esc(host) + '/project/' + projectId + '/feature_flags/' + f.id + '\\'})">Open in PostHog &#x2197;</button>'
+        + '<button class="btn btn-secondary"' + act({type:'findReferences',key:f.key}) + '>Find References</button>'
+        + '<button class="btn btn-secondary"' + act({type:'copy',text:f.key}) + '>Copy Key</button>'
+        + '<button class="btn btn-ghost"' + act({type:'openExternal',url:host+'/project/'+projectId+'/feature_flags/'+f.id}) + '>Open in PostHog &#x2197;</button>'
         + '</div></div>';
 
     // Status toggle
@@ -597,6 +833,7 @@ function getFlagScript(): string {
     html += '</div>';
 
     document.body.innerHTML = html;
+    bindClicks();
 
     // Bindings
     var toggle = document.getElementById('flag-toggle');
@@ -708,9 +945,9 @@ function getExperimentScript(): string {
         html += '<span class="badge draft">' + days + ' day' + (days !== 1 ? 's' : '') + '</span>';
     }
     html += '</div></div><div class="hero-actions">'
-        + '<button class="btn btn-secondary" onclick="send({type:\\'findReferences\\',key:\\'' + esc(exp.feature_flag_key) + '\\'})">Find References</button>'
-        + '<button class="btn btn-secondary" onclick="send({type:\\'copy\\',text:\\'' + esc(exp.feature_flag_key) + '\\'})">Copy Flag Key</button>'
-        + '<button class="btn btn-ghost" onclick="send({type:\\'openExternal\\',url:\\'' + esc(host) + '/project/' + projectId + '/experiments/' + exp.id + '\\'})">Open in PostHog &#x2197;</button>'
+        + '<button class="btn btn-secondary"' + act({type:'findReferences',key:exp.feature_flag_key}) + '>Find References</button>'
+        + '<button class="btn btn-secondary"' + act({type:'copy',text:exp.feature_flag_key}) + '>Copy Flag Key</button>'
+        + '<button class="btn btn-ghost"' + act({type:'openExternal',url:host+'/project/'+projectId+'/experiments/'+exp.id}) + '>Open in PostHog &#x2197;</button>'
         + '</div></div>';
 
     if (exp.description) {
@@ -818,6 +1055,7 @@ function getExperimentScript(): string {
     html += '<div class="meta-row"><span>Created ' + created + ' by ' + esc(createdBy) + '</span></div>';
     html += '</div>';
     document.body.innerHTML = html;
+    bindClicks();
 })();
 `;
 }
@@ -835,8 +1073,8 @@ function getErrorScript(): string {
         + '<div class="hero-title">' + esc(e.name || 'Unknown error') + '</div>'
         + '<div class="hero-badges"><span class="badge ' + (e.status === 'resolved' ? 'resolved' : 'error') + '">' + esc(e.status) + '</span></div>'
         + '</div><div class="hero-actions">'
-        + '<button class="btn btn-primary" onclick="send({type:\\'jumpToError\\',issueId:\\'' + esc(e.id) + '\\'})">Jump to Code</button>'
-        + '<button class="btn btn-ghost" onclick="send({type:\\'openExternal\\',url:\\'' + esc(host) + '/project/' + projectId + '/error_tracking/' + issueId + '\\'})">Open in PostHog &#x2197;</button>'
+        + '<button class="btn btn-primary"' + act({type:'jumpToError',issueId:e.id}) + '>Jump to Code</button>'
+        + '<button class="btn btn-ghost"' + act({type:'openExternal',url:host+'/project/'+projectId+'/error_tracking/'+issueId}) + '>Open in PostHog &#x2197;</button>'
         + '</div></div>';
 
     html += '<div class="card-row">';
@@ -851,6 +1089,7 @@ function getErrorScript(): string {
     html += '<div class="meta-row"><span>First seen: ' + timeAgo(e.first_seen) + '</span>' + (e.last_seen ? '<span>Last seen: ' + timeAgo(e.last_seen) + '</span>' : '') + '</div>';
     html += '</div>';
     document.body.innerHTML = html;
+    bindClicks();
 })();
 `;
 }
@@ -870,7 +1109,7 @@ function getInsightScript(): string {
         + '<div class="hero-badges"><span class="badge draft">' + kind + '</span><span class="badge draft">' + refreshed + '</span></div>'
         + '</div><div class="hero-actions">'
         + '<button class="btn btn-secondary" id="refresh-btn">Refresh Data</button>'
-        + '<button class="btn btn-ghost" onclick="send({type:\\'openExternal\\',url:\\'' + esc(host) + '/project/' + projectId + '/insights/' + (ins.short_id || ins.id) + '\\'})">Open in PostHog &#x2197;</button>'
+        + '<button class="btn btn-ghost"' + act({type:'openExternal',url:host+'/project/'+projectId+'/insights/'+(ins.short_id||ins.id)}) + '>Open in PostHog &#x2197;</button>'
         + '</div></div>';
 
     if (ins.description) html += '<div class="field"><div class="field-value">' + esc(ins.description) + '</div></div>';
@@ -886,6 +1125,7 @@ function getInsightScript(): string {
     html += '<div class="meta-row"><span>Created ' + (ins.created_at ? new Date(ins.created_at).toLocaleDateString() : 'Unknown') + '</span></div>';
     html += '</div>';
     document.body.innerHTML = html;
+    bindClicks();
 
     document.getElementById('refresh-btn').addEventListener('click', function() {
         this.textContent = 'Refreshing...';
@@ -965,6 +1205,84 @@ function getInsightScript(): string {
         }
         return '';
     }
+})();
+`;
+}
+
+function getSessionsScript(): string {
+    return /*js*/ `
+(function() {
+    const key = DATA.key;
+    const type = DATA.type;
+    const sessions = DATA.sessions;
+    const host = DATA.host;
+    const projectId = DATA.projectId;
+
+    let html = '<div class="page">';
+
+    // Hero
+    html += '<div class="hero"><div class="hero-left">'
+        + '<div class="hero-title">&#x1F441; Sessions</div>'
+        + '<div class="hero-subtitle"><code>' + esc(key) + '</code> &middot; ' + (type === 'event' ? 'Event' : 'Feature Flag') + '</div>'
+        + '</div><div class="hero-actions">'
+        + '<button class="btn btn-ghost"' + act({type:'openExternal',url:host+'/project/'+projectId+'/replay'}) + '>All Recordings &#x2197;</button>'
+        + '</div></div>';
+
+    if (sessions === null) {
+        html += '<div class="card" style="text-align:center;padding:40px">'
+            + '<div class="spinner"></div>'
+            + '<div style="margin-top:12px;opacity:0.5;font-size:13px">Loading sessions...</div>'
+            + '</div>';
+    } else if (sessions.length === 0) {
+        html += '<div class="card" style="text-align:center;padding:40px">'
+            + '<div style="font-size:32px;margin-bottom:8px">&#x1F914;</div>'
+            + '<div style="font-size:14px;font-weight:600;margin-bottom:4px">No sessions found</div>'
+            + '<div style="opacity:0.5;font-size:12px">No sessions with this ' + type + ' in the last 24 hours.<br>Make sure session recording is enabled in your PostHog project.</div>'
+            + '</div>';
+    } else {
+        html += '<div style="font-size:12px;opacity:0.5;margin-bottom:12px">' + sessions.length + ' session' + (sessions.length !== 1 ? 's' : '') + ' in the last 24h</div>';
+
+        sessions.forEach(function(s, i) {
+            var ts = new Date(s.timestamp);
+            var timeStr = ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            var dateStr = ts.toLocaleDateString([], { month: 'short', day: 'numeric' });
+            var url = s.currentUrl;
+            var displayUrl = url;
+            if (url) {
+                try { displayUrl = new URL(url).pathname; } catch(e) { displayUrl = url; }
+                if (displayUrl.length > 50) displayUrl = displayUrl.substring(0, 47) + '...';
+            }
+
+            var deviceParts = [];
+            if (s.browser) deviceParts.push(s.browser);
+            if (s.os) deviceParts.push(s.os);
+            if (s.deviceType) deviceParts.push(s.deviceType);
+            var deviceStr = deviceParts.join(' &middot; ');
+
+            html += '<div class="session-card"' + act({type:'watchReplay',session:s}) + '>'
+                + '<div class="session-header">'
+                + '<div class="session-user">'
+                + '<span class="session-avatar">' + esc(s.distinctId.substring(0, 2).toUpperCase()) + '</span>'
+                + '<span class="session-distinct-id">' + esc(s.distinctId.length > 24 ? s.distinctId.substring(0, 21) + '...' : s.distinctId) + '</span>'
+                + '</div>'
+                + '<div class="session-time">' + dateStr + ' ' + timeStr + '</div>'
+                + '</div>';
+
+            if (displayUrl) {
+                html += '<div class="session-url">' + esc(displayUrl) + '</div>';
+            }
+            if (deviceStr) {
+                html += '<div class="session-device">' + deviceStr + '</div>';
+            }
+
+            html += '<div class="session-play">&#x25B6; Watch replay</div>';
+            html += '</div>';
+        });
+    }
+
+    html += '</div>';
+    document.body.innerHTML = html;
+    bindClicks();
 })();
 `;
 }

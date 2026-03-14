@@ -4,6 +4,7 @@ import { PostHogService } from '../services/postHogService';
 import { FlagCacheService } from '../services/flagCacheService';
 import { ExperimentCacheService } from '../services/experimentCacheService';
 import { StackFrame } from '../models/types';
+import { ErrorCacheService } from '../services/errorCacheService';
 import { Commands } from '../constants';
 import { getWebviewHtml } from './getWebviewHtml';
 import { DetailPanelProvider } from './DetailPanelProvider';
@@ -18,6 +19,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         private readonly flagCache: FlagCacheService,
         private readonly experimentCache?: ExperimentCacheService,
         private readonly detailPanel?: DetailPanelProvider,
+        private readonly errorCache?: ErrorCacheService,
     ) {}
 
     resolveWebviewView(webviewView: vscode.WebviewView) {
@@ -189,10 +191,49 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         this.postMessage({ type: 'loading', section: 'errors' });
         try {
             const issues = await this.postHogService.getErrorTrackingIssues(projectId);
-            this.postMessage({ type: 'errors', data: issues, projectId });
-        } catch {
-            this.postMessage({ type: 'error', section: 'errors', message: 'Failed to load errors' });
+
+            // Resolve which issues have files in the current workspace
+            const localIssueIds: string[] = [];
+            if (this.errorCache) {
+                const occurrences = this.errorCache.getAll();
+                const issueIdSet = new Set(occurrences.map(o => o.issueId));
+                for (const id of issueIdSet) {
+                    const occ = occurrences.find(o => o.issueId === id);
+                    if (occ) {
+                        const resolved = await this.resolveFilePath(occ.filePath);
+                        if (resolved) { localIssueIds.push(id); }
+                    }
+                }
+            }
+
+            this.postMessage({ type: 'errors', data: issues, projectId, localIssueIds });
+        } catch (err) {
+            const detail = err instanceof Error ? err.message : String(err);
+            console.error('[PostHog] loadErrors failed:', detail);
+            this.postMessage({ type: 'error', section: 'errors', message: `Failed to load errors: ${detail}` });
         }
+    }
+
+    private async resolveFilePath(filePath: string): Promise<vscode.Uri | null> {
+        let cleaned = filePath;
+        try {
+            const url = new URL(cleaned);
+            cleaned = url.pathname.replace(/^\//, '');
+        } catch { /* not a URL */ }
+
+        if (cleaned.includes('node_modules') || cleaned.startsWith('chrome-extension')) {
+            return null;
+        }
+
+        const matches = await vscode.workspace.findFiles(`**/${cleaned}`, '**/node_modules/**', 1);
+        if (matches.length > 0) { return matches[0]; }
+
+        const basename = cleaned.split('/').pop();
+        if (basename) {
+            const fallback = await vscode.workspace.findFiles(`**/${basename}`, '**/node_modules/**', 3);
+            if (fallback.length === 1) { return fallback[0]; }
+        }
+        return null;
     }
 
     private async loadExperiments() {

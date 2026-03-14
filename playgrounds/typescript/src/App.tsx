@@ -10,6 +10,8 @@ import { ErrorBoundary } from './errors/ErrorBoundary';
 export default function App() {
   const [activeDemo, setActiveDemo] = useState<string | null>(null);
 
+  posthog.capture('annotation created')
+
   const demos: Record<string, { label: string; description: string; component: React.ReactNode }> = {
     buggyCounter: {
       label: 'Render Crash',

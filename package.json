@@ -104,6 +104,10 @@
       {
         "command": "posthog.insertCapture",
         "title": "PostHog: Track Function with PostHog"
+      },
+      {
+        "command": "posthog.showSessions",
+        "title": "PostHog: Watch Sessions"
       }
     ],
     "menus": {
@@ -152,7 +156,29 @@
         "scopeName": "source.hogql",
         "path": "./syntaxes/hogql.tmLanguage.json"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "PostHog",
+      "properties": {
+        "posthog.additionalClientNames": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "markdownDescription": "Extra variable names to recognize as PostHog clients (e.g. `toolbarPosthogJS`, `telemetry`, `posthoganalytics`)."
+        },
+        "posthog.additionalFlagFunctions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "markdownDescription": "Bare function names that accept a feature flag key as the first argument (e.g. `useFeatureFlag`)."
+        },
+        "posthog.detectNestedClients": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Detect PostHog calls through nested member expressions like `window.posthog?.capture()`."
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "pnpm run fetch-grammars && pnpm run package",

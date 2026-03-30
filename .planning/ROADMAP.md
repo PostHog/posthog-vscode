@@ -60,7 +60,11 @@ Plans:
   1. Running "PostHog: Generate Flag Types" from the Command Palette creates or overwrites `.posthog.d.ts` in the workspace root
   2. The generated file contains a TypeScript type for every active flag key, including payload shape where defined
   3. A developer can import the generated types in their application code and get type-safe access to flag payloads
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — TDD: Pure generateFlagTypes function with full type inference and unit tests
+- [ ] 03-02-PLAN.md — Register command, implement handler, wire file write and auto-open
 
 ### Phase 4: OAuth Authentication
 **Goal**: A developer can sign in to PostHog using the standard OAuth flow without handling an API key manually; the existing API key path remains fully functional
@@ -88,12 +92,12 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Dead Code Removal | 4/4 | Complete    | 2026-03-30 |
 | 2. Auth Landing and Sidebar UX | 2/2 | Complete    | 2026-03-30 |
-| 3. Flag Type Generation | 0/? | Not started | - |
+| 3. Flag Type Generation | 0/2 | Not started | - |
 | 4. OAuth Authentication | 0/? | Not started | - |
 | 5. Analytics Tab | 0/? | Not started | - |

@@ -169,7 +169,8 @@ suite('codegenService — generateFlagTypes', () => {
         const flagLine = lines.find((l: string) => l.includes('dedup_flag'));
         assert.ok(flagLine, 'should have a line for dedup_flag');
         if (flagLine) {
-            const typeContent = flagLine.split(':')[1] ?? '';
+            // Line format: "    type dedup_flag = string;" — split on "=" to get the type part
+            const typeContent = flagLine.split('=').slice(1).join('=') ?? '';
             // Count occurrences of "string" in the type definition
             const stringCount = (typeContent.match(/\bstring\b/g) ?? []).length;
             assert.strictEqual(stringCount, 1, 'deduplicated union should only have one "string"');

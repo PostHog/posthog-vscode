@@ -9,20 +9,7 @@ export class PostHogService {
         return value.replace(/\\/g, '\\\\').replace(/'/g, "''");
     }
 
-    private async ensureFreshToken(): Promise<void> {
-        if (this.authService.getAuthMethod() !== 'oauth') return;
-        if (!this.authService.isTokenExpired()) return;
-        try {
-            await this.authService.refreshOAuthToken();
-        } catch {
-            // If refresh fails, the subsequent request will fail with 401
-            // and the caller will handle it appropriately
-            console.warn('[PostHog] OAuth token refresh failed');
-        }
-    }
-
     private async request<T>(path: string, options?: { method?: string; body?: unknown }): Promise<T> {
-        await this.ensureFreshToken();
         const apiKey = await this.authService.getApiKey();
         if (!apiKey) {
             throw new PostHogApiError(401, 'Not authenticated');

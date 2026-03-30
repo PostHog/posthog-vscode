@@ -8,8 +8,6 @@ export const Commands = {
     CREATE_FLAG: 'posthog.createFlag',
     SHOW_FLAG_DETAIL: 'posthog.showFlagDetail',
     SHOW_EXPERIMENT_DETAIL: 'posthog.showExperimentDetail',
-    OPEN_HOGQL_EDITOR: 'posthog.openHogQLEditor',
-    RUN_HOGQL_FILE: 'posthog.runHogQLFile',
     SCAN_STALE_FLAGS: 'posthog.scanStaleFlags',
     CLEANUP_STALE_FLAG: 'posthog.cleanupStaleFlag',
     INSERT_CAPTURE: 'posthog.insertCapture',

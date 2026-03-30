@@ -20,7 +20,6 @@ import { CaptureCodeActionProvider, registerCaptureCommands } from './providers/
 import { StaleFlagService } from './services/staleFlagService';
 import { StaleFlagTreeProvider } from './providers/staleFlagTreeProvider';
 import { DetailPanelProvider } from './views/DetailPanelProvider';
-import { HogQLEditorProvider } from './views/HogQLEditorProvider';
 import { VariantHighlightProvider } from './providers/variantHighlightProvider';
 import { ErrorCacheService } from './services/errorCacheService';
 import { ErrorDecorationProvider } from './providers/errorDecorationProvider';
@@ -51,9 +50,6 @@ export function activate(context: vscode.ExtensionContext) {
     treeSitter.initialize(context.extensionPath).catch(err => {
         console.warn('[PostHog] Tree-sitter initialization failed:', err);
     });
-
-    // HogQL editor
-    const hogqlEditor = new HogQLEditorProvider(context.extensionUri, authService, postHogService);
 
     // Detail panels (full editor tabs)
     const detailPanel = new DetailPanelProvider(
@@ -161,11 +157,6 @@ export function activate(context: vscode.ExtensionContext) {
         ...registerCaptureCommands(),
         vscode.commands.registerCommand(Commands.SHOW_SESSIONS, async (key: string, type: 'event' | 'flag') => {
             detailPanel.showSessions(key, type);
-        }),
-        vscode.commands.registerCommand(Commands.OPEN_HOGQL_EDITOR, () => hogqlEditor.open()),
-        vscode.commands.registerCommand(Commands.RUN_HOGQL_FILE, () => {
-            const editor = vscode.window.activeTextEditor;
-            if (editor) { hogqlEditor.runFile(editor.document); }
         }),
         ...flagDecorationProvider.register(),
         ...eventDecorationProvider.register(),

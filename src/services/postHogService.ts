@@ -485,11 +485,4 @@ export class PostHogService {
 
         return result;
     }
-
-    async runHogQLQuery(projectId: number, query: string): Promise<HogQLQueryResponse> {
-        return this.request<HogQLQueryResponse>(
-            `/api/environments/${projectId}/query/`,
-            { method: 'POST', body: { query: { kind: 'HogQLQuery', query } } },
-        );
-    }
 }

@@ -82,16 +82,6 @@
         "title": "PostHog: Show Experiment Detail"
       },
       {
-        "command": "posthog.openHogQLEditor",
-        "title": "PostHog: Open HogQL Editor",
-        "icon": "$(play)"
-      },
-      {
-        "command": "posthog.runHogQLFile",
-        "title": "PostHog: Run HogQL File",
-        "icon": "$(play)"
-      },
-      {
         "command": "posthog.scanStaleFlags",
         "title": "PostHog: Scan for Stale Flags",
         "icon": "$(search)"
@@ -111,13 +101,6 @@
       }
     ],
     "menus": {
-      "editor/title": [
-        {
-          "command": "posthog.runHogQLFile",
-          "when": "resourceLangId == hogql",
-          "group": "navigation"
-        }
-      ],
       "view/title": [
         {
           "command": "posthog.scanStaleFlags",
@@ -133,30 +116,6 @@
         }
       ]
     },
-    "languages": [
-      {
-        "id": "hogql",
-        "aliases": [
-          "HogQL",
-          "hogql"
-        ],
-        "extensions": [
-          ".hogql"
-        ],
-        "configuration": "./language-configuration.json",
-        "icon": {
-          "light": "./resources/icons/codehog.svg",
-          "dark": "./resources/icons/codehog.svg"
-        }
-      }
-    ],
-    "grammars": [
-      {
-        "language": "hogql",
-        "scopeName": "source.hogql",
-        "path": "./syntaxes/hogql.tmLanguage.json"
-      }
-    ],
     "configuration": {
       "title": "PostHog",
       "properties": {

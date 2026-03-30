@@ -1,5 +1,5 @@
 import { AuthService } from './authService';
-import { PostHogApiError, PaginatedResponse, Project, FeatureFlag, ErrorTrackingIssue, Experiment, EventDefinition, ExceptionEntry, StackFrame, HogQLQueryResponse, ExperimentResults, Insight, EventProperty, ErrorOccurrence, SessionReplayEntry } from '../models/types';
+import { PostHogApiError, PaginatedResponse, Project, FeatureFlag, Experiment, EventDefinition, HogQLQueryResponse, ExperimentResults, Insight, EventProperty, SessionReplayEntry } from '../models/types';
 
 export class PostHogService {
     constructor(private readonly authService: AuthService) {}
@@ -78,19 +78,6 @@ export class PostHogService {
         });
     }
 
-    async getErrorTrackingIssues(projectId: number): Promise<ErrorTrackingIssue[]> {
-        // Error tracking issues are only on the environments router
-        try {
-            const data = await this.request<PaginatedResponse<ErrorTrackingIssue>>(
-                `/api/environments/${projectId}/error_tracking/issues/?limit=50&status=active`
-            );
-            return data.results;
-        } catch (err) {
-            console.warn('[PostHog] Failed to load error tracking issues:', err instanceof Error ? err.message : err);
-            throw err;
-        }
-    }
-
     async getEventDefinitions(projectId: number): Promise<EventDefinition[]> {
         const events: EventDefinition[] = [];
         let nextPath: string | null = `/api/projects/${projectId}/event_definitions/?limit=100`;
@@ -108,28 +95,6 @@ export class PostHogService {
         }
 
         return events;
-    }
-
-    async getErrorStackTrace(projectId: number, issueId: string): Promise<ExceptionEntry[]> {
-        const query = `SELECT properties.$exception_list FROM events WHERE $exception_issue_id = '${issueId}' ORDER BY timestamp DESC LIMIT 1`;
-        const data = await this.request<HogQLQueryResponse>(
-            `/api/environments/${projectId}/query/`,
-            {
-                method: 'POST',
-                body: { query: { kind: 'HogQLQuery', query } },
-            },
-        );
-
-        if (data.results && data.results.length > 0 && data.results[0][0]) {
-            const raw = data.results[0][0];
-            if (typeof raw === 'string') {
-                return JSON.parse(raw) as ExceptionEntry[];
-            }
-            if (Array.isArray(raw)) {
-                return raw as ExceptionEntry[];
-            }
-        }
-        return [];
     }
 
     async getEventVolumes(projectId: number, eventNames: string[]): Promise<Map<string, { count: number; days: number }>> {
@@ -260,73 +225,6 @@ export class PostHogService {
         }
 
         return result;
-    }
-
-    async getErrorOccurrences(projectId: number): Promise<ErrorOccurrence[]> {
-        const issues = await this.getErrorTrackingIssues(projectId);
-        const activeIssues = issues.filter(i => i.status === 'active');
-        if (activeIssues.length === 0) { return []; }
-
-        const occurrences: ErrorOccurrence[] = [];
-
-        // Fetch stack traces in parallel, bounded to avoid overwhelming the API
-        const BATCH_SIZE = 10;
-        for (let i = 0; i < activeIssues.length; i += BATCH_SIZE) {
-            const batch = activeIssues.slice(i, i + BATCH_SIZE);
-            const results = await Promise.allSettled(
-                batch.map(issue => this.getErrorStackTrace(projectId, issue.id))
-            );
-
-            for (let j = 0; j < batch.length; j++) {
-                const issue = batch[j];
-                const result = results[j];
-                if (result.status !== 'fulfilled' || result.value.length === 0) { continue; }
-
-                const frame = this.findFirstInAppFrame(result.value);
-                if (!frame) { continue; }
-
-                occurrences.push({
-                    issueId: issue.id,
-                    title: issue.name || result.value[0]?.type || 'Unknown error',
-                    description: issue.description || result.value[0]?.value || null,
-                    status: issue.status,
-                    occurrences: issue.occurrences ?? 0,
-                    firstSeen: issue.first_seen,
-                    lastSeen: issue.last_seen ?? null,
-                    filePath: frame.filename,
-                    line: frame.lineno,
-                    column: frame.colno || null,
-                    functionName: frame.function || null,
-                });
-            }
-        }
-
-        return occurrences;
-    }
-
-    private findFirstInAppFrame(exceptions: ExceptionEntry[]): StackFrame | null {
-        for (const ex of exceptions) {
-            const frames = ex.stack_trace?.frames;
-            if (!frames || frames.length === 0) { continue; }
-
-            // Frames are typically ordered bottom-to-top; the last in-app frame
-            // is the most relevant (closest to the throw site).
-            for (let i = frames.length - 1; i >= 0; i--) {
-                const f = frames[i];
-                if (f.in_app !== false && f.filename && f.lineno > 0) {
-                    return f;
-                }
-            }
-
-            // Fallback: any frame with a filename and line
-            for (let i = frames.length - 1; i >= 0; i--) {
-                const f = frames[i];
-                if (f.filename && f.lineno > 0) {
-                    return f;
-                }
-            }
-        }
-        return null;
     }
 
     async getRecentSessions(projectId: number, eventName: string): Promise<SessionReplayEntry[]> {

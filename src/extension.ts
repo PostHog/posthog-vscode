@@ -21,8 +21,6 @@ import { StaleFlagService } from './services/staleFlagService';
 import { StaleFlagTreeProvider } from './providers/staleFlagTreeProvider';
 import { DetailPanelProvider } from './views/DetailPanelProvider';
 import { VariantHighlightProvider } from './providers/variantHighlightProvider';
-import { ErrorCacheService } from './services/errorCacheService';
-import { ErrorDecorationProvider } from './providers/errorDecorationProvider';
 import { SessionCodeLensProvider } from './providers/sessionCodeLensProvider';
 import { Views, Commands, ContextKeys } from './constants';
 
@@ -32,7 +30,6 @@ export function activate(context: vscode.ExtensionContext) {
     const flagCache = new FlagCacheService();
     const eventCache = new EventCacheService();
     const experimentCache = new ExperimentCacheService();
-    const errorCache = new ErrorCacheService();
 
     // Tree-sitter powered code intelligence
     const treeSitter = new TreeSitterService();
@@ -67,7 +64,6 @@ export function activate(context: vscode.ExtensionContext) {
         flagCache,
         experimentCache,
         detailPanel,
-        errorCache,
     );
 
     // Autocomplete, code actions & inline decorations — all powered by tree-sitter
@@ -82,7 +78,6 @@ export function activate(context: vscode.ExtensionContext) {
     const captureCodeActionProvider = new CaptureCodeActionProvider(treeSitter);
     const staleFlagService = new StaleFlagService(flagCache, experimentCache, treeSitter);
     const staleFlagTreeProvider = new StaleFlagTreeProvider(staleFlagService);
-    const errorDecorationProvider = new ErrorDecorationProvider(errorCache, authService);
     const sessionCodeLensProvider = new SessionCodeLensProvider(authService, postHogService, treeSitter);
 
     // All languages supported by tree-sitter grammars
@@ -107,7 +102,6 @@ export function activate(context: vscode.ExtensionContext) {
                 eventCache.updateVolumes(volumes);
                 eventCache.updateSparklines(sparklines);
             }).catch(() => {});
-            postHogService.getErrorOccurrences(projectId).then(occurrences => errorCache.update(occurrences)).catch(() => {});
             postHogService.getExperiments(projectId).then(async exps => {
                 experimentCache.update(exps);
                 const active = exps.filter(e => e.start_date);
@@ -161,7 +155,6 @@ export function activate(context: vscode.ExtensionContext) {
         ...flagDecorationProvider.register(),
         ...eventDecorationProvider.register(),
         ...variantHighlightProvider.register(),
-        ...errorDecorationProvider.register(),
         vscode.languages.registerCodeLensProvider(languageSelector, sessionCodeLensProvider),
         sessionCodeLensProvider.startAutoRefresh(),
         { dispose: () => treeSitter.dispose() },

@@ -79,7 +79,32 @@ export function getLayout(logoUri: vscode.Uri): string {
 
         <!-- Analytics -->
         <div id="section-analytics" class="section">
-            <div class="loading" id="analytics-loading">Loading insights...</div>
+            <div class="insight-grid" id="analytics-loading">
+              <div class="skeleton-card">
+                <div class="skeleton-card-header">
+                  <div class="skeleton-bone icon"></div>
+                  <div class="skeleton-bone title"></div>
+                  <div class="skeleton-bone type"></div>
+                </div>
+                <div class="skeleton-bone chart"></div>
+              </div>
+              <div class="skeleton-card">
+                <div class="skeleton-card-header">
+                  <div class="skeleton-bone icon"></div>
+                  <div class="skeleton-bone title"></div>
+                  <div class="skeleton-bone type"></div>
+                </div>
+                <div class="skeleton-bone chart"></div>
+              </div>
+              <div class="skeleton-card">
+                <div class="skeleton-card-header">
+                  <div class="skeleton-bone icon"></div>
+                  <div class="skeleton-bone title"></div>
+                  <div class="skeleton-bone type"></div>
+                </div>
+                <div class="skeleton-bone chart"></div>
+              </div>
+            </div>
             <div class="insight-grid" id="analytics-list" style="display:none;"></div>
             <div class="empty-state" id="analytics-empty" style="display:none;">
                 <div class="icon">&#x1F4CA;</div>

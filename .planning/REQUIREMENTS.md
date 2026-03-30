@@ -8,10 +8,10 @@
 ### Cleanup
 
 - [ ] **CLEAN-01**: Remove error tracking code (errorCacheService, errorDecorationProvider, sidebar error tab)
-- [ ] **CLEAN-02**: Remove HogQL editor (HogQLEditorProvider, .hogql language registration, commands)
+- [x] **CLEAN-02**: Remove HogQL editor (HogQLEditorProvider, .hogql language registration, commands)
 - [ ] **CLEAN-03**: Remove smart capture insertion (captureCodeActionProvider, related commands)
 - [ ] **CLEAN-04**: Remove Python, Go, Ruby tree-sitter grammars and WASM files
-- [ ] **CLEAN-05**: Remove all package.json contributions for dropped features (commands, menus, languages)
+- [x] **CLEAN-05**: Remove all package.json contributions for dropped features (commands, menus, languages)
 
 ### Authentication
 
@@ -70,10 +70,10 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | CLEAN-01 | Phase 1 | Pending |
-| CLEAN-02 | Phase 1 | Pending |
+| CLEAN-02 | Phase 1 | Complete |
 | CLEAN-03 | Phase 1 | Pending |
 | CLEAN-04 | Phase 1 | Pending |
-| CLEAN-05 | Phase 1 | Pending |
+| CLEAN-05 | Phase 1 | Complete |
 | AUTH-01 | Phase 2 | Pending |
 | SIDE-01 | Phase 2 | Pending |
 | SIDE-02 | Phase 2 | Pending |

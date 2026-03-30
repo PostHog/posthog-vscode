@@ -89,7 +89,7 @@ html { height: 100vh; overflow: hidden; }
 .nav-tab:hover { opacity: 0.85; }
 .nav-tab.active {
     opacity: 1;
-    border-bottom-color: var(--ph-yellow);
+    border-bottom-color: var(--ph-blue);
 }
 
 /* ── Search ── */

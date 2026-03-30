@@ -46,9 +46,9 @@ export function getLayout(logoUri: vscode.Uri): string {
     </div>
 
     <div class="nav">
-        <button class="nav-tab active" data-tab="analytics">Analytics</button>
-        <button class="nav-tab" data-tab="flags">Flags</button>
+        <button class="nav-tab active" data-tab="flags">Flags</button>
         <button class="nav-tab" data-tab="experiments">Experiments</button>
+        <button class="nav-tab" data-tab="analytics">Analytics</button>
     </div>
 
     <div class="search-bar">
@@ -56,18 +56,8 @@ export function getLayout(logoUri: vscode.Uri): string {
     </div>
 
     <div class="scroll-area">
-        <!-- Analytics -->
-        <div id="section-analytics" class="section active">
-            <div class="loading" id="analytics-loading">Loading insights...</div>
-            <div class="insight-grid" id="analytics-list" style="display:none;"></div>
-            <div class="empty-state" id="analytics-empty" style="display:none;">
-                <div class="icon">&#x1F4CA;</div>
-                <p>No saved insights found</p>
-            </div>
-        </div>
-
         <!-- Feature Flags -->
-        <div id="section-flags" class="section">
+        <div id="section-flags" class="section active">
             <div class="loading" id="flags-loading">Loading flags...</div>
             <div class="item-list" id="flags-list" style="display:none;"></div>
             <div class="empty-state" id="flags-empty" style="display:none;">
@@ -83,6 +73,16 @@ export function getLayout(logoUri: vscode.Uri): string {
             <div class="empty-state" id="experiments-empty" style="display:none;">
                 <div class="icon">&#x2697;</div>
                 <p>No experiments found</p>
+            </div>
+        </div>
+
+        <!-- Analytics -->
+        <div id="section-analytics" class="section">
+            <div class="loading" id="analytics-loading">Loading insights...</div>
+            <div class="insight-grid" id="analytics-list" style="display:none;"></div>
+            <div class="empty-state" id="analytics-empty" style="display:none;">
+                <div class="icon">&#x1F4CA;</div>
+                <p>No saved insights found</p>
             </div>
         </div>
 

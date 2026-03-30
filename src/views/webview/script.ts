@@ -3,7 +3,7 @@ export function getScript(): string {
 const vscode = acquireVsCodeApi();
 function send(msg) { vscode.postMessage(msg); }
 
-let currentTab = 'analytics';
+let currentTab = 'flags';
 let loadedTabs = new Set();
 let allData = { flags: [], experiments: [], analytics: [] };
 let experimentResults = {};
@@ -902,7 +902,9 @@ window.addEventListener('message', e => {
             document.getElementById('main-app').style.display = msg.authenticated ? '' : 'none';
             if (msg.authenticated) {
                 loadedTabs.clear();
-                loadedTabs.add('analytics');
+                loadedTabs.add('flags');
+                switchTab('flags');
+                send({ type: 'loadFlags' });
             }
             break;
         case 'loading': {

@@ -76,7 +76,12 @@ Plans:
   3. A developer can still sign in using a personal API key as an alternative to OAuth
   4. A developer can sign out and switch between OAuth and API key auth methods
   5. The OAuth callback validates the state parameter — a replayed or forged callback is rejected silently
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — Auth foundation: OAuth constants, token storage, transparent getApiKey, proactive refresh
+- [ ] 04-02-PLAN.md — OAuth PKCE flow: UriHandler, PKCE helpers, sign-in command, sign-out cleanup
+- [ ] 04-03-PLAN.md — Landing page: dual sign-in buttons (OAuth primary, API key secondary)
 
 ### Phase 5: Analytics Tab
 **Goal**: The Analytics tab shows the developer's saved PostHog insights with chart visualizations rendered natively in the sidebar
@@ -99,5 +104,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 1. Dead Code Removal | 4/4 | Complete    | 2026-03-30 |
 | 2. Auth Landing and Sidebar UX | 2/2 | Complete    | 2026-03-30 |
 | 3. Flag Type Generation | 1/2 | Complete    | 2026-03-30 |
-| 4. OAuth Authentication | 0/? | Not started | - |
+| 4. OAuth Authentication | 0/3 | Not started | - |
 | 5. Analytics Tab | 0/? | Not started | - |

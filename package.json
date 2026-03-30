@@ -92,10 +92,6 @@
         "icon": "$(trash)"
       },
       {
-        "command": "posthog.insertCapture",
-        "title": "PostHog: Track Function with PostHog"
-      },
-      {
         "command": "posthog.showSessions",
         "title": "PostHog: Watch Sessions"
       }

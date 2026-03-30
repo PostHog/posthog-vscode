@@ -16,7 +16,6 @@ import { registerAuthCommands } from './commands/authCommands';
 import { FlagLinkProvider } from './providers/flagLinkProvider';
 import { registerFeatureFlagCommands } from './commands/featureFlagCommands';
 import { registerStaleFlagCommands } from './commands/staleFlagCommands';
-import { CaptureCodeActionProvider, registerCaptureCommands } from './providers/captureCodeActionProvider';
 import { StaleFlagService } from './services/staleFlagService';
 import { StaleFlagTreeProvider } from './providers/staleFlagTreeProvider';
 import { DetailPanelProvider } from './views/DetailPanelProvider';
@@ -75,7 +74,6 @@ export function activate(context: vscode.ExtensionContext) {
     const eventDecorationProvider = new EventDecorationProvider(eventCache, treeSitter);
     const variantHighlightProvider = new VariantHighlightProvider(flagCache, experimentCache, treeSitter);
     const flagLinkProvider = new FlagLinkProvider(flagCache, experimentCache, treeSitter);
-    const captureCodeActionProvider = new CaptureCodeActionProvider(treeSitter);
     const staleFlagService = new StaleFlagService(flagCache, experimentCache, treeSitter);
     const staleFlagTreeProvider = new StaleFlagTreeProvider(staleFlagService);
     const sessionCodeLensProvider = new SessionCodeLensProvider(authService, postHogService, treeSitter);
@@ -141,14 +139,10 @@ export function activate(context: vscode.ExtensionContext) {
                 sidebarProvider.navigateToExperiment(flagKey);
             }
         }),
-        vscode.languages.registerCodeActionsProvider(languageSelector, captureCodeActionProvider, {
-            providedCodeActionKinds: CaptureCodeActionProvider.providedCodeActionKinds,
-        }),
         vscode.window.registerTreeDataProvider(Views.STALE_FLAGS, staleFlagTreeProvider),
         ...registerAuthCommands(authService, postHogService, sidebarProvider),
         ...registerFeatureFlagCommands(authService, postHogService, sidebarProvider, flagCache),
         ...registerStaleFlagCommands(staleFlagService),
-        ...registerCaptureCommands(),
         vscode.commands.registerCommand(Commands.SHOW_SESSIONS, async (key: string, type: 'event' | 'flag') => {
             detailPanel.showSessions(key, type);
         }),

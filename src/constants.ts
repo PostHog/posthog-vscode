@@ -1,6 +1,7 @@
 export const Commands = {
     SIGN_IN: 'posthog.signIn',
     SIGN_OUT: 'posthog.signOut',
+    SIGN_IN_OAUTH: 'posthog.signInOAuth',
     SELECT_PROJECT: 'posthog.selectProject',
     REFRESH_FEATURE_FLAGS: 'posthog.refreshFeatureFlags',
     COPY_FLAG_KEY: 'posthog.copyFlagKey',
@@ -28,6 +29,10 @@ export const StorageKeys = {
     HOST: 'posthog.host',
     PROJECT_ID: 'posthog.projectId',
     IS_AUTHENTICATED: 'posthog.isAuthenticated',
+    OAUTH_ACCESS_TOKEN: 'posthog.oauthAccessToken',
+    OAUTH_REFRESH_TOKEN: 'posthog.oauthRefreshToken',
+    AUTH_METHOD: 'posthog.authMethod',
+    TOKEN_EXPIRY: 'posthog.tokenExpiry',
 } as const;
 
 export const Defaults = {
@@ -37,4 +42,13 @@ export const Defaults = {
         { label: 'EU Cloud', url: 'https://eu.posthog.com' },
         { label: 'Self-hosted', url: '' },
     ],
+} as const;
+
+export const OAuthConfig = {
+    CLIENT_ID: '', // Placeholder — set after PostHog OAuth app registration
+    SCOPES: 'feature_flag:read experiment:read insight:read project:read',
+    AUTHORIZE_PATH: '/oauth/authorize',
+    TOKEN_PATH: '/oauth/token',
+    CALLBACK_PATH: '/callback',
+    TIMEOUT_MS: 5 * 60 * 1000, // 5 minutes
 } as const;

@@ -902,6 +902,7 @@ function showInsightDetail(id) {
 
 // ── Event listeners ──
 
+document.getElementById('btn-sign-in-oauth').addEventListener('click', () => send({ type: 'signInOAuth' }));
 document.getElementById('btn-sign-in').addEventListener('click', () => send({ type: 'signIn' }));
 document.getElementById('btn-select-project').addEventListener('click', () => send({ type: 'selectProject' }));
 document.getElementById('btn-sign-out').addEventListener('click', () => send({ type: 'signOut' }));

@@ -94,6 +94,10 @@
       {
         "command": "posthog.showSessions",
         "title": "PostHog: Watch Sessions"
+      },
+      {
+        "command": "posthog.generateFlagTypes",
+        "title": "PostHog: Generate Flag Types"
       }
     ],
     "menus": {

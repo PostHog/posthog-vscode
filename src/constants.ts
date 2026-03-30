@@ -11,6 +11,7 @@ export const Commands = {
     SCAN_STALE_FLAGS: 'posthog.scanStaleFlags',
     CLEANUP_STALE_FLAG: 'posthog.cleanupStaleFlag',
     SHOW_SESSIONS: 'posthog.showSessions',
+    GENERATE_FLAG_TYPES: 'posthog.generateFlagTypes',
 } as const;
 
 export const Views = {

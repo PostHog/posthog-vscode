@@ -18,6 +18,10 @@ function esc(s) {
     return d.innerHTML.replace(/"/g, '&quot;');
 }
 
+function isDarkTheme() {
+    return document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast');
+}
+
 function timeAgo(dateStr) {
     if (!dateStr) return 'Unknown';
     const diff = Date.now() - new Date(dateStr).getTime();
@@ -293,6 +297,18 @@ function renderSparkline(series, large) {
 
         const color = colors[si % colors.length];
         svgPaths += '<polyline points="' + points + '" fill="none" stroke="' + color + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>';
+        if (si === 0) {
+            const fillPoints = points + ' ' + ((data.length - 1) * step).toFixed(1) + ',' + h + ' 0,' + h;
+            svgPaths += '<polygon points="' + fillPoints + '" fill="' + color + '" opacity="0.08"/>';
+        }
+    }
+
+    if (large && series.length > 1) {
+        const min = Math.min(...series[0].data, 0);
+        const max = Math.max(...series[0].data, 1);
+        const range = max - min || 1;
+        const zeroY = (h - 2 - ((0 - min) / range) * (h - 4)).toFixed(1);
+        svgPaths += '<line x1="0" y1="' + zeroY + '" x2="200" y2="' + zeroY + '" stroke="' + (isDarkTheme() ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)') + '" stroke-width="0.5" stroke-dasharray="3,3"/>';
     }
 
     const lastVal = series[0].data[series[0].data.length - 1];
@@ -320,6 +336,7 @@ function renderFunnel(steps, large) {
     if (!steps || steps.length === 0) return '<div class="insight-card-empty">No data</div>';
     const maxCount = Math.max(...steps.map(s => s.count), 1);
     const limit = large ? steps.length : Math.min(steps.length, 4);
+    const trackBg = isDarkTheme() ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
     let html = '';
     for (let i = 0; i < limit; i++) {
         const s = steps[i];
@@ -328,7 +345,7 @@ function renderFunnel(steps, large) {
         const name = s.custom_name || s.name || 'Step ' + (i + 1);
         html += '<div class="funnel-step">'
             + '<div class="funnel-step-label">' + esc(name) + '</div>'
-            + '<div style="flex:1;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;">'
+            + '<div style="flex:1;background:' + trackBg + ';border-radius:3px;overflow:hidden;">'
             + '<div class="funnel-step-bar" style="width:' + pct.toFixed(1) + '%"></div>'
             + '</div>'
             + '<div class="funnel-step-pct">' + convRate + '</div>'
@@ -353,8 +370,9 @@ function renderRetention(cohorts, large) {
             const pct = baseCount > 0 ? (val.count / baseCount * 100) : 0;
             const alpha = Math.max(0.08, pct / 100);
             const bg = 'rgba(29,74,255,' + alpha.toFixed(2) + ')';
+            const textColor = alpha > 0.4 ? '#fff' : (isDarkTheme() ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)');
             const text = col === 0 ? baseCount : Math.round(pct) + '%';
-            html += '<div class="retention-cell" style="background:' + bg + ';' + (col === 0 ? 'width:32px;font-size:8px;' : '') + '">' + text + '</div>';
+            html += '<div class="retention-cell" style="background:' + bg + ';color:' + textColor + ';' + (col === 0 ? 'width:32px;font-size:8px;' : '') + '">' + text + '</div>';
         }
         html += '</div>';
     }
@@ -412,6 +430,11 @@ function renderLifecycle(series, large) {
         }).join(' ');
         const color = statusColors[s.status] || '#999';
         svgPaths += '<polyline points="' + points + '" fill="none" stroke="' + color + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>';
+    }
+
+    if (large) {
+        const baselineColor = isDarkTheme() ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+        svgPaths += '<line x1="0" y1="' + (h - 2) + '" x2="200" y2="' + (h - 2) + '" stroke="' + baselineColor + '" stroke-width="0.5"/>';
     }
 
     let legend = '';

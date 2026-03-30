@@ -779,6 +779,65 @@ html { height: 100vh; overflow: hidden; }
     padding: 14px 0;
 }
 
+/* ── Skeleton loading ── */
+.skeleton-card {
+    background: var(--vscode-textCodeBlock-background, rgba(255,255,255,0.04));
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 6px;
+    padding: 12px;
+    cursor: default;
+    overflow: hidden;
+    position: relative;
+}
+.skeleton-card-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+.skeleton-bone {
+    background: var(--vscode-input-background, rgba(255,255,255,0.08));
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+}
+.skeleton-bone::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
+    animation: shimmer 1.5s infinite;
+}
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+.skeleton-bone.icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+.skeleton-bone.title {
+    height: 12px;
+    flex: 1;
+}
+.skeleton-bone.type {
+    height: 10px;
+    width: 40px;
+    flex-shrink: 0;
+}
+.skeleton-bone.chart {
+    height: 44px;
+    width: 100%;
+}
+.vscode-light .skeleton-bone {
+    background: rgba(0,0,0,0.06);
+}
+.vscode-light .skeleton-bone::after {
+    background: linear-gradient(90deg, transparent, rgba(0,0,0,0.04), transparent);
+}
+
 /* ── Sparkline ── */
 .sparkline-container { overflow: hidden; }
 .sparkline-container svg { display: block; width: 100%; }

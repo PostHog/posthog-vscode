@@ -33,7 +33,7 @@
 - [x] **ANLY-01**: User can view list of saved insights in the Analytics sidebar tab
 - [x] **ANLY-02**: Saved insights display as lightweight cards with chart visualizations
 - [x] **ANLY-03**: Charts render via Chart.js (trends, funnels, retention)
-- [ ] **ANLY-04**: Insights show loading skeleton states while fetching
+- [x] **ANLY-04**: Insights show loading skeleton states while fetching
 
 ### Code Generation
 
@@ -89,7 +89,7 @@
 | ANLY-01 | Phase 5 | Complete |
 | ANLY-02 | Phase 5 | Complete |
 | ANLY-03 | Phase 5 | Complete |
-| ANLY-04 | Phase 5 | Pending |
+| ANLY-04 | Phase 5 | Complete |
 
 **Coverage:**
 - v1 requirements: 21 total

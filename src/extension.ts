@@ -81,6 +81,18 @@ export function activate(context: vscode.ExtensionContext) {
     // All languages supported by tree-sitter grammars
     const languageSelector = treeSitter.supportedLanguages.map(lang => ({ language: lang, scheme: 'file' }));
 
+    // OAuth URI handler — must be registered before any command that triggers OAuth
+    const uriHandler: vscode.UriHandler = {
+        handleUri(uri: vscode.Uri) {
+            const params = new URLSearchParams(uri.query);
+            const code = params.get('code');
+            const state = params.get('state');
+            if (code && state) {
+                authService.handleOAuthCallback(code, state);
+            }
+        }
+    };
+
     // Set initial auth context
     const authed = authService.isAuthenticated();
     vscode.commands.executeCommand('setContext', ContextKeys.IS_AUTHENTICATED, authed);
@@ -114,6 +126,7 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     context.subscriptions.push(
+        vscode.window.registerUriHandler(uriHandler),
         vscode.window.registerWebviewViewProvider(Views.SIDEBAR, sidebarProvider),
         vscode.languages.registerCompletionItemProvider(languageSelector, completionProvider, "'", '"', '`'),
         vscode.languages.registerCompletionItemProvider(languageSelector, eventCompletionProvider, "'", '"', '`'),

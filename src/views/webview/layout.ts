@@ -30,8 +30,9 @@ export function getLayout(logoUri: vscode.Uri): string {
             </div>
         </div>
     </div>
-    <button class="sign-in-btn" id="btn-sign-in">Sign In with API Key</button>
-    <p class="welcome-hint">Requires a PostHog personal API key</p>
+    <button class="sign-in-btn sign-in-btn--primary" id="btn-sign-in-oauth">Sign In with PostHog</button>
+    <button class="sign-in-btn sign-in-btn--secondary" id="btn-sign-in">Sign In with API Key</button>
+    <p class="welcome-hint">API key works for self-hosted instances</p>
 </div>
 
 <!-- Main app (authenticated) -->

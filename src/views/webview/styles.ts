@@ -290,9 +290,9 @@ html { height: 100vh; overflow: hidden; }
     line-height: 1.4;
 }
 .welcome .sign-in-btn {
+    width: 100%;
+    max-width: 260px;
     padding: 10px 32px;
-    background: var(--ph-blue);
-    color: #fff;
     border: none;
     border-radius: 6px;
     font-size: 13px;
@@ -302,6 +302,18 @@ html { height: 100vh; overflow: hidden; }
     letter-spacing: 0.2px;
 }
 .welcome .sign-in-btn:hover { opacity: 0.85; }
+.welcome .sign-in-btn--primary {
+    background: var(--ph-blue);
+    color: #fff;
+    margin-bottom: 8px;
+}
+.welcome .sign-in-btn--secondary {
+    background: transparent;
+    color: var(--vscode-foreground);
+    border: 1px solid var(--vscode-input-border, rgba(255, 255, 255, 0.15));
+    font-size: 12px;
+    padding: 8px 32px;
+}
 .welcome-hint {
     font-size: 11px;
     opacity: 0.4;

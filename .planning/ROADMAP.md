@@ -29,12 +29,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. The sidebar shows no error tracking tab or HogQL-related UI elements
   3. The .vsix bundle size is measurably smaller (3-6 MB reduction from removed WASM grammars)
   4. TypeScript compilation produces zero errors referencing removed modules
-**Plans**: 3 plans
+**Plans**: 4 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Remove HogQL editor and smart capture insertion features
+- [ ] 01-01-PLAN.md — Remove HogQL editor feature
 - [ ] 01-02-PLAN.md — Remove error tracking from all layers (services, providers, views, webview)
-- [ ] 01-03-PLAN.md — Remove Python, Go, Ruby tree-sitter grammars and WASM files
+- [ ] 01-03-PLAN.md — Remove smart capture insertion feature
+- [ ] 01-04-PLAN.md — Remove Python, Go, Ruby tree-sitter grammars and WASM files
 
 ### Phase 2: Auth Landing and Sidebar UX
 **Goal**: Every new user sees a polished, on-brand landing page before signing in, and every authenticated user can find flags and experiments quickly using search
@@ -87,7 +88,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Dead Code Removal | 0/3 | Planning complete | - |
+| 1. Dead Code Removal | 0/4 | Planning complete | - |
 | 2. Auth Landing and Sidebar UX | 0/? | Not started | - |
 | 3. Flag Type Generation | 0/? | Not started | - |
 | 4. OAuth Authentication | 0/? | Not started | - |

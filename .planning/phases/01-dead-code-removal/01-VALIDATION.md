@@ -2,8 +2,8 @@
 phase: 1
 slug: dead-code-removal
 status: draft
-nyquist_compliant: false
-wave_0_complete: false
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-03-30
 ---
 
@@ -38,11 +38,12 @@ created: 2026-03-30
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 01-01 | 01 | 1 | CLEAN-02 | compile | `pnpm compile` | N/A | pending |
-| 01-02 | 02 | 1 | CLEAN-01 | compile | `pnpm compile` | N/A | pending |
-| 01-03 | 03 | 1 | CLEAN-03 | compile | `pnpm compile` | N/A | pending |
-| 01-04 | 04 | 1 | CLEAN-04 | compile | `pnpm compile` | N/A | pending |
-| 01-05 | 05 | 1 | CLEAN-05 | compile+audit | `pnpm compile && pnpm package` | N/A | pending |
+| 01-01-T1 | 01 | 1 | CLEAN-02 | compile | `pnpm compile` | N/A | pending |
+| 01-02-T1 | 02 | 2 | CLEAN-01 | compile+grep | `pnpm compile` | N/A | pending |
+| 01-02-T2 | 02 | 2 | CLEAN-01 | compile+grep | `pnpm compile` | N/A | pending |
+| 01-03-T1 | 03 | 3 | CLEAN-03 | compile+grep | `pnpm compile` | N/A | pending |
+| 01-04-T1 | 04 | 4 | CLEAN-04 | file-check | `ls wasm/ grammars/` | N/A | pending |
+| 01-04-T2 | 04 | 4 | CLEAN-04 | compile+grep | `pnpm compile` | N/A | pending |
 
 *Status: pending*
 
@@ -50,7 +51,7 @@ created: 2026-03-30
 
 ## Wave 0 Requirements
 
-Existing infrastructure covers all phase requirements. `pnpm compile` validates TypeScript correctness after each removal.
+Existing infrastructure covers all phase requirements. `pnpm compile` validates TypeScript correctness after each removal. No additional test scaffolding needed.
 
 ---
 
@@ -66,11 +67,11 @@ Existing infrastructure covers all phase requirements. `pnpm compile` validates 
 
 ## Validation Sign-Off
 
-- [ ] All tasks have automated verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 15s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have automated verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 15s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** ready

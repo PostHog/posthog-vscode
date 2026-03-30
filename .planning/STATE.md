@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 04-oauth-authentication-04-03-PLAN.md
-last_updated: "2026-03-30T17:30:33.056Z"
+stopped_at: Completed 04-oauth-authentication-04-02-PLAN.md
+last_updated: "2026-03-30T17:33:44.222Z"
 last_activity: 2026-03-30 — Roadmap created, phases derived from requirements
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 11
-  completed_plans: 10
+  completed_plans: 11
   percent: 0
 ---
 
@@ -59,6 +59,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 03-flag-type-generation P02 | 5 | 2 tasks | 3 files |
 | Phase 04-oauth-authentication P01 | 3 | 2 tasks | 3 files |
 | Phase 04-oauth-authentication P03 | 3 | 2 tasks | 3 files |
+| Phase 04-oauth-authentication P02 | 6m | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -88,6 +89,8 @@ Recent decisions affecting current work:
 - [Phase 04-oauth-authentication]: ensureFreshToken() swallows refresh failures — request proceeds and fails with 401 naturally
 - [Phase 04-oauth-authentication]: btn-sign-in ID preserved on API key button (immutable Phase 2 contract); OAuth button gets new btn-sign-in-oauth ID
 - [Phase 04-oauth-authentication]: Hint text changed to 'API key works for self-hosted instances' to frame API key as fallback not requirement
+- [Phase 04-oauth-authentication]: SIGN_IN_OAUTH gated on OAuthConfig.CLIENT_ID — gracefully degrades to API key suggestion when empty string
+- [Phase 04-oauth-authentication]: signOut updated to clear ALL auth storage unconditionally (API key + OAuth tokens + auth method + token expiry)
 
 ### Pending Todos
 
@@ -100,6 +103,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-30T17:30:33.054Z
-Stopped at: Completed 04-oauth-authentication-04-03-PLAN.md
+Last session: 2026-03-30T17:33:44.220Z
+Stopped at: Completed 04-oauth-authentication-04-02-PLAN.md
 Resume file: None

@@ -18,9 +18,9 @@
 - [x] **AUTH-01**: User sees a polished landing page in the sidebar when not authenticated
 - [x] **AUTH-02**: User can sign in via OAuth (PostHog PKCE authorization code flow)
 - [x] **AUTH-03**: OAuth tokens are stored exclusively in VS Code SecretStorage
-- [ ] **AUTH-04**: OAuth callback validates state parameter to prevent CSRF
+- [x] **AUTH-04**: OAuth callback validates state parameter to prevent CSRF
 - [x] **AUTH-05**: User can still sign in via personal API key as fallback
-- [ ] **AUTH-06**: User can sign out and switch between auth methods
+- [x] **AUTH-06**: User can sign out and switch between auth methods
 
 ### Sidebar UX
 
@@ -83,9 +83,9 @@
 | CGEN-03 | Phase 3 | Complete |
 | AUTH-02 | Phase 4 | Complete |
 | AUTH-03 | Phase 4 | Complete |
-| AUTH-04 | Phase 4 | Pending |
+| AUTH-04 | Phase 4 | Complete |
 | AUTH-05 | Phase 4 | Complete |
-| AUTH-06 | Phase 4 | Pending |
+| AUTH-06 | Phase 4 | Complete |
 | ANLY-01 | Phase 5 | Pending |
 | ANLY-02 | Phase 5 | Pending |
 | ANLY-03 | Phase 5 | Pending |

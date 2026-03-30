@@ -93,6 +93,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             case 'signIn':
                 await vscode.commands.executeCommand(Commands.SIGN_IN);
                 return this.sendAuthState();
+            case 'signInOAuth':
+                await vscode.commands.executeCommand(Commands.SIGN_IN_OAUTH);
+                return this.sendAuthState();
             case 'signOut':
                 await vscode.commands.executeCommand(Commands.SIGN_OUT);
                 return this.sendAuthState();

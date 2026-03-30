@@ -13,7 +13,7 @@ This milestone takes Codehog from a working-but-bloated brownfield extension to 
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Dead Code Removal** - Remove all dropped features — HogQL editor, error tracking, smart capture, and non-JS/TS language support (completed 2026-03-30)
-- [ ] **Phase 2: Auth Landing and Sidebar UX** - Polished unauthenticated landing page, sidebar search/filter on flags and experiments, and three-tab sidebar structure
+- [x] **Phase 2: Auth Landing and Sidebar UX** - Polished unauthenticated landing page, sidebar search/filter on flags and experiments, and three-tab sidebar structure (completed 2026-03-30)
 - [ ] **Phase 3: Flag Type Generation** - Command Palette entry generates TypeScript type definitions from live flag payloads into a `.posthog.d.ts` file
 - [ ] **Phase 4: OAuth Authentication** - Full PKCE authorization code flow with PostHog as the provider; personal API key fallback preserved
 - [ ] **Phase 5: Analytics Tab** - Polished Analytics sidebar tab with Chart.js visualizations, loading skeleton states, and improved insight cards
@@ -93,7 +93,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Dead Code Removal | 4/4 | Complete    | 2026-03-30 |
-| 2. Auth Landing and Sidebar UX | 1/2 | In Progress|  |
+| 2. Auth Landing and Sidebar UX | 2/2 | Complete   | 2026-03-30 |
 | 3. Flag Type Generation | 0/? | Not started | - |
 | 4. OAuth Authentication | 0/? | Not started | - |
 | 5. Analytics Tab | 0/? | Not started | - |

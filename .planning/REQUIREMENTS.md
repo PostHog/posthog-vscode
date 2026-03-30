@@ -24,9 +24,9 @@
 
 ### Sidebar UX
 
-- [ ] **SIDE-01**: User can search/filter feature flags list by name
-- [ ] **SIDE-02**: User can search/filter experiments list by name
-- [ ] **SIDE-03**: Sidebar tabs: Flags, Experiments, Analytics (saved insights)
+- [x] **SIDE-01**: User can search/filter feature flags list by name
+- [x] **SIDE-02**: User can search/filter experiments list by name
+- [x] **SIDE-03**: Sidebar tabs: Flags, Experiments, Analytics (saved insights)
 
 ### Analytics
 
@@ -75,9 +75,9 @@
 | CLEAN-04 | Phase 1 | Complete |
 | CLEAN-05 | Phase 1 | Complete |
 | AUTH-01 | Phase 2 | Complete |
-| SIDE-01 | Phase 2 | Pending |
-| SIDE-02 | Phase 2 | Pending |
-| SIDE-03 | Phase 2 | Pending |
+| SIDE-01 | Phase 2 | Complete |
+| SIDE-02 | Phase 2 | Complete |
+| SIDE-03 | Phase 2 | Complete |
 | CGEN-01 | Phase 3 | Pending |
 | CGEN-02 | Phase 3 | Pending |
 | CGEN-03 | Phase 3 | Pending |

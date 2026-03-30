@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 02-auth-landing-and-sidebar-ux-01-PLAN.md
-last_updated: "2026-03-30T16:15:28.311Z"
+stopped_at: Completed 02-auth-landing-and-sidebar-ux-02-PLAN.md
+last_updated: "2026-03-30T16:19:52.706Z"
 last_activity: 2026-03-30 — Roadmap created, phases derived from requirements
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 5
+  completed_plans: 6
   percent: 0
 ---
 
@@ -54,6 +54,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01-dead-code-removal P02 | 7 | 2 tasks | 9 files |
 | Phase 01-dead-code-removal P04 | 2 | 2 tasks | 1 files |
 | Phase 02-auth-landing-and-sidebar-ux P01 | 5 | 1 tasks | 2 files |
+| Phase 02-auth-landing-and-sidebar-ux P02 | 3 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,9 @@ Recent decisions affecting current work:
 - [Phase 01-dead-code-removal]: Removed Python, Go, Ruby tree-sitter grammar support; v1 supports only JavaScript, TypeScript, JSX, and TSX
 - [Phase 02-auth-landing-and-sidebar-ux]: Replaced element selectors with class-based CSS selectors for .welcome component
 - [Phase 02-auth-landing-and-sidebar-ux]: Welcome screen id=welcome-screen and id=btn-sign-in are immutable script.ts contract; only inner content is redesignable
+- [Phase 02-auth-landing-and-sidebar-ux]: Active tab color changed from --ph-yellow to --ph-blue to match PostHog brand
+- [Phase 02-auth-landing-and-sidebar-ux]: Default tab changed from analytics to flags — flags is primary use case for developers
+- [Phase 02-auth-landing-and-sidebar-ux]: No-results element created dynamically in JS rather than pre-added to layout.ts — keeps HTML clean
 
 ### Pending Todos
 
@@ -84,6 +88,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-30T16:15:28.309Z
-Stopped at: Completed 02-auth-landing-and-sidebar-ux-01-PLAN.md
+Last session: 2026-03-30T16:19:52.704Z
+Stopped at: Completed 02-auth-landing-and-sidebar-ux-02-PLAN.md
 Resume file: None

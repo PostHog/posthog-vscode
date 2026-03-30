@@ -224,33 +224,82 @@ html { height: 100vh; overflow: hidden; }
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 48px 24px;
+    padding: 40px 20px;
     text-align: center;
-    gap: 16px;
+    gap: 0;
+    min-height: 100vh;
 }
-.welcome img { height: 36px; margin-bottom: 4px; }
-.welcome h2 {
-    font-size: 15px;
-    font-weight: 600;
+.welcome-logo { height: 40px; margin-bottom: 16px; }
+.welcome-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 6px;
 }
-.welcome p {
+.welcome-subtitle {
     font-size: 12px;
     opacity: 0.6;
     line-height: 1.5;
+    max-width: 240px;
+    margin-bottom: 24px;
+}
+.welcome-features {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    max-width: 260px;
+    margin-bottom: 28px;
+    text-align: left;
+}
+.welcome-feature {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+.welcome-feature-icon {
+    font-size: 16px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: rgba(29, 74, 255, 0.1);
+    flex-shrink: 0;
+}
+.welcome-feature-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding-top: 2px;
+}
+.welcome-feature-name {
+    font-size: 12px;
+    font-weight: 600;
+}
+.welcome-feature-desc {
+    font-size: 11px;
+    opacity: 0.5;
+    line-height: 1.4;
 }
 .welcome .sign-in-btn {
-    padding: 8px 24px;
+    padding: 10px 32px;
     background: var(--ph-blue);
     color: #fff;
     border: none;
     border-radius: 6px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
-    margin-top: 4px;
     transition: opacity 0.15s;
+    letter-spacing: 0.2px;
 }
 .welcome .sign-in-btn:hover { opacity: 0.85; }
+.welcome-hint {
+    font-size: 11px;
+    opacity: 0.4;
+    margin-top: 12px;
+}
 
 /* ── Detail panel ── */
 #detail-panel {

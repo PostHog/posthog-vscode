@@ -4,10 +4,34 @@ export function getLayout(logoUri: vscode.Uri): string {
     return /*html*/ `
 <!-- Welcome screen (unauthenticated) -->
 <div id="welcome-screen" class="welcome" style="display:none;">
-    <img src="${logoUri}" alt="PostHog" />
-    <h2>Welcome to PostHog</h2>
-    <p>Your PostHog command center.<br>Connect your account to get started.</p>
+    <img src="${logoUri}" alt="PostHog" class="welcome-logo" />
+    <h2 class="welcome-title">PostHog for VS Code</h2>
+    <p class="welcome-subtitle">Your feature flags, experiments, and analytics — right in your editor.</p>
+    <div class="welcome-features">
+        <div class="welcome-feature">
+            <span class="welcome-feature-icon">&#x2691;</span>
+            <div class="welcome-feature-text">
+                <span class="welcome-feature-name">Feature Flags</span>
+                <span class="welcome-feature-desc">See flag status inline, autocomplete flag keys</span>
+            </div>
+        </div>
+        <div class="welcome-feature">
+            <span class="welcome-feature-icon">&#x2697;</span>
+            <div class="welcome-feature-text">
+                <span class="welcome-feature-name">Experiments</span>
+                <span class="welcome-feature-desc">Track experiment variants and results</span>
+            </div>
+        </div>
+        <div class="welcome-feature">
+            <span class="welcome-feature-icon">&#x1F4CA;</span>
+            <div class="welcome-feature-text">
+                <span class="welcome-feature-name">Analytics</span>
+                <span class="welcome-feature-desc">View saved insights and trends</span>
+            </div>
+        </div>
+    </div>
     <button class="sign-in-btn" id="btn-sign-in">Sign In with API Key</button>
+    <p class="welcome-hint">Requires a PostHog personal API key</p>
 </div>
 
 <!-- Main app (authenticated) -->

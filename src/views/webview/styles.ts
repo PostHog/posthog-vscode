@@ -897,5 +897,26 @@ html { height: 100vh; overflow: hidden; }
     padding: 8px 10px;
     border-radius: 4px;
     margin-top: 3px;
+}
+
+/* -- Light theme overrides -- */
+.vscode-light .table-widget tr:nth-child(even) {
+    background: rgba(0,0,0,0.03);
+}
+.vscode-light .funnel-step-bar {
+    opacity: 0.85;
+}
+.vscode-light .insight-detail-viz {
+    background: rgba(0,0,0,0.03);
+}
+.vscode-light .detail-desc {
+    background: rgba(0,0,0,0.03);
+}
+.vscode-light .exp-metric-block {
+    background: rgba(0,0,0,0.03);
+}
+.vscode-light .insight-card {
+    background: rgba(0,0,0,0.02);
+    border-color: rgba(0,0,0,0.1);
 }`;
 }

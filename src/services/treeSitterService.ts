@@ -57,25 +57,6 @@ const JS_FLAG_METHODS = new Set([
 ]);
 const JS_ALL_METHODS = new Set([...JS_CAPTURE_METHODS, ...JS_FLAG_METHODS]);
 
-const PY_CAPTURE_METHODS = new Set(['capture']);
-const PY_FLAG_METHODS = new Set([
-    'get_feature_flag', 'is_feature_enabled', 'get_feature_flag_payload',
-    'get_remote_config',
-]);
-const PY_ALL_METHODS = new Set([...PY_CAPTURE_METHODS, ...PY_FLAG_METHODS]);
-
-const GO_CAPTURE_METHODS = new Set(['Capture']);
-const GO_FLAG_METHODS = new Set([
-    'GetFeatureFlag', 'IsFeatureEnabled', 'GetFeatureFlagPayload',
-]);
-const GO_ALL_METHODS = new Set([...GO_CAPTURE_METHODS, ...GO_FLAG_METHODS]);
-
-const RB_CAPTURE_METHODS = new Set(['capture']);
-const RB_FLAG_METHODS = new Set([
-    'is_feature_enabled', 'get_feature_flag', 'get_feature_flag_payload',
-]);
-const RB_ALL_METHODS = new Set([...RB_CAPTURE_METHODS, ...RB_FLAG_METHODS]);
-
 const CLIENT_NAMES = new Set(['posthog', 'client', 'ph']);
 
 interface LangFamily {
@@ -191,143 +172,6 @@ const JS_QUERIES: QueryStrings = {
     `,
 };
 
-const PYTHON_QUERIES: QueryStrings = {
-    postHogCalls: `
-        (call
-            function: (attribute
-                object: (_) @client
-                attribute: (identifier) @method)
-            arguments: (argument_list
-                (string (string_content) @key))) @call
-    `,
-
-    flagAssignments: `
-        (assignment
-            left: (identifier) @var_name
-            right: (call
-                function: (attribute
-                    object: (_) @client
-                    attribute: (identifier) @method)
-                arguments: (argument_list
-                    (string (string_content) @flag_key))))
-    `,
-
-    functions: `
-        (function_definition
-            name: (identifier) @func_name
-            parameters: (parameters) @func_params
-            body: (block) @func_body)
-
-        (decorated_definition
-            definition: (function_definition
-                name: (identifier) @func_name
-                parameters: (parameters) @func_params
-                body: (block) @func_body))
-    `,
-
-    clientAliases: `
-        (assignment
-            left: (identifier) @alias
-            right: (identifier) @source)
-    `,
-
-    destructuredMethods: ``,
-
-    bareFunctionCalls: `
-        (call
-            function: (identifier) @func_name
-            arguments: (argument_list
-                (string (string_content) @key))) @call
-    `,
-};
-
-const GO_QUERIES: QueryStrings = {
-    postHogCalls: `
-        (call_expression
-            function: (selector_expression
-                operand: (_) @client
-                field: (field_identifier) @method)
-            arguments: (argument_list
-                (interpreted_string_literal) @key)) @call
-    `,
-
-    flagAssignments: `
-        (short_var_declaration
-            left: (expression_list (identifier) @var_name)
-            right: (expression_list
-                (call_expression
-                    function: (selector_expression
-                        operand: (_) @client
-                        field: (field_identifier) @method)
-                    arguments: (argument_list
-                        (interpreted_string_literal) @flag_key))))
-    `,
-
-    functions: `
-        (function_declaration
-            name: (identifier) @func_name
-            parameters: (parameter_list) @func_params
-            body: (block) @func_body)
-
-        (method_declaration
-            name: (field_identifier) @func_name
-            parameters: (parameter_list) @func_params
-            body: (block) @func_body)
-    `,
-
-    clientAliases: `
-        (short_var_declaration
-            left: (expression_list (identifier) @alias)
-            right: (expression_list (identifier) @source))
-    `,
-
-    destructuredMethods: ``,
-
-    bareFunctionCalls: ``,
-};
-
-const RUBY_QUERIES: QueryStrings = {
-    postHogCalls: `
-        (call
-            receiver: (_) @client
-            method: (identifier) @method
-            arguments: (argument_list
-                (string (string_content) @key))) @call
-    `,
-
-    flagAssignments: `
-        (assignment
-            left: (identifier) @var_name
-            right: (call
-                receiver: (_) @client
-                method: (identifier) @method
-                arguments: (argument_list
-                    (string (string_content) @flag_key))))
-    `,
-
-    functions: `
-        (method
-            name: (identifier) @func_name
-            parameters: (method_parameters) @func_params
-            body: (_) @func_body)
-    `,
-
-    clientAliases: `
-        (assignment
-            left: (identifier) @alias
-            right: (identifier) @source)
-    `,
-
-    destructuredMethods: ``,
-
-    bareFunctionCalls: `
-        (call
-            method: (identifier) @func_name
-            arguments: (argument_list
-                (string (string_content) @key))) @call
-    `,
-};
-
 // ── Language → family mapping ──
 
 const LANG_FAMILIES: Record<string, LangFamily> = {
@@ -335,9 +179,6 @@ const LANG_FAMILIES: Record<string, LangFamily> = {
     javascriptreact: { wasm: 'tree-sitter-javascript.wasm', captureMethods: JS_CAPTURE_METHODS, flagMethods: JS_FLAG_METHODS, allMethods: JS_ALL_METHODS, queries: JS_QUERIES },
     typescript: { wasm: 'tree-sitter-typescript.wasm', captureMethods: JS_CAPTURE_METHODS, flagMethods: JS_FLAG_METHODS, allMethods: JS_ALL_METHODS, queries: JS_QUERIES },
     typescriptreact: { wasm: 'tree-sitter-tsx.wasm', captureMethods: JS_CAPTURE_METHODS, flagMethods: JS_FLAG_METHODS, allMethods: JS_ALL_METHODS, queries: JS_QUERIES },
-    python: { wasm: 'tree-sitter-python.wasm', captureMethods: PY_CAPTURE_METHODS, flagMethods: PY_FLAG_METHODS, allMethods: PY_ALL_METHODS, queries: PYTHON_QUERIES },
-    go: { wasm: 'tree-sitter-go.wasm', captureMethods: GO_CAPTURE_METHODS, flagMethods: GO_FLAG_METHODS, allMethods: GO_ALL_METHODS, queries: GO_QUERIES },
-    ruby: { wasm: 'tree-sitter-ruby.wasm', captureMethods: RB_CAPTURE_METHODS, flagMethods: RB_FLAG_METHODS, allMethods: RB_ALL_METHODS, queries: RUBY_QUERIES },
 };
 
 // ── Service ──

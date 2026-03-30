@@ -3,6 +3,7 @@ import { AuthService } from '../services/authService';
 import { PostHogService } from '../services/postHogService';
 import { FlagCacheService } from '../services/flagCacheService';
 import { Commands } from '../constants';
+import { generateFlagTypes } from '../services/codegenService';
 
 interface Refreshable {
     refresh(): void;
@@ -83,5 +84,34 @@ export function registerFeatureFlagCommands(
         }
     });
 
-    return [refresh, copyKey, openInBrowser, createFlag];
+    const generateTypes = vscode.commands.registerCommand(Commands.GENERATE_FLAG_TYPES, async () => {
+        if (!authService.isAuthenticated() || !authService.getProjectId()) {
+            vscode.window.showErrorMessage('PostHog: Please sign in first.');
+            return;
+        }
+
+        const flags = flagCache?.getFlags() ?? [];
+        const active = flags.filter(f => !f.deleted);
+        if (active.length === 0) {
+            vscode.window.showInformationMessage('No feature flags found. Refresh flags first.');
+            return;
+        }
+
+        const folders = vscode.workspace.workspaceFolders;
+        if (!folders || folders.length === 0) {
+            vscode.window.showErrorMessage('PostHog: No workspace folder open.');
+            return;
+        }
+
+        const output = generateFlagTypes(active);
+        const uri = vscode.Uri.joinPath(folders[0].uri, '.posthog.d.ts');
+        await vscode.workspace.fs.writeFile(uri, Buffer.from(output, 'utf8'));
+        const doc = await vscode.workspace.openTextDocument(uri);
+        await vscode.window.showTextDocument(doc);
+        vscode.window.showInformationMessage(
+            `PostHog: Generated flag types for ${active.length} flag${active.length === 1 ? '' : 's'} → .posthog.d.ts`
+        );
+    });
+
+    return [refresh, copyKey, openInBrowser, createFlag, generateTypes];
 }

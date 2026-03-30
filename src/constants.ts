@@ -1,6 +1,7 @@
 export const Commands = {
     SIGN_IN: 'posthog.signIn',
     SIGN_OUT: 'posthog.signOut',
+    SIGN_IN_OAUTH: 'posthog.signInOAuth',
     SELECT_PROJECT: 'posthog.selectProject',
     REFRESH_FEATURE_FLAGS: 'posthog.refreshFeatureFlags',
     COPY_FLAG_KEY: 'posthog.copyFlagKey',
@@ -8,12 +9,10 @@ export const Commands = {
     CREATE_FLAG: 'posthog.createFlag',
     SHOW_FLAG_DETAIL: 'posthog.showFlagDetail',
     SHOW_EXPERIMENT_DETAIL: 'posthog.showExperimentDetail',
-    OPEN_HOGQL_EDITOR: 'posthog.openHogQLEditor',
-    RUN_HOGQL_FILE: 'posthog.runHogQLFile',
     SCAN_STALE_FLAGS: 'posthog.scanStaleFlags',
     CLEANUP_STALE_FLAG: 'posthog.cleanupStaleFlag',
-    INSERT_CAPTURE: 'posthog.insertCapture',
     SHOW_SESSIONS: 'posthog.showSessions',
+    GENERATE_FLAG_TYPES: 'posthog.generateFlagTypes',
 } as const;
 
 export const Views = {

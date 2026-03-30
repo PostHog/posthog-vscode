@@ -89,7 +89,7 @@ html { height: 100vh; overflow: hidden; }
 .nav-tab:hover { opacity: 0.85; }
 .nav-tab.active {
     opacity: 1;
-    border-bottom-color: var(--ph-yellow);
+    border-bottom-color: var(--ph-blue);
 }
 
 /* ── Search ── */
@@ -211,6 +211,13 @@ html { height: 100vh; overflow: hidden; }
 .empty-state .icon { font-size: 32px; margin-bottom: 12px; }
 .empty-state p { font-size: 12px; line-height: 1.6; }
 
+.no-results {
+    text-align: center;
+    padding: 24px 16px;
+    font-size: 12px;
+    opacity: 0.5;
+}
+
 .loading {
     text-align: center;
     padding: 32px;
@@ -224,33 +231,94 @@ html { height: 100vh; overflow: hidden; }
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 48px 24px;
+    padding: 40px 20px;
     text-align: center;
-    gap: 16px;
+    gap: 0;
+    min-height: 100vh;
 }
-.welcome img { height: 36px; margin-bottom: 4px; }
-.welcome h2 {
-    font-size: 15px;
-    font-weight: 600;
+.welcome-logo { height: 40px; margin-bottom: 16px; }
+.welcome-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 6px;
 }
-.welcome p {
+.welcome-subtitle {
     font-size: 12px;
     opacity: 0.6;
     line-height: 1.5;
+    max-width: 240px;
+    margin-bottom: 24px;
 }
-.welcome .sign-in-btn {
-    padding: 8px 24px;
-    background: var(--ph-blue);
-    color: #fff;
-    border: none;
+.welcome-features {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    max-width: 260px;
+    margin-bottom: 28px;
+    text-align: left;
+}
+.welcome-feature {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+.welcome-feature-icon {
+    font-size: 16px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 6px;
+    background: rgba(29, 74, 255, 0.1);
+    flex-shrink: 0;
+}
+.welcome-feature-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding-top: 2px;
+}
+.welcome-feature-name {
     font-size: 12px;
     font-weight: 600;
+}
+.welcome-feature-desc {
+    font-size: 11px;
+    opacity: 0.5;
+    line-height: 1.4;
+}
+.welcome .sign-in-btn {
+    width: 100%;
+    max-width: 260px;
+    padding: 10px 32px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
     cursor: pointer;
-    margin-top: 4px;
     transition: opacity 0.15s;
+    letter-spacing: 0.2px;
 }
 .welcome .sign-in-btn:hover { opacity: 0.85; }
+.welcome .sign-in-btn--primary {
+    background: var(--ph-blue);
+    color: #fff;
+    margin-bottom: 8px;
+}
+.welcome .sign-in-btn--secondary {
+    background: transparent;
+    color: var(--vscode-foreground);
+    border: 1px solid var(--vscode-input-border, rgba(255, 255, 255, 0.15));
+    font-size: 12px;
+    padding: 8px 32px;
+}
+.welcome-hint {
+    font-size: 11px;
+    opacity: 0.4;
+    margin-top: 12px;
+}
 
 /* ── Detail panel ── */
 #detail-panel {
@@ -711,6 +779,65 @@ html { height: 100vh; overflow: hidden; }
     padding: 14px 0;
 }
 
+/* ── Skeleton loading ── */
+.skeleton-card {
+    background: var(--vscode-textCodeBlock-background, rgba(255,255,255,0.04));
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 6px;
+    padding: 12px;
+    cursor: default;
+    overflow: hidden;
+    position: relative;
+}
+.skeleton-card-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+.skeleton-bone {
+    background: var(--vscode-input-background, rgba(255,255,255,0.08));
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+}
+.skeleton-bone::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
+    animation: shimmer 1.5s infinite;
+}
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+.skeleton-bone.icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+.skeleton-bone.title {
+    height: 12px;
+    flex: 1;
+}
+.skeleton-bone.type {
+    height: 10px;
+    width: 40px;
+    flex-shrink: 0;
+}
+.skeleton-bone.chart {
+    height: 44px;
+    width: 100%;
+}
+.vscode-light .skeleton-bone {
+    background: rgba(0,0,0,0.06);
+}
+.vscode-light .skeleton-bone::after {
+    background: linear-gradient(90deg, transparent, rgba(0,0,0,0.04), transparent);
+}
+
 /* ── Sparkline ── */
 .sparkline-container { overflow: hidden; }
 .sparkline-container svg { display: block; width: 100%; }
@@ -829,5 +956,26 @@ html { height: 100vh; overflow: hidden; }
     padding: 8px 10px;
     border-radius: 4px;
     margin-top: 3px;
+}
+
+/* -- Light theme overrides -- */
+.vscode-light .table-widget tr:nth-child(even) {
+    background: rgba(0,0,0,0.03);
+}
+.vscode-light .funnel-step-bar {
+    opacity: 0.85;
+}
+.vscode-light .insight-detail-viz {
+    background: rgba(0,0,0,0.03);
+}
+.vscode-light .detail-desc {
+    background: rgba(0,0,0,0.03);
+}
+.vscode-light .exp-metric-block {
+    background: rgba(0,0,0,0.03);
+}
+.vscode-light .insight-card {
+    background: rgba(0,0,0,0.02);
+    border-color: rgba(0,0,0,0.1);
 }`;
 }

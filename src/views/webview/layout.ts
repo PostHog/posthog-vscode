@@ -4,10 +4,35 @@ export function getLayout(logoUri: vscode.Uri): string {
     return /*html*/ `
 <!-- Welcome screen (unauthenticated) -->
 <div id="welcome-screen" class="welcome" style="display:none;">
-    <img src="${logoUri}" alt="PostHog" />
-    <h2>Welcome to PostHog</h2>
-    <p>Your PostHog command center.<br>Connect your account to get started.</p>
-    <button class="sign-in-btn" id="btn-sign-in">Sign In with API Key</button>
+    <img src="${logoUri}" alt="PostHog" class="welcome-logo" />
+    <h2 class="welcome-title">PostHog for VS Code</h2>
+    <p class="welcome-subtitle">Your feature flags, experiments, and analytics — right in your editor.</p>
+    <div class="welcome-features">
+        <div class="welcome-feature">
+            <span class="welcome-feature-icon">&#x2691;</span>
+            <div class="welcome-feature-text">
+                <span class="welcome-feature-name">Feature Flags</span>
+                <span class="welcome-feature-desc">See flag status inline, autocomplete flag keys</span>
+            </div>
+        </div>
+        <div class="welcome-feature">
+            <span class="welcome-feature-icon">&#x2697;</span>
+            <div class="welcome-feature-text">
+                <span class="welcome-feature-name">Experiments</span>
+                <span class="welcome-feature-desc">Track experiment variants and results</span>
+            </div>
+        </div>
+        <div class="welcome-feature">
+            <span class="welcome-feature-icon">&#x1F4CA;</span>
+            <div class="welcome-feature-text">
+                <span class="welcome-feature-name">Analytics</span>
+                <span class="welcome-feature-desc">View saved insights and trends</span>
+            </div>
+        </div>
+    </div>
+    <button class="sign-in-btn sign-in-btn--primary" id="btn-sign-in-oauth">Sign In with PostHog</button>
+    <button class="sign-in-btn sign-in-btn--secondary" id="btn-sign-in">Sign In with API Key</button>
+    <p class="welcome-hint">API key works for self-hosted instances</p>
 </div>
 
 <!-- Main app (authenticated) -->
@@ -22,50 +47,23 @@ export function getLayout(logoUri: vscode.Uri): string {
     </div>
 
     <div class="nav">
-        <button class="nav-tab active" data-tab="analytics">Analytics</button>
-        <button class="nav-tab" data-tab="flags">Flags</button>
-        <button class="nav-tab" data-tab="errors">Errors</button>
+        <button class="nav-tab active" data-tab="flags">Flags</button>
         <button class="nav-tab" data-tab="experiments">Experiments</button>
+        <button class="nav-tab" data-tab="analytics">Analytics</button>
     </div>
 
     <div class="search-bar">
         <input id="search" type="text" placeholder="Search..." />
     </div>
 
-    <div id="errors-filter" style="display:none;padding:4px 12px;">
-        <label style="display:flex;align-items:center;gap:6px;font-size:11px;opacity:0.7;cursor:pointer;user-select:none;">
-            <input type="checkbox" id="errors-local-only" /> This repo only
-        </label>
-    </div>
-
     <div class="scroll-area">
-        <!-- Analytics -->
-        <div id="section-analytics" class="section active">
-            <div class="loading" id="analytics-loading">Loading insights...</div>
-            <div class="insight-grid" id="analytics-list" style="display:none;"></div>
-            <div class="empty-state" id="analytics-empty" style="display:none;">
-                <div class="icon">&#x1F4CA;</div>
-                <p>No saved insights found</p>
-            </div>
-        </div>
-
         <!-- Feature Flags -->
-        <div id="section-flags" class="section">
+        <div id="section-flags" class="section active">
             <div class="loading" id="flags-loading">Loading flags...</div>
             <div class="item-list" id="flags-list" style="display:none;"></div>
             <div class="empty-state" id="flags-empty" style="display:none;">
                 <div class="icon">&#x2691;</div>
                 <p>No feature flags found</p>
-            </div>
-        </div>
-
-        <!-- Error Tracking -->
-        <div id="section-errors" class="section">
-            <div class="loading" id="errors-loading">Loading errors...</div>
-            <div class="item-list" id="errors-list" style="display:none;"></div>
-            <div class="empty-state" id="errors-empty" style="display:none;">
-                <div class="icon">&#x2713;</div>
-                <p>No errors tracked. Nice!</p>
             </div>
         </div>
 
@@ -76,6 +74,41 @@ export function getLayout(logoUri: vscode.Uri): string {
             <div class="empty-state" id="experiments-empty" style="display:none;">
                 <div class="icon">&#x2697;</div>
                 <p>No experiments found</p>
+            </div>
+        </div>
+
+        <!-- Analytics -->
+        <div id="section-analytics" class="section">
+            <div class="insight-grid" id="analytics-loading">
+              <div class="skeleton-card">
+                <div class="skeleton-card-header">
+                  <div class="skeleton-bone icon"></div>
+                  <div class="skeleton-bone title"></div>
+                  <div class="skeleton-bone type"></div>
+                </div>
+                <div class="skeleton-bone chart"></div>
+              </div>
+              <div class="skeleton-card">
+                <div class="skeleton-card-header">
+                  <div class="skeleton-bone icon"></div>
+                  <div class="skeleton-bone title"></div>
+                  <div class="skeleton-bone type"></div>
+                </div>
+                <div class="skeleton-bone chart"></div>
+              </div>
+              <div class="skeleton-card">
+                <div class="skeleton-card-header">
+                  <div class="skeleton-bone icon"></div>
+                  <div class="skeleton-bone title"></div>
+                  <div class="skeleton-bone type"></div>
+                </div>
+                <div class="skeleton-bone chart"></div>
+              </div>
+            </div>
+            <div class="insight-grid" id="analytics-list" style="display:none;"></div>
+            <div class="empty-state" id="analytics-empty" style="display:none;">
+                <div class="icon">&#x1F4CA;</div>
+                <p>No saved insights found</p>
             </div>
         </div>
 

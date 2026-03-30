@@ -3,12 +3,11 @@ export function getScript(): string {
 const vscode = acquireVsCodeApi();
 function send(msg) { vscode.postMessage(msg); }
 
-let currentTab = 'analytics';
+let currentTab = 'flags';
 let loadedTabs = new Set();
-let allData = { flags: [], errors: [], experiments: [], analytics: [] };
+let allData = { flags: [], experiments: [], analytics: [] };
 let experimentResults = {};
 let projectId = null;
-let localIssueIds = [];
 
 // ── Helpers ──
 
@@ -17,6 +16,10 @@ function esc(s) {
     const d = document.createElement('div');
     d.textContent = s;
     return d.innerHTML.replace(/"/g, '&quot;');
+}
+
+function isDarkTheme() {
+    return document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast');
 }
 
 function timeAgo(dateStr) {
@@ -53,13 +56,10 @@ function switchTab(tab) {
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
     document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === 'section-' + tab));
     document.getElementById('search').value = '';
-    var errFilter = document.getElementById('errors-filter');
-    if (errFilter) { errFilter.style.display = (tab === 'errors' && localIssueIds.length > 0) ? '' : 'none'; }
 
     if (!loadedTabs.has(tab)) {
         loadedTabs.add(tab);
         if (tab === 'flags') send({ type: 'loadFlags' });
-        else if (tab === 'errors') send({ type: 'loadErrors' });
         else if (tab === 'experiments') send({ type: 'loadExperiments' });
         else if (tab === 'analytics') send({ type: 'loadInsights' });
     }
@@ -70,11 +70,30 @@ function switchTab(tab) {
 function filterItems() {
     const q = document.getElementById('search').value.toLowerCase();
     const list = document.getElementById(currentTab + '-list');
+    if (!list) return;
     const selector = currentTab === 'analytics' ? '.insight-card' : '.item';
-    list.querySelectorAll(selector).forEach(item => {
+    const items = list.querySelectorAll(selector);
+    let visibleCount = 0;
+    items.forEach(item => {
         const text = item.textContent.toLowerCase();
-        item.style.display = text.includes(q) ? '' : 'none';
+        const show = text.includes(q);
+        item.style.display = show ? '' : 'none';
+        if (show) visibleCount++;
     });
+
+    // Show/hide no-results message
+    let noResults = list.querySelector('.no-results');
+    if (visibleCount === 0 && q.length > 0 && items.length > 0) {
+        if (!noResults) {
+            noResults = document.createElement('div');
+            noResults.className = 'no-results';
+            noResults.textContent = 'No matching items';
+            list.appendChild(noResults);
+        }
+        noResults.style.display = '';
+    } else if (noResults) {
+        noResults.style.display = 'none';
+    }
 }
 
 // ── List item action bindings ──
@@ -135,47 +154,6 @@ function renderFlags(flags) {
                 + '</div>';
         }).join('');
         bindListClicks(list, 'key', (key) => send({ type: 'openFlagPanel', key }));
-    });
-}
-
-function renderErrors(issues) {
-    allData.errors = issues;
-    const filterDiv = document.getElementById('errors-filter');
-    if (filterDiv) { filterDiv.style.display = localIssueIds.length > 0 ? '' : 'none'; }
-    const localOnly = document.getElementById('errors-local-only');
-    const filtered = localOnly && localOnly.checked
-        ? issues.filter(e => localIssueIds.includes(e.id))
-        : issues;
-    renderSection('errors', filtered, (list, items) => {
-        list.innerHTML = items.map(e => {
-            const dotClass = e.status === 'resolved' ? 'resolved' : 'error';
-            const desc = e.description ? e.description.split('\\\\n')[0].substring(0, 120) : '';
-            const badge = e.occurrences != null ? '<span class="badge count">' + e.occurrences + '</span>' : '';
-            const issueId = e.short_id || e.id;
-            const isLocal = localIssueIds.includes(e.id);
-            const jumpBtn = isLocal
-                ? '<button class="act-jump" data-issue-id="' + esc(e.id) + '" title="Jump to error in code" style="opacity:0.7;">&#x21B7;</button>'
-                : '';
-            return '<div class="item" data-id="' + esc(e.id) + '"' + (isLocal ? ' data-local="1"' : '') + ' style="cursor:pointer;">'
-                + '<div class="dot ' + dotClass + '"></div>'
-                + '<div class="info">'
-                + '<div class="primary">' + (isLocal ? '<span title="Found in this repo" style="margin-right:4px;">&#x1F4C2;</span>' : '') + esc(e.name || 'Unknown error') + '</div>'
-                + '<div class="secondary">' + esc(desc) + '</div>'
-                + '</div>'
-                + badge
-                + '<div class="item-actions">'
-                + jumpBtn
-                + '<button class="act-open" data-path="/project/' + projectId + '/error_tracking/' + issueId + '" title="Open in PostHog">&#x2197;</button>'
-                + '</div>'
-                + '</div>';
-        }).join('');
-        bindListClicks(list, 'id', (id) => send({ type: 'openErrorPanel', id }));
-        list.querySelectorAll('.act-jump').forEach(btn => {
-            btn.addEventListener('click', (ev) => {
-                ev.stopPropagation();
-                send({ type: 'jumpToError', issueId: btn.getAttribute('data-issue-id') });
-            });
-        });
     });
 }
 
@@ -319,6 +297,18 @@ function renderSparkline(series, large) {
 
         const color = colors[si % colors.length];
         svgPaths += '<polyline points="' + points + '" fill="none" stroke="' + color + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>';
+        if (si === 0) {
+            const fillPoints = points + ' ' + ((data.length - 1) * step).toFixed(1) + ',' + h + ' 0,' + h;
+            svgPaths += '<polygon points="' + fillPoints + '" fill="' + color + '" opacity="0.08"/>';
+        }
+    }
+
+    if (large && series.length > 1) {
+        const min = Math.min(...series[0].data, 0);
+        const max = Math.max(...series[0].data, 1);
+        const range = max - min || 1;
+        const zeroY = (h - 2 - ((0 - min) / range) * (h - 4)).toFixed(1);
+        svgPaths += '<line x1="0" y1="' + zeroY + '" x2="200" y2="' + zeroY + '" stroke="' + (isDarkTheme() ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)') + '" stroke-width="0.5" stroke-dasharray="3,3"/>';
     }
 
     const lastVal = series[0].data[series[0].data.length - 1];
@@ -346,6 +336,7 @@ function renderFunnel(steps, large) {
     if (!steps || steps.length === 0) return '<div class="insight-card-empty">No data</div>';
     const maxCount = Math.max(...steps.map(s => s.count), 1);
     const limit = large ? steps.length : Math.min(steps.length, 4);
+    const trackBg = isDarkTheme() ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
     let html = '';
     for (let i = 0; i < limit; i++) {
         const s = steps[i];
@@ -354,7 +345,7 @@ function renderFunnel(steps, large) {
         const name = s.custom_name || s.name || 'Step ' + (i + 1);
         html += '<div class="funnel-step">'
             + '<div class="funnel-step-label">' + esc(name) + '</div>'
-            + '<div style="flex:1;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;">'
+            + '<div style="flex:1;background:' + trackBg + ';border-radius:3px;overflow:hidden;">'
             + '<div class="funnel-step-bar" style="width:' + pct.toFixed(1) + '%"></div>'
             + '</div>'
             + '<div class="funnel-step-pct">' + convRate + '</div>'
@@ -379,8 +370,9 @@ function renderRetention(cohorts, large) {
             const pct = baseCount > 0 ? (val.count / baseCount * 100) : 0;
             const alpha = Math.max(0.08, pct / 100);
             const bg = 'rgba(29,74,255,' + alpha.toFixed(2) + ')';
+            const textColor = alpha > 0.4 ? '#fff' : (isDarkTheme() ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)');
             const text = col === 0 ? baseCount : Math.round(pct) + '%';
-            html += '<div class="retention-cell" style="background:' + bg + ';' + (col === 0 ? 'width:32px;font-size:8px;' : '') + '">' + text + '</div>';
+            html += '<div class="retention-cell" style="background:' + bg + ';color:' + textColor + ';' + (col === 0 ? 'width:32px;font-size:8px;' : '') + '">' + text + '</div>';
         }
         html += '</div>';
     }
@@ -440,6 +432,11 @@ function renderLifecycle(series, large) {
         svgPaths += '<polyline points="' + points + '" fill="none" stroke="' + color + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>';
     }
 
+    if (large) {
+        const baselineColor = isDarkTheme() ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+        svgPaths += '<line x1="0" y1="' + (h - 2) + '" x2="200" y2="' + (h - 2) + '" stroke="' + baselineColor + '" stroke-width="0.5"/>';
+    }
+
     let legend = '';
     if (large) {
         legend = '<div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap;">';
@@ -488,7 +485,6 @@ function showDetail(title, bodyHtml) {
             if (action === 'findRefs') send({ type: 'findReferences', key: btn.dataset.key });
             else if (action === 'copy') send({ type: 'copyFlagKey', key: btn.dataset.key });
             else if (action === 'open') send({ type: 'openExternal', path: btn.dataset.path });
-            else if (action === 'jumpError') send({ type: 'jumpToError', issueId: btn.dataset.issueId });
             else if (action === 'refreshInsight') send({ type: 'refreshInsight', insightId: Number(btn.dataset.insightId) });
         });
     });
@@ -679,27 +675,6 @@ function showFlagDetail(key) {
 
         send({ type: 'updateFlag', flagId: flagId, active: active, filters: filters });
     });
-}
-
-function showErrorDetail(id) {
-    const e = allData.errors.find(x => x.id === id);
-    if (!e) return;
-
-    const dotClass = e.status === 'resolved' ? 'resolved' : 'error';
-    const desc = e.description || '';
-    const issueId = e.short_id || e.id;
-
-    showDetail(e.name || 'Unknown error', ''
-        + detailField('Status', '<span class="detail-status">' + statusDotHtml(dotClass) + ' ' + esc(e.status) + '</span>')
-        + detailField('First seen', timeAgo(e.first_seen))
-        + (e.last_seen ? detailField('Last seen', timeAgo(e.last_seen)) : '')
-        + (e.occurrences != null ? detailField('Occurrences', String(e.occurrences)) : '')
-        + (desc ? '<div class="detail-field"><div class="detail-label">Description</div><div class="detail-desc">' + esc(desc) + '</div></div>' : '')
-        + '<div class="detail-actions">'
-        + detailBtn('primary', 'jumpError', { 'issue-id': e.id }, 'Jump to Code')
-        + detailBtn('secondary', 'open', { path: '/project/' + projectId + '/error_tracking/' + issueId }, 'Open in PostHog')
-        + '</div>'
-    );
 }
 
 function fmtPct(n) { return (n * 100).toFixed(1) + '%'; }
@@ -950,13 +925,11 @@ function showInsightDetail(id) {
 
 // ── Event listeners ──
 
+document.getElementById('btn-sign-in-oauth').addEventListener('click', () => send({ type: 'signInOAuth' }));
 document.getElementById('btn-sign-in').addEventListener('click', () => send({ type: 'signIn' }));
 document.getElementById('btn-select-project').addEventListener('click', () => send({ type: 'selectProject' }));
 document.getElementById('btn-sign-out').addEventListener('click', () => send({ type: 'signOut' }));
 document.getElementById('search').addEventListener('input', filterItems);
-document.getElementById('errors-local-only').addEventListener('change', () => {
-    if (allData.errors.length) { renderErrors(allData.errors); }
-});
 document.getElementById('detail-back').addEventListener('click', hideDetail);
 document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.addEventListener('click', () => { hideDetail(); switchTab(tab.dataset.tab); });
@@ -972,7 +945,9 @@ window.addEventListener('message', e => {
             document.getElementById('main-app').style.display = msg.authenticated ? '' : 'none';
             if (msg.authenticated) {
                 loadedTabs.clear();
-                loadedTabs.add('analytics');
+                loadedTabs.add('flags');
+                switchTab('flags');
+                send({ type: 'loadFlags' });
             }
             break;
         case 'loading': {
@@ -987,11 +962,6 @@ window.addEventListener('message', e => {
         case 'flags':
             projectId = msg.projectId;
             renderFlags(msg.data);
-            break;
-        case 'errors':
-            projectId = msg.projectId;
-            if (msg.localIssueIds) { localIssueIds = msg.localIssueIds; }
-            renderErrors(msg.data);
             break;
         case 'experiments':
             projectId = msg.projectId;

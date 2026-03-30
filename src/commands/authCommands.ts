@@ -94,6 +94,17 @@ export function registerAuthCommands(
         }
     });
 
+    // Stub — OAuth not yet implemented. UI button is wired; someone else will fill in the flow.
+    const signInOAuth = vscode.commands.registerCommand(Commands.SIGN_IN_OAUTH, async () => {
+        const choice = await vscode.window.showErrorMessage(
+            'PostHog: OAuth is not yet available. Please sign in with an API key.',
+            'Sign In with API Key'
+        );
+        if (choice === 'Sign In with API Key') {
+            vscode.commands.executeCommand(Commands.SIGN_IN);
+        }
+    });
+
     const signOut = vscode.commands.registerCommand(Commands.SIGN_OUT, async () => {
         await authService.deleteApiKey();
         await authService.clearProjectId();
@@ -121,5 +132,5 @@ export function registerAuthCommands(
         }
     });
 
-    return [signIn, signOut, selectProject];
+    return [signIn, signInOAuth, signOut, selectProject];
 }

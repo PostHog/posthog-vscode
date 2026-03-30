@@ -16,20 +16,6 @@ export interface FeatureFlag {
     deleted: boolean;
 }
 
-export interface ErrorTrackingIssue {
-    id: string;
-    short_id?: string;
-    name: string | null;
-    description: string | null;
-    status: 'active' | 'resolved' | 'pending_release' | 'archived' | 'suppressed';
-    occurrences?: number;
-    sessions?: number;
-    users?: number;
-    first_seen: string;
-    last_seen?: string;
-    volume?: number[] | null;
-}
-
 export interface ExperimentMetric {
     name: string;
     metric_type: 'funnel' | 'mean' | 'ratio' | 'retention';
@@ -144,36 +130,6 @@ export interface EventProperty {
     name: string;
     property_type: string | null;
     is_numerical: boolean;
-}
-
-export interface StackFrame {
-    filename: string;
-    lineno: number;
-    colno: number;
-    function: string;
-    source?: string;
-    in_app?: boolean;
-}
-
-export interface ExceptionEntry {
-    type: string;
-    value: string;
-    mechanism?: { type: string };
-    stack_trace?: { frames: StackFrame[] };
-}
-
-export interface ErrorOccurrence {
-    issueId: string;
-    title: string;
-    description: string | null;
-    status: ErrorTrackingIssue['status'];
-    occurrences: number;
-    firstSeen: string;
-    lastSeen: string | null;
-    filePath: string;
-    line: number;
-    column: number | null;
-    functionName: string | null;
 }
 
 export interface SessionReplayEntry {

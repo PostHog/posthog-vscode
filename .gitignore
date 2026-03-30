@@ -8,3 +8,4 @@ wasm/
 grammars/
 .grammar-build/
 .DS_Store
+.planning/

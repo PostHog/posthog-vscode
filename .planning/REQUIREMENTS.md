@@ -7,7 +7,7 @@
 
 ### Cleanup
 
-- [ ] **CLEAN-01**: Remove error tracking code (errorCacheService, errorDecorationProvider, sidebar error tab)
+- [x] **CLEAN-01**: Remove error tracking code (errorCacheService, errorDecorationProvider, sidebar error tab)
 - [x] **CLEAN-02**: Remove HogQL editor (HogQLEditorProvider, .hogql language registration, commands)
 - [ ] **CLEAN-03**: Remove smart capture insertion (captureCodeActionProvider, related commands)
 - [ ] **CLEAN-04**: Remove Python, Go, Ruby tree-sitter grammars and WASM files
@@ -69,7 +69,7 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CLEAN-01 | Phase 1 | Pending |
+| CLEAN-01 | Phase 1 | Complete |
 | CLEAN-02 | Phase 1 | Complete |
 | CLEAN-03 | Phase 1 | Pending |
 | CLEAN-04 | Phase 1 | Pending |

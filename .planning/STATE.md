@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 01-dead-code-removal-01-01-PLAN.md
-last_updated: "2026-03-30T14:58:11.659Z"
+stopped_at: Completed 01-dead-code-removal-01-02-PLAN.md
+last_updated: "2026-03-30T15:07:20.176Z"
 last_activity: 2026-03-30 — Roadmap created, phases derived from requirements
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -51,6 +51,7 @@ Progress: [░░░░░░░░░░] 0%
 
 *Updated after each plan completion*
 | Phase 01-dead-code-removal P01 | 1 | 1 tasks | 6 files |
+| Phase 01-dead-code-removal P02 | 7 | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -63,6 +64,8 @@ Recent decisions affecting current work:
 - Phase 4 (OAuth): Gated on PostHog OAuth app registration — do not implement until redirect URI and client_id are confirmed with PostHog team
 - [Phase 01-dead-code-removal]: Removed runHogQLQuery from postHogService.ts since it was exclusively called by HogQLEditorProvider
 - [Phase 01-dead-code-removal]: Removed editor/title menus section, languages and grammars arrays entirely since the only entries were hogql-related
+- [Phase 01-dead-code-removal]: Removed StackFrame and ExceptionEntry from models/types.ts since all consumers were also removed with error tracking
+- [Phase 01-dead-code-removal]: Removed resolveFilePath from SidebarProvider (only called by loadErrors which was removed)
 
 ### Pending Todos
 
@@ -75,6 +78,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-30T14:58:11.657Z
-Stopped at: Completed 01-dead-code-removal-01-01-PLAN.md
+Last session: 2026-03-30T15:07:20.175Z
+Stopped at: Completed 01-dead-code-removal-01-02-PLAN.md
 Resume file: None

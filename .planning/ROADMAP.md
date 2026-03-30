@@ -46,7 +46,11 @@ Plans:
   2. A user with 50+ flags can type in a search box and see the list filter to matching results in real time
   3. A user with 50+ experiments can type in a search box and see the list filter to matching results in real time
   4. The sidebar shows three tabs — Flags, Experiments, Analytics — and switching between them persists the search state
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Redesign unauthenticated welcome screen with PostHog-branded landing page
+- [ ] 02-02-PLAN.md — Reorder sidebar tabs, fix active tab color, add search no-results feedback
 
 ### Phase 3: Flag Type Generation
 **Goal**: A developer can generate accurate TypeScript type definitions from their live PostHog flags without leaving the editor
@@ -89,7 +93,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Dead Code Removal | 4/4 | Complete    | 2026-03-30 |
-| 2. Auth Landing and Sidebar UX | 0/? | Not started | - |
+| 2. Auth Landing and Sidebar UX | 0/2 | Planning complete | - |
 | 3. Flag Type Generation | 0/? | Not started | - |
 | 4. OAuth Authentication | 0/? | Not started | - |
 | 5. Analytics Tab | 0/? | Not started | - |

@@ -3,8 +3,6 @@ import { AuthService } from '../services/authService';
 import { PostHogService } from '../services/postHogService';
 import { FlagCacheService } from '../services/flagCacheService';
 import { ExperimentCacheService } from '../services/experimentCacheService';
-import { StackFrame } from '../models/types';
-import { ErrorCacheService } from '../services/errorCacheService';
 import { Commands } from '../constants';
 import { getWebviewHtml } from './getWebviewHtml';
 import { DetailPanelProvider } from './DetailPanelProvider';
@@ -19,7 +17,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         private readonly flagCache: FlagCacheService,
         private readonly experimentCache?: ExperimentCacheService,
         private readonly detailPanel?: DetailPanelProvider,
-        private readonly errorCache?: ErrorCacheService,
     ) {}
 
     resolveWebviewView(webviewView: vscode.WebviewView) {
@@ -103,8 +100,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 return vscode.commands.executeCommand(Commands.SELECT_PROJECT);
             case 'loadFlags':
                 return this.loadFlags();
-            case 'loadErrors':
-                return this.loadErrors();
             case 'loadExperiments':
                 return this.loadExperiments();
             case 'copyFlagKey':
@@ -114,8 +109,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             case 'createFlag':
                 await vscode.commands.executeCommand(Commands.CREATE_FLAG, msg.key);
                 return this.loadFlags();
-            case 'jumpToError':
-                return this.jumpToError(msg.issueId as string);
             case 'findReferences':
                 return vscode.commands.executeCommand('workbench.action.findInFiles', {
                     query: msg.key,
@@ -133,8 +126,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 return this.updateFlag(msg.flagId as number, msg.active as boolean, msg.filters as Record<string, unknown>);
             case 'openFlagPanel':
                 return this.openFlagPanel(msg.key as string);
-            case 'openErrorPanel':
-                return this.openErrorPanel(msg.id as string);
             case 'openExperimentPanel':
                 return this.openExperimentPanel(msg.id as number);
             case 'openInsightPanel':
@@ -182,58 +173,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         } catch {
             this.postMessage({ type: 'error', section: 'flags', message: 'Failed to load feature flags' });
         }
-    }
-
-    private async loadErrors() {
-        const projectId = this.authService.getProjectId();
-        if (!projectId) { return; }
-
-        this.postMessage({ type: 'loading', section: 'errors' });
-        try {
-            const issues = await this.postHogService.getErrorTrackingIssues(projectId);
-
-            // Resolve which issues have files in the current workspace
-            const localIssueIds: string[] = [];
-            if (this.errorCache) {
-                const occurrences = this.errorCache.getAll();
-                const issueIdSet = new Set(occurrences.map(o => o.issueId));
-                for (const id of issueIdSet) {
-                    const occ = occurrences.find(o => o.issueId === id);
-                    if (occ) {
-                        const resolved = await this.resolveFilePath(occ.filePath);
-                        if (resolved) { localIssueIds.push(id); }
-                    }
-                }
-            }
-
-            this.postMessage({ type: 'errors', data: issues, projectId, localIssueIds });
-        } catch (err) {
-            const detail = err instanceof Error ? err.message : String(err);
-            console.error('[PostHog] loadErrors failed:', detail);
-            this.postMessage({ type: 'error', section: 'errors', message: `Failed to load errors: ${detail}` });
-        }
-    }
-
-    private async resolveFilePath(filePath: string): Promise<vscode.Uri | null> {
-        let cleaned = filePath;
-        try {
-            const url = new URL(cleaned);
-            cleaned = url.pathname.replace(/^\//, '');
-        } catch { /* not a URL */ }
-
-        if (cleaned.includes('node_modules') || cleaned.startsWith('chrome-extension')) {
-            return null;
-        }
-
-        const matches = await vscode.workspace.findFiles(`**/${cleaned}`, '**/node_modules/**', 1);
-        if (matches.length > 0) { return matches[0]; }
-
-        const basename = cleaned.split('/').pop();
-        if (basename) {
-            const fallback = await vscode.workspace.findFiles(`**/${basename}`, '**/node_modules/**', 3);
-            if (fallback.length === 1) { return fallback[0]; }
-        }
-        return null;
     }
 
     private async loadExperiments() {
@@ -329,17 +268,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         if (flag) { this.detailPanel.showFlag(flag); }
     }
 
-    private async openErrorPanel(id: string) {
-        if (!this.detailPanel) { return; }
-        const projectId = this.authService.getProjectId();
-        if (!projectId) { return; }
-        try {
-            const issues = await this.postHogService.getErrorTrackingIssues(projectId);
-            const error = issues.find(e => e.id === id);
-            if (error) { this.detailPanel.showError(error); }
-        } catch { /* ignore */ }
-    }
-
     private async openExperimentPanel(id: number) {
         if (!this.detailPanel || !this.experimentCache) { return; }
         const exps = this.experimentCache.getExperiments();
@@ -366,81 +294,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             this.insightsCache = await this.postHogService.getInsights(projectId);
             return this.insightsCache;
         } catch { return []; }
-    }
-
-    // ── Error navigation ──
-
-    private async jumpToError(issueId: string) {
-        const projectId = this.authService.getProjectId();
-        if (!projectId) { return; }
-
-        try {
-            const exceptions = await this.postHogService.getErrorStackTrace(projectId, issueId);
-            if (exceptions.length === 0) {
-                vscode.window.showInformationMessage('No stack trace available for this error.');
-                return;
-            }
-
-            for (const entry of exceptions) {
-                const frames = entry.stack_trace?.frames;
-                if (!frames) { continue; }
-
-                // Frames are typically bottom-up; reverse to get top (most relevant) first
-                const ordered = [...frames].reverse();
-
-                for (const frame of ordered) {
-                    const localFile = await this.resolveFrame(frame);
-                    if (localFile) {
-                        const line = Math.max(0, (frame.lineno || 1) - 1);
-                        const col = Math.max(0, (frame.colno || 1) - 1);
-                        const position = new vscode.Position(line, col);
-                        const doc = await vscode.workspace.openTextDocument(localFile);
-                        await vscode.window.showTextDocument(doc, {
-                            selection: new vscode.Range(position, position),
-                            preview: true,
-                        });
-                        return;
-                    }
-                }
-            }
-
-            vscode.window.showInformationMessage('Could not match stack trace to a local file.');
-        } catch {
-            vscode.window.showErrorMessage('Failed to fetch error details.');
-        }
-    }
-
-    private async resolveFrame(frame: StackFrame): Promise<vscode.Uri | null> {
-        if (!frame.filename) { return null; }
-
-        let filePath = frame.filename;
-
-        // Strip URL origin (e.g. http://localhost:5173/src/foo.tsx -> src/foo.tsx)
-        try {
-            const url = new URL(filePath);
-            filePath = url.pathname.replace(/^\//, '');
-        } catch {
-            // Not a URL, use as-is
-        }
-
-        if (filePath.includes('node_modules') || filePath.startsWith('chrome-extension')) {
-            return null;
-        }
-
-        const matches = await vscode.workspace.findFiles(`**/${filePath}`, '**/node_modules/**', 1);
-        if (matches.length > 0) {
-            return matches[0];
-        }
-
-        const basename = filePath.split('/').pop();
-        if (basename) {
-            const fallback = await vscode.workspace.findFiles(`**/${basename}`, '**/node_modules/**', 3);
-            if (fallback.length === 1) {
-                return fallback[0];
-            }
-        }
-
-        return null;
     }
 
     // ── Webview messaging ──

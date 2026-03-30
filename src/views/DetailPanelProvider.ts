@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { AuthService } from '../services/authService';
 import { PostHogService } from '../services/postHogService';
 import { FlagCacheService } from '../services/flagCacheService';
-import { FeatureFlag, Experiment, ExperimentResults, ErrorTrackingIssue, Insight, SessionReplayEntry } from '../models/types';
+import { FeatureFlag, Experiment, ExperimentResults, Insight, SessionReplayEntry } from '../models/types';
 
 function getNonce(): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -38,12 +38,6 @@ export class DetailPanelProvider {
             host: this.getHost(), projectId: this.authService.getProjectId(),
         });
         this.bindCommonMessages(panel);
-    }
-
-    showError(error: ErrorTrackingIssue) {
-        const panel = this.getOrCreatePanel('err-' + error.id, error.name || 'Error', 'Error');
-        panel.webview.html = this.buildHtml(panel.webview, 'error', { error, host: this.getHost(), projectId: this.authService.getProjectId() });
-        this.bindErrorMessages(panel);
     }
 
     showInsight(insight: Insight) {
@@ -210,44 +204,6 @@ export class DetailPanelProvider {
                         panel.webview.postMessage({ type: 'flagSaveError', message: detail });
                     }
                     break;
-                }
-            }
-        });
-    }
-
-    private bindErrorMessages(panel: vscode.WebviewPanel) {
-        this.bindCommonMessages(panel);
-        panel.webview.onDidReceiveMessage(async (msg: { type: string; [k: string]: unknown }) => {
-            if (msg.type === 'jumpToError') {
-                // Re-use logic from SidebarProvider
-                const projectId = this.authService.getProjectId();
-                if (!projectId) { return; }
-                try {
-                    const exceptions = await this.postHogService.getErrorStackTrace(projectId, msg.issueId as string);
-                    if (exceptions.length === 0) {
-                        vscode.window.showInformationMessage('No stack trace available.');
-                        return;
-                    }
-                    for (const entry of exceptions) {
-                        const frames = entry.stack_trace?.frames;
-                        if (!frames) { continue; }
-                        const ordered = [...frames].reverse();
-                        for (const frame of ordered) {
-                            if (!frame.filename || frame.filename.includes('node_modules')) { continue; }
-                            let filePath = frame.filename;
-                            try { filePath = new URL(filePath).pathname.replace(/^\//, ''); } catch { /* not a URL */ }
-                            const matches = await vscode.workspace.findFiles(`**/${filePath}`, '**/node_modules/**', 1);
-                            if (matches.length > 0) {
-                                const doc = await vscode.workspace.openTextDocument(matches[0]);
-                                const pos = new vscode.Position(Math.max(0, (frame.lineno || 1) - 1), Math.max(0, (frame.colno || 1) - 1));
-                                await vscode.window.showTextDocument(doc, { selection: new vscode.Range(pos, pos), preview: true });
-                                return;
-                            }
-                        }
-                    }
-                    vscode.window.showInformationMessage('Could not match stack trace to a local file.');
-                } catch {
-                    vscode.window.showErrorMessage('Failed to fetch error details.');
                 }
             }
         });
@@ -747,7 +703,6 @@ function bindClicks() {
     switch (type) {
         case 'flag': return common + getFlagScript();
         case 'experiment': return common + getExperimentScript();
-        case 'error': return common + getErrorScript();
         case 'insight': return common + getInsightScript();
         case 'sessions': return common + getSessionsScript();
         default: return common;
@@ -1053,40 +1008,6 @@ function getExperimentScript(): string {
     }
 
     html += '<div class="meta-row"><span>Created ' + created + ' by ' + esc(createdBy) + '</span></div>';
-    html += '</div>';
-    document.body.innerHTML = html;
-    bindClicks();
-})();
-`;
-}
-
-function getErrorScript(): string {
-    return /*js*/ `
-(function() {
-    const e = DATA.error;
-    const host = DATA.host;
-    const projectId = DATA.projectId;
-    const issueId = e.short_id || e.id;
-
-    let html = '<div class="page">';
-    html += '<div class="hero"><div class="hero-left">'
-        + '<div class="hero-title">' + esc(e.name || 'Unknown error') + '</div>'
-        + '<div class="hero-badges"><span class="badge ' + (e.status === 'resolved' ? 'resolved' : 'error') + '">' + esc(e.status) + '</span></div>'
-        + '</div><div class="hero-actions">'
-        + '<button class="btn btn-primary"' + act({type:'jumpToError',issueId:e.id}) + '>Jump to Code</button>'
-        + '<button class="btn btn-ghost"' + act({type:'openExternal',url:host+'/project/'+projectId+'/error_tracking/'+issueId}) + '>Open in PostHog &#x2197;</button>'
-        + '</div></div>';
-
-    html += '<div class="card-row">';
-    if (e.occurrences != null) html += '<div class="card"><div class="card-title">Occurrences</div><div style="font-size:24px;font-weight:700">' + fmtNum(e.occurrences) + '</div></div>';
-    if (e.sessions != null) html += '<div class="card"><div class="card-title">Sessions</div><div style="font-size:24px;font-weight:700">' + fmtNum(e.sessions) + '</div></div>';
-    if (e.users != null) html += '<div class="card"><div class="card-title">Users</div><div style="font-size:24px;font-weight:700">' + fmtNum(e.users) + '</div></div>';
-    html += '</div>';
-
-    if (e.description) html += '<div class="card"><div class="card-title">Description</div><div class="field-value">' + esc(e.description) + '</div></div>';
-
-    function timeAgo(d) { if (!d) return 'Unknown'; var diff = Date.now() - new Date(d).getTime(); var days = Math.floor(diff/86400000); if (days===0) return 'Today'; if (days===1) return 'Yesterday'; if (days<30) return days+'d ago'; return Math.floor(days/30)+'mo ago'; }
-    html += '<div class="meta-row"><span>First seen: ' + timeAgo(e.first_seen) + '</span>' + (e.last_seen ? '<span>Last seen: ' + timeAgo(e.last_seen) + '</span>' : '') + '</div>';
     html += '</div>';
     document.body.innerHTML = html;
     bindClicks();

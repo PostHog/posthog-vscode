@@ -5,10 +5,9 @@ function send(msg) { vscode.postMessage(msg); }
 
 let currentTab = 'analytics';
 let loadedTabs = new Set();
-let allData = { flags: [], errors: [], experiments: [], analytics: [] };
+let allData = { flags: [], experiments: [], analytics: [] };
 let experimentResults = {};
 let projectId = null;
-let localIssueIds = [];
 
 // ── Helpers ──
 
@@ -53,13 +52,10 @@ function switchTab(tab) {
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
     document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === 'section-' + tab));
     document.getElementById('search').value = '';
-    var errFilter = document.getElementById('errors-filter');
-    if (errFilter) { errFilter.style.display = (tab === 'errors' && localIssueIds.length > 0) ? '' : 'none'; }
 
     if (!loadedTabs.has(tab)) {
         loadedTabs.add(tab);
         if (tab === 'flags') send({ type: 'loadFlags' });
-        else if (tab === 'errors') send({ type: 'loadErrors' });
         else if (tab === 'experiments') send({ type: 'loadExperiments' });
         else if (tab === 'analytics') send({ type: 'loadInsights' });
     }
@@ -135,47 +131,6 @@ function renderFlags(flags) {
                 + '</div>';
         }).join('');
         bindListClicks(list, 'key', (key) => send({ type: 'openFlagPanel', key }));
-    });
-}
-
-function renderErrors(issues) {
-    allData.errors = issues;
-    const filterDiv = document.getElementById('errors-filter');
-    if (filterDiv) { filterDiv.style.display = localIssueIds.length > 0 ? '' : 'none'; }
-    const localOnly = document.getElementById('errors-local-only');
-    const filtered = localOnly && localOnly.checked
-        ? issues.filter(e => localIssueIds.includes(e.id))
-        : issues;
-    renderSection('errors', filtered, (list, items) => {
-        list.innerHTML = items.map(e => {
-            const dotClass = e.status === 'resolved' ? 'resolved' : 'error';
-            const desc = e.description ? e.description.split('\\\\n')[0].substring(0, 120) : '';
-            const badge = e.occurrences != null ? '<span class="badge count">' + e.occurrences + '</span>' : '';
-            const issueId = e.short_id || e.id;
-            const isLocal = localIssueIds.includes(e.id);
-            const jumpBtn = isLocal
-                ? '<button class="act-jump" data-issue-id="' + esc(e.id) + '" title="Jump to error in code" style="opacity:0.7;">&#x21B7;</button>'
-                : '';
-            return '<div class="item" data-id="' + esc(e.id) + '"' + (isLocal ? ' data-local="1"' : '') + ' style="cursor:pointer;">'
-                + '<div class="dot ' + dotClass + '"></div>'
-                + '<div class="info">'
-                + '<div class="primary">' + (isLocal ? '<span title="Found in this repo" style="margin-right:4px;">&#x1F4C2;</span>' : '') + esc(e.name || 'Unknown error') + '</div>'
-                + '<div class="secondary">' + esc(desc) + '</div>'
-                + '</div>'
-                + badge
-                + '<div class="item-actions">'
-                + jumpBtn
-                + '<button class="act-open" data-path="/project/' + projectId + '/error_tracking/' + issueId + '" title="Open in PostHog">&#x2197;</button>'
-                + '</div>'
-                + '</div>';
-        }).join('');
-        bindListClicks(list, 'id', (id) => send({ type: 'openErrorPanel', id }));
-        list.querySelectorAll('.act-jump').forEach(btn => {
-            btn.addEventListener('click', (ev) => {
-                ev.stopPropagation();
-                send({ type: 'jumpToError', issueId: btn.getAttribute('data-issue-id') });
-            });
-        });
     });
 }
 
@@ -488,7 +443,6 @@ function showDetail(title, bodyHtml) {
             if (action === 'findRefs') send({ type: 'findReferences', key: btn.dataset.key });
             else if (action === 'copy') send({ type: 'copyFlagKey', key: btn.dataset.key });
             else if (action === 'open') send({ type: 'openExternal', path: btn.dataset.path });
-            else if (action === 'jumpError') send({ type: 'jumpToError', issueId: btn.dataset.issueId });
             else if (action === 'refreshInsight') send({ type: 'refreshInsight', insightId: Number(btn.dataset.insightId) });
         });
     });
@@ -679,27 +633,6 @@ function showFlagDetail(key) {
 
         send({ type: 'updateFlag', flagId: flagId, active: active, filters: filters });
     });
-}
-
-function showErrorDetail(id) {
-    const e = allData.errors.find(x => x.id === id);
-    if (!e) return;
-
-    const dotClass = e.status === 'resolved' ? 'resolved' : 'error';
-    const desc = e.description || '';
-    const issueId = e.short_id || e.id;
-
-    showDetail(e.name || 'Unknown error', ''
-        + detailField('Status', '<span class="detail-status">' + statusDotHtml(dotClass) + ' ' + esc(e.status) + '</span>')
-        + detailField('First seen', timeAgo(e.first_seen))
-        + (e.last_seen ? detailField('Last seen', timeAgo(e.last_seen)) : '')
-        + (e.occurrences != null ? detailField('Occurrences', String(e.occurrences)) : '')
-        + (desc ? '<div class="detail-field"><div class="detail-label">Description</div><div class="detail-desc">' + esc(desc) + '</div></div>' : '')
-        + '<div class="detail-actions">'
-        + detailBtn('primary', 'jumpError', { 'issue-id': e.id }, 'Jump to Code')
-        + detailBtn('secondary', 'open', { path: '/project/' + projectId + '/error_tracking/' + issueId }, 'Open in PostHog')
-        + '</div>'
-    );
 }
 
 function fmtPct(n) { return (n * 100).toFixed(1) + '%'; }
@@ -954,9 +887,6 @@ document.getElementById('btn-sign-in').addEventListener('click', () => send({ ty
 document.getElementById('btn-select-project').addEventListener('click', () => send({ type: 'selectProject' }));
 document.getElementById('btn-sign-out').addEventListener('click', () => send({ type: 'signOut' }));
 document.getElementById('search').addEventListener('input', filterItems);
-document.getElementById('errors-local-only').addEventListener('change', () => {
-    if (allData.errors.length) { renderErrors(allData.errors); }
-});
 document.getElementById('detail-back').addEventListener('click', hideDetail);
 document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.addEventListener('click', () => { hideDetail(); switchTab(tab.dataset.tab); });
@@ -987,11 +917,6 @@ window.addEventListener('message', e => {
         case 'flags':
             projectId = msg.projectId;
             renderFlags(msg.data);
-            break;
-        case 'errors':
-            projectId = msg.projectId;
-            if (msg.localIssueIds) { localIssueIds = msg.localIssueIds; }
-            renderErrors(msg.data);
             break;
         case 'experiments':
             projectId = msg.projectId;

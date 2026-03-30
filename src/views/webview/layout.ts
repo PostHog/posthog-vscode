@@ -24,18 +24,11 @@ export function getLayout(logoUri: vscode.Uri): string {
     <div class="nav">
         <button class="nav-tab active" data-tab="analytics">Analytics</button>
         <button class="nav-tab" data-tab="flags">Flags</button>
-        <button class="nav-tab" data-tab="errors">Errors</button>
         <button class="nav-tab" data-tab="experiments">Experiments</button>
     </div>
 
     <div class="search-bar">
         <input id="search" type="text" placeholder="Search..." />
-    </div>
-
-    <div id="errors-filter" style="display:none;padding:4px 12px;">
-        <label style="display:flex;align-items:center;gap:6px;font-size:11px;opacity:0.7;cursor:pointer;user-select:none;">
-            <input type="checkbox" id="errors-local-only" /> This repo only
-        </label>
     </div>
 
     <div class="scroll-area">
@@ -56,16 +49,6 @@ export function getLayout(logoUri: vscode.Uri): string {
             <div class="empty-state" id="flags-empty" style="display:none;">
                 <div class="icon">&#x2691;</div>
                 <p>No feature flags found</p>
-            </div>
-        </div>
-
-        <!-- Error Tracking -->
-        <div id="section-errors" class="section">
-            <div class="loading" id="errors-loading">Loading errors...</div>
-            <div class="item-list" id="errors-list" style="display:none;"></div>
-            <div class="empty-state" id="errors-empty" style="display:none;">
-                <div class="icon">&#x2713;</div>
-                <p>No errors tracked. Nice!</p>
             </div>
         </div>
 

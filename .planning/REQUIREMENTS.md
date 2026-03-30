@@ -39,7 +39,7 @@
 
 - [ ] **CGEN-01**: User can generate TypeScript type definitions from flag payloads via Command Palette
 - [ ] **CGEN-02**: Generated types are written to a `.posthog.d.ts` file in the workspace root
-- [ ] **CGEN-03**: Generated types include all active flag keys with their payload shapes
+- [x] **CGEN-03**: Generated types include all active flag keys with their payload shapes
 
 ## v2 Requirements
 
@@ -80,7 +80,7 @@
 | SIDE-03 | Phase 2 | Complete |
 | CGEN-01 | Phase 3 | Pending |
 | CGEN-02 | Phase 3 | Pending |
-| CGEN-03 | Phase 3 | Pending |
+| CGEN-03 | Phase 3 | Complete |
 | AUTH-02 | Phase 4 | Pending |
 | AUTH-03 | Phase 4 | Pending |
 | AUTH-04 | Phase 4 | Pending |

@@ -15,7 +15,7 @@
 
 ### Authentication
 
-- [ ] **AUTH-01**: User sees a polished landing page in the sidebar when not authenticated
+- [x] **AUTH-01**: User sees a polished landing page in the sidebar when not authenticated
 - [ ] **AUTH-02**: User can sign in via OAuth (PostHog PKCE authorization code flow)
 - [ ] **AUTH-03**: OAuth tokens are stored exclusively in VS Code SecretStorage
 - [ ] **AUTH-04**: OAuth callback validates state parameter to prevent CSRF
@@ -74,7 +74,7 @@
 | CLEAN-03 | Phase 1 | Complete |
 | CLEAN-04 | Phase 1 | Complete |
 | CLEAN-05 | Phase 1 | Complete |
-| AUTH-01 | Phase 2 | Pending |
+| AUTH-01 | Phase 2 | Complete |
 | SIDE-01 | Phase 2 | Pending |
 | SIDE-02 | Phase 2 | Pending |
 | SIDE-03 | Phase 2 | Pending |

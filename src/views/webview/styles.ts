@@ -211,6 +211,13 @@ html { height: 100vh; overflow: hidden; }
 .empty-state .icon { font-size: 32px; margin-bottom: 12px; }
 .empty-state p { font-size: 12px; line-height: 1.6; }
 
+.no-results {
+    text-align: center;
+    padding: 24px 16px;
+    font-size: 12px;
+    opacity: 0.5;
+}
+
 .loading {
     text-align: center;
     padding: 32px;

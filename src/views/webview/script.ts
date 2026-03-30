@@ -66,11 +66,30 @@ function switchTab(tab) {
 function filterItems() {
     const q = document.getElementById('search').value.toLowerCase();
     const list = document.getElementById(currentTab + '-list');
+    if (!list) return;
     const selector = currentTab === 'analytics' ? '.insight-card' : '.item';
-    list.querySelectorAll(selector).forEach(item => {
+    const items = list.querySelectorAll(selector);
+    let visibleCount = 0;
+    items.forEach(item => {
         const text = item.textContent.toLowerCase();
-        item.style.display = text.includes(q) ? '' : 'none';
+        const show = text.includes(q);
+        item.style.display = show ? '' : 'none';
+        if (show) visibleCount++;
     });
+
+    // Show/hide no-results message
+    let noResults = list.querySelector('.no-results');
+    if (visibleCount === 0 && q.length > 0 && items.length > 0) {
+        if (!noResults) {
+            noResults = document.createElement('div');
+            noResults.className = 'no-results';
+            noResults.textContent = 'No matching items';
+            list.appendChild(noResults);
+        }
+        noResults.style.display = '';
+    } else if (noResults) {
+        noResults.style.display = 'none';
+    }
 }
 
 // ── List item action bindings ──

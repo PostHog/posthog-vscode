@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Auth Landing and Sidebar UX** - Polished unauthenticated landing page, sidebar search/filter on flags and experiments, and three-tab sidebar structure (completed 2026-03-30)
 - [x] **Phase 3: Flag Type Generation** - Command Palette entry generates TypeScript type definitions from live flag payloads into a `.posthog.d.ts` file (completed 2026-03-30)
 - [x] **Phase 4: OAuth Authentication** - Full PKCE authorization code flow with PostHog as the provider; personal API key fallback preserved (completed 2026-03-30)
-- [ ] **Phase 5: Analytics Tab** - Polished Analytics sidebar tab with Chart.js visualizations, loading skeleton states, and improved insight cards
+- [ ] **Phase 5: Analytics Tab** - Polished Analytics sidebar tab with enhanced SVG visualizations, loading skeleton states, and theme-aware insight cards
 
 ## Phase Details
 
@@ -89,10 +89,14 @@ Plans:
 **Requirements**: ANLY-01, ANLY-02, ANLY-03, ANLY-04
 **Success Criteria** (what must be TRUE):
   1. Opening the Analytics tab shows a list of the user's saved PostHog insights as cards
-  2. Each insight card displays a Chart.js chart — trend line, funnel, or retention curve — matching the insight type
+  2. Each insight card displays a chart visualization — trend line, funnel, or retention curve — matching the insight type
   3. While insights are loading, the tab shows skeleton placeholder cards rather than a blank state
   4. Charts render correctly in both VS Code light and dark themes
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — Loading skeleton placeholder cards with shimmer animation
+- [ ] 05-02-PLAN.md — Theme-aware chart visualizations with enhanced SVG renderers
 
 ## Progress
 
@@ -105,4 +109,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 2. Auth Landing and Sidebar UX | 2/2 | Complete    | 2026-03-30 |
 | 3. Flag Type Generation | 1/2 | Complete    | 2026-03-30 |
 | 4. OAuth Authentication | 3/3 | Complete    | 2026-03-30 |
-| 5. Analytics Tab | 0/? | Not started | - |
+| 5. Analytics Tab | 0/2 | Not started | - |

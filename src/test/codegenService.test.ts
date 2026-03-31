@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { generateFlagTypes } from '../services/codegenService';
+import { generateFlagTypes, inferType, extractPayloadValue } from '../services/codegenService';
 import { FeatureFlag } from '../models/types';
 
 function makeFlag(overrides: Partial<FeatureFlag> & { key: string }): FeatureFlag {
@@ -185,5 +185,40 @@ suite('codegenService — generateFlagTypes', () => {
         const result = generateFlagTypes(flags);
         assert.ok(result.includes('// Flags: 2'), 'should show flag count of 2');
         assert.ok(result.includes('declare namespace PostHogFlags'), 'should declare namespace');
+    });
+});
+
+suite('codegenService — inferType', () => {
+
+    test('undefined input returns "unknown"', () => {
+        assert.strictEqual(inferType(undefined), 'unknown');
+    });
+
+    test('deeply nested arrays [[[1]]] returns "number[][][]"', () => {
+        assert.strictEqual(inferType([[[1]]]), 'number[][][]');
+    });
+});
+
+suite('codegenService — extractPayloadValue', () => {
+
+    test('numeric input (not string) returns parsed value directly', () => {
+        const result = extractPayloadValue(42);
+        assert.deepStrictEqual(result, { parsed: 42, ok: true });
+    });
+
+    test('boolean input returns parsed value directly', () => {
+        const result = extractPayloadValue(true);
+        assert.deepStrictEqual(result, { parsed: true, ok: true });
+    });
+
+    test('pre-parsed object returns parsed value directly', () => {
+        const obj = { theme: 'dark', version: 2 };
+        const result = extractPayloadValue(obj);
+        assert.deepStrictEqual(result, { parsed: obj, ok: true });
+    });
+
+    test('empty string tries JSON.parse, fails, returns ok false', () => {
+        const result = extractPayloadValue('');
+        assert.deepStrictEqual(result, { parsed: undefined, ok: false });
     });
 });

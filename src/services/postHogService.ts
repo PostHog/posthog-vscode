@@ -1,12 +1,12 @@
 import { AuthService } from './authService';
+import { escapeHogQLString } from '../utils/hogql';
 import { PostHogApiError, PaginatedResponse, Project, FeatureFlag, Experiment, EventDefinition, HogQLQueryResponse, ExperimentResults, Insight, EventProperty, SessionReplayEntry } from '../models/types';
 
 export class PostHogService {
     constructor(private readonly authService: AuthService) {}
 
     private escapeHogQLString(value: string): string {
-        // Escape backslashes first, then single quotes for safe embedding in HogQL string literals
-        return value.replace(/\\/g, '\\\\').replace(/'/g, "''");
+        return escapeHogQLString(value);
     }
 
     private async request<T>(path: string, options?: { method?: string; body?: unknown }): Promise<T> {

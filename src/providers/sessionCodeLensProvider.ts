@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { AuthService } from '../services/authService';
 import { PostHogService } from '../services/postHogService';
 import { TreeSitterService } from '../services/treeSitterService';
+import { TelemetryService } from '../services/telemetryService';
 import { Commands } from '../constants';
 
 const FLAG_METHODS = new Set([
@@ -24,11 +25,13 @@ export class SessionCodeLensProvider implements vscode.CodeLensProvider {
     private cache = new Map<string, { sessions: number; users: number; ts: number }>();
     private pending = new Set<string>();
     private refreshTimer: ReturnType<typeof setTimeout> | undefined;
+    private lastCapture = new Map<string, number>();
 
     constructor(
         private readonly authService: AuthService,
         private readonly postHogService: PostHogService,
         private readonly treeSitter: TreeSitterService,
+        private readonly telemetry: TelemetryService,
     ) {}
 
     async provideCodeLenses(doc: vscode.TextDocument): Promise<vscode.CodeLens[]> {
@@ -69,6 +72,14 @@ export class SessionCodeLensProvider implements vscode.CodeLensProvider {
         // Kick off batch fetch for uncached keys
         if (needsFetch.events.size > 0 || needsFetch.flags.size > 0) {
             this.fetchAndRefresh([...needsFetch.events], [...needsFetch.flags]);
+        }
+
+        if (lenses.length > 0) {
+            const docKey = doc.uri.toString();
+            if (Date.now() - (this.lastCapture.get(docKey) || 0) > 60_000) {
+                this.lastCapture.set(docKey, Date.now());
+                this.telemetry.capture('codelens_provided', { type: 'session', count: lenses.length, language: doc.languageId });
+            }
         }
 
         return lenses;

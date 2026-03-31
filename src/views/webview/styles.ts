@@ -42,12 +42,26 @@ html { height: 100vh; overflow: hidden; }
     border-bottom: 1px solid var(--vscode-panel-border);
 }
 .header img { height: 22px; }
+.header-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+}
 .header .title {
     font-size: 13px;
     font-weight: 600;
     opacity: 0.85;
 }
-.header .actions { margin-left: auto; display: flex; gap: 6px; }
+.header .project-name {
+    font-size: 10px;
+    opacity: 0.55;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 140px;
+}
+.header .actions { margin-left: auto; display: flex; gap: 6px; align-items: center; }
 .header .actions button {
     background: none;
     border: none;
@@ -58,6 +72,16 @@ html { height: 100vh; overflow: hidden; }
     padding: 2px;
 }
 .header .actions button:hover { opacity: 1; }
+.rbac-badge {
+    font-size: 9px;
+    font-weight: 600;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--ph-yellow);
+    color: #000;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+}
 
 /* ── Nav tabs ── */
 .nav {
@@ -945,6 +969,21 @@ html { height: 100vh; overflow: hidden; }
     margin-bottom: 14px;
 }
 
+/* ── Experiment progress bar ── */
+.exp-progress { margin: 8px 0; }
+.exp-progress-bar { height: 6px; background: var(--vscode-editorWidget-border); border-radius: 3px; overflow: hidden; }
+.exp-progress-fill { height: 100%; background: var(--ph-blue, #1D4AFF); border-radius: 3px; transition: width 0.3s; }
+.exp-progress-text { font-size: 11px; color: var(--vscode-descriptionForeground); margin-top: 4px; }
+
+/* ── Experiment summary counts ── */
+.exp-summary {
+    padding: 6px 12px;
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    opacity: 0.7;
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
 .detail-desc {
     font-size: 11px;
     line-height: 1.5;
@@ -977,5 +1016,121 @@ html { height: 100vh; overflow: hidden; }
 .vscode-light .insight-card {
     background: rgba(0,0,0,0.02);
     border-color: rgba(0,0,0,0.1);
-}`;
+}
+
+/* ── Confirmation bar ── */
+.confirm-bar {
+    background: rgba(249, 189, 43, 0.15);
+    border: 1px solid var(--ph-yellow, #F9BD2B);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin: 8px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+.confirm-bar .confirm-text {
+    font-size: 12px;
+    color: var(--vscode-foreground);
+    flex: 1;
+}
+.confirm-bar .confirm-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+.confirm-bar .btn-confirm {
+    background: var(--ph-yellow, #F9BD2B);
+    color: #000;
+    border: none;
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+}
+.confirm-bar .btn-confirm:hover { opacity: 0.85; }
+.confirm-bar .btn-cancel {
+    background: transparent;
+    border: 1px solid var(--vscode-input-border);
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--vscode-foreground);
+}
+.confirm-bar .btn-cancel:hover { background: var(--vscode-list-hoverBackground); }
+
+/* ── Error state ── */
+.error-state {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    background: rgba(229, 62, 62, 0.1);
+    border: 1px solid var(--ph-red, #E53E3E);
+    border-radius: 6px;
+    margin: 8px 12px;
+}
+.error-icon { color: var(--ph-red, #E53E3E); font-size: 16px; }
+.error-message { flex: 1; font-size: 12px; color: var(--vscode-foreground); }
+.error-retry {
+    background: transparent;
+    border: 1px solid var(--vscode-input-border);
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--vscode-foreground);
+    flex-shrink: 0;
+}
+.error-retry:hover { background: var(--vscode-list-hoverBackground); }
+
+/* ── Help link ── */
+.help-link {
+    font-size: 11px;
+    color: var(--ph-blue, #1D4AFF);
+    cursor: pointer;
+    opacity: 0.8;
+    text-decoration: none;
+}
+.help-link:hover { opacity: 1; text-decoration: underline; }
+
+/* ── My flags filter toggle ── */
+.filter-btn {
+    background: transparent;
+    border: 1px solid var(--vscode-input-border, rgba(255,255,255,0.15));
+    color: var(--vscode-foreground);
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 10px;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.15s, background 0.15s;
+    flex-shrink: 0;
+}
+.filter-btn:hover { opacity: 1; }
+.filter-btn.active {
+    background: var(--ph-blue, #1D4AFF);
+    color: #fff;
+    border-color: var(--ph-blue, #1D4AFF);
+    opacity: 1;
+}
+
+/* ── Platform filter ── */
+.platform-filter {
+    padding: 0 12px 4px;
+    display: none;
+}
+.platform-select {
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border, transparent);
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 10px;
+    outline: none;
+}
+.platform-select:focus { border-color: var(--ph-blue); }`;
 }

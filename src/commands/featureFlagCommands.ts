@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { AuthService } from '../services/authService';
 import { PostHogService } from '../services/postHogService';
 import { FlagCacheService } from '../services/flagCacheService';
+import { TelemetryService } from '../services/telemetryService';
 import { Commands } from '../constants';
 import { generateFlagTypes } from '../services/codegenService';
 
@@ -14,7 +15,8 @@ export function registerFeatureFlagCommands(
     authService: AuthService,
     postHogService: PostHogService,
     sidebar: Refreshable,
-    flagCache?: FlagCacheService,
+    flagCache: FlagCacheService | undefined,
+    telemetry: TelemetryService,
 ): vscode.Disposable[] {
     const refresh = vscode.commands.registerCommand(Commands.REFRESH_FEATURE_FLAGS, () => {
         sidebar.refresh();
@@ -23,6 +25,7 @@ export function registerFeatureFlagCommands(
     const copyKey = vscode.commands.registerCommand(Commands.COPY_FLAG_KEY, (flagKey?: string) => {
         if (flagKey) {
             vscode.env.clipboard.writeText(flagKey);
+            telemetry.capture('flag_key_copied', { flag_key: flagKey });
             vscode.window.showInformationMessage(`Copied: ${flagKey}`);
         }
     });
@@ -34,6 +37,7 @@ export function registerFeatureFlagCommands(
             if (projectId) {
                 const url = `${host}/project/${projectId}/feature_flags/${flagId}`;
                 vscode.env.openExternal(vscode.Uri.parse(url));
+                telemetry.capture('flag_opened_in_browser', { flag_id: flagId });
             }
         }
     });
@@ -77,8 +81,10 @@ export function registerFeatureFlagCommands(
                 flagCache.update(flags);
             }
             sidebar.navigateToFlag(flag.key);
+            telemetry.capture('flag_created', { flag_key: key, initially_active: activeChoice.value });
             vscode.window.showInformationMessage(`PostHog: Created feature flag "${flag.key}"`);
         } catch (err) {
+            telemetry.capture('flag_create_failed', { flag_key: key });
             const detail = err instanceof Error ? err.message : String(err);
             vscode.window.showErrorMessage(`PostHog: Failed to create flag "${key}": ${detail}`);
         }
@@ -108,6 +114,7 @@ export function registerFeatureFlagCommands(
         await vscode.workspace.fs.writeFile(uri, Buffer.from(output, 'utf8'));
         const doc = await vscode.workspace.openTextDocument(uri);
         await vscode.window.showTextDocument(doc);
+        telemetry.capture('flag_types_generated', { flag_count: active.length });
         vscode.window.showInformationMessage(
             `PostHog: Generated flag types for ${active.length} flag${active.length === 1 ? '' : 's'} → .posthog.d.ts`
         );

@@ -58,6 +58,12 @@ export class EventDecorationProvider {
         const editor = vscode.window.activeTextEditor;
         if (!editor) { return; }
 
+        const config = vscode.workspace.getConfiguration('posthog');
+        if (!config.get<boolean>('showInlineDecorations', true)) {
+            editor.setDecorations(this.decoration, []);
+            return;
+        }
+
         const doc = editor.document;
         if (!this.treeSitter.isSupported(doc.languageId)) { return; }
 

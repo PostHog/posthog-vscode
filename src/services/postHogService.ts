@@ -35,6 +35,28 @@ export class PostHogService {
         return response.json() as Promise<T>;
     }
 
+    async checkPermissions(projectId: number): Promise<{ canWrite: boolean }> {
+        try {
+            await this.request<Project>(`/api/projects/${projectId}/`);
+            return { canWrite: true };
+        } catch (err) {
+            if (err instanceof PostHogApiError && err.statusCode === 403) {
+                return { canWrite: false };
+            }
+            // Assume write access if we can't determine permissions
+            return { canWrite: true };
+        }
+    }
+
+    async getCurrentUserEmail(): Promise<string | null> {
+        try {
+            const data = await this.request<{ email?: string }>('/api/users/@me/');
+            return data.email ?? null;
+        } catch {
+            return null;
+        }
+    }
+
     async getProjects(): Promise<Project[]> {
         const data = await this.request<PaginatedResponse<Project>>('/api/projects/');
         return data.results;
@@ -101,7 +123,7 @@ export class PostHogService {
         const result = new Map<string, { count: number; days: number }>();
         if (eventNames.length === 0) { return result; }
 
-        const escaped = eventNames.map(n => `'${n.replace(/'/g, "\\'")}'`).join(', ');
+        const escaped = eventNames.map(n => `'${this.escapeHogQLString(n)}'`).join(', ');
         const query = `SELECT event, count() as cnt FROM events WHERE event IN (${escaped}) AND timestamp > now() - INTERVAL 7 DAY GROUP BY event`;
 
         try {
@@ -123,6 +145,20 @@ export class PostHogService {
         }
 
         return result;
+    }
+
+    async launchExperiment(projectId: number, experimentId: number): Promise<Experiment> {
+        return this.request<Experiment>(`/api/projects/${projectId}/experiments/${experimentId}/`, {
+            method: 'PATCH',
+            body: { start_date: new Date().toISOString() },
+        });
+    }
+
+    async stopExperiment(projectId: number, experimentId: number): Promise<Experiment> {
+        return this.request<Experiment>(`/api/projects/${projectId}/experiments/${experimentId}/`, {
+            method: 'PATCH',
+            body: { end_date: new Date().toISOString() },
+        });
     }
 
     async getExperiments(projectId: number): Promise<Experiment[]> {
@@ -191,7 +227,7 @@ export class PostHogService {
         if (eventNames.length === 0) { return result; }
 
         const escaped = eventNames.map(n => `'${this.escapeHogQLString(n)}'`).join(', ');
-        const query = `SELECT event, toDate(timestamp) as day, count() as cnt FROM events WHERE event IN (${escaped}) AND timestamp >= toDate(now()) - INTERVAL 6 DAY GROUP BY event, day ORDER BY event, day`;
+        const query = `SELECT event, toDate(timestamp) as day, count() as cnt FROM events WHERE event IN (${escaped}) AND timestamp >= toDate(now()) - INTERVAL 7 DAY GROUP BY event, day ORDER BY event, day`;
 
         try {
             const data = await this.request<HogQLQueryResponse>(

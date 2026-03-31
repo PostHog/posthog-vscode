@@ -20,7 +20,7 @@ function safePropertyName(key: string): string {
  * @param value - The parsed value to infer a type from
  * @param depth - Current recursion depth (starts at 0)
  */
-function inferType(value: unknown, depth: number = 0): string {
+export function inferType(value: unknown, depth: number = 0): string {
     if (value === null) {
         return 'null';
     }
@@ -64,7 +64,7 @@ function inferType(value: unknown, depth: number = 0): string {
  * If the raw value is already a non-string primitive or object, uses it directly.
  * Returns undefined if the value is null/undefined (boolean flag).
  */
-function extractPayloadValue(raw: unknown): { parsed: unknown; ok: boolean } {
+export function extractPayloadValue(raw: unknown): { parsed: unknown; ok: boolean } {
     if (raw === null || raw === undefined) {
         // null/undefined payload => boolean flag
         return { parsed: undefined, ok: false };

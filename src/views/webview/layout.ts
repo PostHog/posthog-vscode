@@ -32,6 +32,7 @@ export function getLayout(logoUri: vscode.Uri): string {
     </div>
     <button class="sign-in-btn sign-in-btn--primary" id="btn-sign-in-oauth">Sign In with PostHog</button>
     <button class="sign-in-btn sign-in-btn--secondary" id="btn-sign-in">Sign In with API Key</button>
+    <a class="help-link" href="#" id="btn-get-api-key">Don't have an API key? Get one here</a>
     <p class="welcome-hint">API key works for self-hosted instances</p>
 </div>
 
@@ -39,8 +40,12 @@ export function getLayout(logoUri: vscode.Uri): string {
 <div id="main-app" style="display:none;">
     <div class="header">
         <img src="${logoUri}" alt="PostHog" />
-        <span class="title">PostHog</span>
+        <div class="header-text">
+            <span class="title">PostHog</span>
+            <span class="project-name" id="project-name"></span>
+        </div>
         <div class="actions">
+            <span class="rbac-badge" id="rbac-badge" title="Read-only access" style="display:none;">RO</span>
             <button id="btn-select-project" title="Switch project">&#x21C5;</button>
             <button id="btn-sign-out" title="Sign out">&#x23FB;</button>
         </div>
@@ -52,8 +57,18 @@ export function getLayout(logoUri: vscode.Uri): string {
         <button class="nav-tab" data-tab="analytics">Analytics</button>
     </div>
 
-    <div class="search-bar">
-        <input id="search" type="text" placeholder="Search..." />
+    <div class="search-bar" style="display:flex;gap:6px;align-items:center;">
+        <input id="search" type="text" placeholder="Search..." style="flex:1;" />
+        <button class="filter-btn" id="my-flags-toggle" title="Show my flags only" style="display:none;">Mine</button>
+    </div>
+
+    <div class="platform-filter" id="platform-filter">
+        <select class="platform-select" id="platform-select">
+            <option value="all">All Platforms</option>
+            <option value="web">Web</option>
+            <option value="ios">iOS</option>
+            <option value="android">Android</option>
+        </select>
     </div>
 
     <div class="scroll-area">

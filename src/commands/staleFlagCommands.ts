@@ -1,8 +1,10 @@
 import * as vscode from 'vscode';
 import { StaleFlagService, buildCleanupEditForRef } from '../services/staleFlagService';
+import { TelemetryService } from '../services/telemetryService';
 
 export function registerStaleFlagCommands(
     staleFlagService: StaleFlagService,
+    telemetry: TelemetryService,
 ): vscode.Disposable[] {
     return [
         vscode.commands.registerCommand('posthog.scanStaleFlags', async () => {
@@ -12,6 +14,7 @@ export function registerStaleFlagCommands(
             );
 
             const totalRefs = stale.reduce((sum, f) => sum + f.references.length, 0);
+            telemetry.capture('stale_flags_scanned', { stale_count: stale.length, total_references: totalRefs });
             if (stale.length === 0) {
                 vscode.window.showInformationMessage('No stale feature flags found.');
             } else {
@@ -38,6 +41,8 @@ export function registerStaleFlagCommands(
             }
 
             const keepEnabled = staleFlag.reason !== 'inactive';
+            const mode = keepEnabled ? 'keep_enabled' : 'remove_inactive';
+            telemetry.capture('stale_flag_cleanup_started', { flag_key: staleFlag.key, mode });
 
             const action = keepEnabled ? 'keep the enabled code path' : 'remove the flag check (flag is inactive)';
             const confirm = await vscode.window.showWarningMessage(
@@ -53,8 +58,10 @@ export function registerStaleFlagCommands(
             const edits: { ref: typeof staleFlag.references[0]; edit: vscode.WorkspaceEdit }[] = [];
             const failures: string[] = [];
 
+            const additionalClientNames = vscode.workspace.getConfiguration('posthog').get<string[]>('additionalClientNames', []);
+
             for (const ref of staleFlag.references) {
-                const edit = await buildCleanupEditForRef(ref, keepEnabled);
+                const edit = await buildCleanupEditForRef(ref, keepEnabled, additionalClientNames);
                 if (edit) {
                     edits.push({ ref, edit });
                 } else {
@@ -109,6 +116,8 @@ export function registerStaleFlagCommands(
                     `Could not auto-clean ${failures.length} reference${failures.length === 1 ? '' : 's'}:\n${failures.join('\n')}`,
                 );
             }
+
+            telemetry.capture('stale_flag_cleanup_completed', { flag_key: staleFlag.key });
 
             // Re-scan to update the tree
             await staleFlagService.scan();

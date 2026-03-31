@@ -6,6 +6,7 @@ import { ExperimentCacheService } from '../services/experimentCacheService';
 import { Commands } from '../constants';
 import { getWebviewHtml } from './getWebviewHtml';
 import { DetailPanelProvider } from './DetailPanelProvider';
+import { TelemetryService } from '../services/telemetryService';
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
     private view?: vscode.WebviewView;
@@ -17,6 +18,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         private readonly flagCache: FlagCacheService,
         private readonly experimentCache?: ExperimentCacheService,
         private readonly detailPanel?: DetailPanelProvider,
+        private readonly telemetry?: TelemetryService,
     ) {}
 
     resolveWebviewView(webviewView: vscode.WebviewView) {
@@ -89,6 +91,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     private async handleMessage(msg: { type: string; [key: string]: unknown }) {
         switch (msg.type) {
             case 'ready':
+                this.telemetry?.capture('sidebar_opened');
                 return this.sendAuthState();
             case 'signIn':
                 await vscode.commands.executeCommand(Commands.SIGN_IN);
@@ -102,17 +105,22 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             case 'selectProject':
                 return vscode.commands.executeCommand(Commands.SELECT_PROJECT);
             case 'loadFlags':
+                this.telemetry?.capture('sidebar_tab_viewed', { tab: 'flags' });
                 return this.loadFlags();
             case 'loadExperiments':
+                this.telemetry?.capture('sidebar_tab_viewed', { tab: 'experiments' });
                 return this.loadExperiments();
             case 'copyFlagKey':
+                this.telemetry?.capture('flag_key_copied', { flag_key: msg.key, source: 'sidebar' });
                 await vscode.env.clipboard.writeText(msg.key as string);
                 vscode.window.showInformationMessage(`Copied: ${msg.key}`);
                 return;
             case 'createFlag':
+                this.telemetry?.capture('flag_create_from_sidebar', { flag_key: msg.key });
                 await vscode.commands.executeCommand(Commands.CREATE_FLAG, msg.key);
                 return this.loadFlags();
             case 'findReferences':
+                this.telemetry?.capture('flag_references_searched', { flag_key: msg.key, source: 'sidebar' });
                 return vscode.commands.executeCommand('workbench.action.findInFiles', {
                     query: msg.key,
                     isRegex: false,
@@ -122,18 +130,39 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                     filesToExclude: '**/node_modules/**',
                 });
             case 'loadInsights':
+                this.telemetry?.capture('sidebar_tab_viewed', { tab: 'analytics' });
                 return this.loadInsights();
             case 'refreshInsight':
+                this.telemetry?.capture('insight_refreshed', { insight_id: msg.insightId });
                 return this.refreshInsight(msg.insightId as number);
             case 'updateFlag':
+                this.telemetry?.capture('flag_saved', { flag_id: msg.flagId, source: 'sidebar' });
                 return this.updateFlag(msg.flagId as number, msg.active as boolean, msg.filters as Record<string, unknown>);
             case 'openFlagPanel':
+                this.telemetry?.capture('sidebar_flag_clicked', { flag_key: msg.key });
                 return this.openFlagPanel(msg.key as string);
             case 'openExperimentPanel':
+                this.telemetry?.capture('sidebar_experiment_clicked', { experiment_id: msg.id });
                 return this.openExperimentPanel(msg.id as number);
             case 'openInsightPanel':
+                this.telemetry?.capture('sidebar_insight_clicked', { insight_id: msg.id });
                 return this.openInsightPanel(msg.id as number);
+            case 'open-api-key-page': {
+                this.telemetry?.capture('api_key_page_opened');
+                const apiKeyHost = this.authService.getHost().replace(/\/+$/, '') || 'https://us.posthog.com';
+                return vscode.env.openExternal(vscode.Uri.parse(`${apiKeyHost}/settings/user-api-keys`));
+            }
+            case 'retry': {
+                this.telemetry?.capture('sidebar_retry', { section: msg.section });
+                const section = msg.section as string;
+                if (section === 'flags') { return this.loadFlags(); }
+                if (section === 'errors') { return; }
+                if (section === 'experiments') { return this.loadExperiments(); }
+                if (section === 'analytics') { return this.loadInsights(); }
+                return;
+            }
             case 'openExternal': {
+                this.telemetry?.capture('external_link_opened', { source: 'sidebar' });
                 const host = this.authService.getHost().replace(/\/+$/, '');
                 return vscode.env.openExternal(vscode.Uri.parse(`${host}${msg.path}`));
             }
@@ -151,7 +180,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 authed = true;
             }
         }
-        this.postMessage({ type: 'authState', authenticated: authed });
+        this.postMessage({
+            type: 'authState',
+            authenticated: authed,
+            projectName: this.authService.getProjectName() ?? null,
+            posthogHost: this.authService.getHost(),
+            canWrite: this.authService.getCanWrite(),
+        });
         if (authed) {
             await this.loadInsights();
         }
@@ -159,20 +194,26 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     // ── Data loaders ──
 
+    private userEmail: string | null = null;
+
     private async loadFlags() {
         const projectId = this.authService.getProjectId();
         if (!projectId) { return; }
 
         this.postMessage({ type: 'loading', section: 'flags' });
         try {
-            const flags = await this.postHogService.getFeatureFlags(projectId);
+            const [flags] = await Promise.all([
+                this.postHogService.getFeatureFlags(projectId),
+                // Fetch user email once for the "My flags" filter
+                this.userEmail ? Promise.resolve(null) : this.postHogService.getCurrentUserEmail().then(email => { this.userEmail = email; }),
+            ]);
             this.flagCache.update(flags);
             const active = flags.filter(f => !f.deleted);
             active.sort((a, b) => {
                 if (a.active !== b.active) { return a.active ? -1 : 1; }
                 return a.key.localeCompare(b.key);
             });
-            this.postMessage({ type: 'flags', data: active, projectId });
+            this.postMessage({ type: 'flags', data: active, projectId, userEmail: this.userEmail });
         } catch {
             this.postMessage({ type: 'error', section: 'flags', message: 'Failed to load feature flags' });
         }
@@ -209,6 +250,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             this.insightsCache = insights;
             // Send whatever we have immediately
             this.postMessage({ type: 'insights', data: insights, projectId });
+            this.telemetry?.capture('insights_loaded', { count: insights.length });
 
             // Refresh insights that have no cached results
             const stale = insights.filter(i => !i.result || i.result.length === 0);
@@ -257,9 +299,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             const flags = await this.postHogService.getFeatureFlags(projectId);
             this.flagCache.update(flags);
             this.postMessage({ type: 'flagUpdated', data: updated });
+            this.telemetry?.capture('flag_saved_success', { flag_id: flagId });
         } catch (err) {
             const detail = err instanceof Error ? err.message : String(err);
             this.postMessage({ type: 'flagUpdateError', message: detail });
+            this.telemetry?.capture('flag_save_failed', { flag_id: flagId });
         }
     }
 

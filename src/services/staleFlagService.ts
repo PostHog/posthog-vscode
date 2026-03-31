@@ -25,9 +25,6 @@ export interface StaleFlag {
 const FLAG_METHODS = new Set([
     'getFeatureFlag', 'isFeatureEnabled', 'getFeatureFlagPayload',
     'getFeatureFlagResult', 'isFeatureFlagEnabled', 'getRemoteConfig',
-    'get_feature_flag', 'is_feature_enabled', 'get_feature_flag_payload', 'get_remote_config',
-    'GetFeatureFlag', 'IsFeatureEnabled', 'GetFeatureFlagPayload',
-    'is_feature_enabled', 'get_feature_flag', 'get_feature_flag_payload',
 ]);
 
 export class StaleFlagService {
@@ -47,7 +44,8 @@ export class StaleFlagService {
 
     async scan(): Promise<StaleFlag[]> {
         const files = await vscode.workspace.findFiles(
-            '**/*.{ts,tsx,js,jsx,py,rb,go,php}',
+            // Only JS/TS supported — add more extensions when WASM grammars are shipped
+            '**/*.{ts,tsx,js,jsx}',
             '{**/node_modules/**,**/dist/**,**/build/**,.git/**}',
         );
 
@@ -152,8 +150,8 @@ export class StaleFlagService {
         return false;
     }
 
-    buildCleanupEdit(ref: StaleFlagReference): vscode.WorkspaceEdit | null {
-        return null;
+    async buildCleanupEdit(ref: StaleFlagReference, keepEnabled: boolean = true): Promise<vscode.WorkspaceEdit | null> {
+        return buildCleanupEditForRef(ref, keepEnabled);
     }
 }
 
@@ -172,15 +170,19 @@ const POSTHOG_FLAG_METHODS = [
 export async function buildCleanupEditForRef(
     ref: StaleFlagReference,
     keepEnabled: boolean,
+    additionalClientNames?: string[],
 ): Promise<vscode.WorkspaceEdit | null> {
     const doc = await vscode.workspace.openTextDocument(ref.uri);
     const text = doc.getText();
 
     const lineText = doc.lineAt(ref.line).text;
 
+    const clientNames = ['posthog', 'client', 'ph', ...(additionalClientNames || [])];
+    const clientPattern = clientNames.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+
     // Pattern 1: Ternary — expr ? a : b
     const ternaryMatch = lineText.match(
-        new RegExp(`(?:posthog|client|ph)\\.(?:${POSTHOG_FLAG_METHODS.join('|')})\\s*\\([^)]+\\)\\s*\\?\\s*(.+?)\\s*:\\s*(.+?)(?:;|,|\\)|$)`)
+        new RegExp(`(?:${clientPattern})\\.(?:${POSTHOG_FLAG_METHODS.join('|')})\\s*\\([^)]+\\)\\s*\\?\\s*(.+?)\\s*:\\s*(.+?)(?:;|,|\\)|$)`)
     );
     if (ternaryMatch) {
         const replacement = keepEnabled ? ternaryMatch[1].trim() : ternaryMatch[2].trim().replace(/;$/, '');

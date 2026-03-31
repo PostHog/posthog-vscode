@@ -1,11 +1,13 @@
 import * as vscode from 'vscode';
 import { EventCacheService } from '../services/eventCacheService';
 import { TreeSitterService } from '../services/treeSitterService';
+import { TelemetryService } from '../services/telemetryService';
 
 export class EventCompletionProvider implements vscode.CompletionItemProvider {
     constructor(
         private readonly eventCache: EventCacheService,
         private readonly treeSitter: TreeSitterService,
+        private readonly telemetry: TelemetryService,
     ) {}
 
     async provideCompletionItems(
@@ -18,7 +20,7 @@ export class EventCompletionProvider implements vscode.CompletionItemProvider {
         if (!ctx || ctx.type !== 'capture_event') { return undefined; }
 
         const events = this.eventCache.getEvents().filter(e => !e.hidden);
-        return events.map(event => {
+        const items = events.map(event => {
             const isCustom = !event.name.startsWith('$');
             const item = new vscode.CompletionItem(event.name, vscode.CompletionItemKind.Event);
             item.detail = event.verified ? 'Verified' : (isCustom ? 'Custom event' : 'PostHog event');
@@ -31,5 +33,11 @@ export class EventCompletionProvider implements vscode.CompletionItemProvider {
             item.sortText = (event.verified ? '0' : '1') + (isCustom ? '0' : '1') + '-' + event.name;
             return item;
         });
+
+        if (items.length > 0) {
+            this.telemetry.capture('completion_provided', { type: 'event_name', count: items.length, language: document.languageId });
+        }
+
+        return items;
     }
 }

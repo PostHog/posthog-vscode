@@ -28,6 +28,18 @@ export interface VariantBranch {
     endLine: number;
 }
 
+export interface FlagAssignment {
+    varName: string;
+    method: string;
+    flagKey: string;
+    /** Line of the assignment statement */
+    line: number;
+    /** Column right after the variable name (where `: Type` would go in TS) */
+    varNameEndCol: number;
+    /** Whether the variable already has a type annotation */
+    hasTypeAnnotation: boolean;
+}
+
 export interface CompletionContext {
     type: 'capture_event' | 'flag_key' | 'property_key' | 'property_value';
     eventName?: string;
@@ -549,6 +561,57 @@ export class TreeSitterService {
         this.findEnabledIfs(tree.rootNode, allClients, family, branches);
 
         return branches;
+    }
+
+    async findFlagAssignments(doc: vscode.TextDocument): Promise<FlagAssignment[]> {
+        const ready = await this.ensureReady(doc.languageId);
+        if (!ready) { return []; }
+
+        const { lang, family } = ready;
+        const tree = this.parse(doc.getText(), lang);
+        if (!tree) { return []; }
+
+        const allClients = this.getEffectiveClients();
+        const { clientAliases } = this.findAliases(lang, tree, family);
+        for (const a of clientAliases) { allClients.add(a); }
+
+        const assignments: FlagAssignment[] = [];
+
+        const assignQuery = this.getQuery(lang, family.queries.flagAssignments);
+        if (assignQuery) {
+            const matches = assignQuery.matches(tree.rootNode);
+            for (const match of matches) {
+                const varNode = match.captures.find(c => c.name === 'var_name');
+                const clientNode = match.captures.find(c => c.name === 'client');
+                const methodNode = match.captures.find(c => c.name === 'method');
+                const keyNode = match.captures.find(c => c.name === 'flag_key');
+
+                if (!varNode || !clientNode || !methodNode || !keyNode) { continue; }
+                const varClientName = this.extractClientName(clientNode.node);
+                if (!varClientName || !allClients.has(varClientName)) { continue; }
+
+                const method = methodNode.node.text;
+                if (!family.flagMethods.has(method)) { continue; }
+
+                // Check if there's already a type annotation by looking at the parent
+                // In TS: `const flag: boolean = ...` — the variable_declarator has a type_annotation child
+                const declarator = varNode.node.parent;
+                const hasTypeAnnotation = declarator
+                    ? declarator.namedChildren.some(c => c.type === 'type_annotation')
+                    : false;
+
+                assignments.push({
+                    varName: varNode.node.text,
+                    method,
+                    flagKey: this.cleanStringValue(keyNode.node.text),
+                    line: varNode.node.startPosition.row,
+                    varNameEndCol: varNode.node.endPosition.column,
+                    hasTypeAnnotation,
+                });
+            }
+        }
+
+        return assignments;
     }
 
     async getCompletionContext(doc: vscode.TextDocument, position: vscode.Position): Promise<CompletionContext | null> {

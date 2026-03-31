@@ -1096,7 +1096,13 @@ window.addEventListener('message', e => {
             var projNameEl = document.getElementById('project-name');
             if (projNameEl) {
                 var host = msg.posthogHost || '';
-                var hostShort = host.includes('us.posthog.com') ? 'US' : host.includes('eu.posthog.com') ? 'EU' : host ? new URL(host).hostname : '';
+                var hostShort = '';
+                try {
+                    var hostname = host ? new URL(host).hostname : '';
+                    hostShort = (hostname === 'us.posthog.com' || hostname === 'us.i.posthog.com') ? 'US'
+                        : (hostname === 'eu.posthog.com' || hostname === 'eu.i.posthog.com') ? 'EU'
+                        : hostname;
+                } catch(e) { hostShort = host; }
                 var projLabel = msg.projectName ? msg.projectName + ' [' + hostShort + ']' : hostShort;
                 projNameEl.textContent = projLabel;
                 projNameEl.title = (msg.projectName || '') + ' — ' + host;

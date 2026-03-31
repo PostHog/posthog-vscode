@@ -114,8 +114,11 @@ export class TelemetryService {
     private getHostType(): string {
         if (!this.authService) { return 'unknown'; }
         const host = this.authService.getHost();
-        if (host.includes('us.posthog.com')) { return 'us_cloud'; }
-        if (host.includes('eu.posthog.com')) { return 'eu_cloud'; }
+        try {
+            const hostname = new URL(host).hostname;
+            if (hostname === 'us.posthog.com' || hostname === 'us.i.posthog.com') { return 'us_cloud'; }
+            if (hostname === 'eu.posthog.com' || hostname === 'eu.i.posthog.com') { return 'eu_cloud'; }
+        } catch { /* invalid URL */ }
         return 'self_hosted';
     }
 }

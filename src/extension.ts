@@ -171,7 +171,13 @@ export function activate(context: vscode.ExtensionContext) {
         } else {
             const age = formatSyncAge(flagCache.lastRefreshed);
             const host = authService.getHost();
-            const hostShort = host.includes('us.posthog.com') ? 'US' : host.includes('eu.posthog.com') ? 'EU' : new URL(host).hostname;
+            let hostShort: string;
+            try {
+                const hostname = new URL(host).hostname;
+                hostShort = hostname === 'us.posthog.com' || hostname === 'us.i.posthog.com' ? 'US'
+                    : hostname === 'eu.posthog.com' || hostname === 'eu.i.posthog.com' ? 'EU'
+                    : hostname;
+            } catch { hostShort = host; }
             const label = projectName ? `PostHog: ${projectName} [${hostShort}]` : `PostHog [${hostShort}]`;
             statusBar.text = age ? `$(cloud) ${label} (synced ${age})` : `$(cloud) ${label}`;
             statusBar.backgroundColor = undefined;

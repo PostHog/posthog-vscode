@@ -12,6 +12,13 @@ export default function App() {
 
   posthog.capture('annotation created')
 
+  const var1: boolean | undefined = posthog.getFeatureFlag('alerts-anomaly-detection')
+
+  const var2: 'control' | 'test' | undefined = posthog.getFeatureFlag('ai-session-summary')
+
+  const payload1 = posthog.getFeatureFlagPayload('ai-session-summary')
+
+
   const demos: Record<string, { label: string; description: string; component: React.ReactNode }> = {
     buggyCounter: {
       label: 'Render Crash',

@@ -3,6 +3,10 @@ import { Experiment, ExperimentResults } from '../models/types';
 export class ExperimentCacheService {
     private experiments: Experiment[] = [];
     private results = new Map<number, ExperimentResults>();
+    private listeners: Array<() => void> = [];
+    private _lastRefreshed: Date | null = null;
+
+    get lastRefreshed(): Date | null { return this._lastRefreshed; }
 
     getExperiments(): Experiment[] {
         return this.experiments;
@@ -18,9 +22,16 @@ export class ExperimentCacheService {
 
     update(experiments: Experiment[]): void {
         this.experiments = experiments;
+        this._lastRefreshed = new Date();
+        for (const listener of this.listeners) { listener(); }
     }
 
     updateResults(experimentId: number, results: ExperimentResults): void {
         this.results.set(experimentId, results);
+        for (const listener of this.listeners) { listener(); }
+    }
+
+    onChange(listener: () => void): void {
+        this.listeners.push(listener);
     }
 }

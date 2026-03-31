@@ -41,6 +41,11 @@
           "id": "posthog-stale-flags",
           "name": "Stale Flags",
           "when": "posthog.isAuthenticated"
+        },
+        {
+          "id": "posthog-debug",
+          "name": "Debug",
+          "when": "posthog.isDevelopment"
         }
       ]
     },
@@ -102,9 +107,20 @@
       {
         "command": "posthog.signInOAuth",
         "title": "PostHog: Sign In with PostHog"
+      },
+      {
+        "command": "posthog.generateType",
+        "title": "PostHog: Generate Type"
       }
     ],
     "menus": {
+      "editor/context": [
+        {
+          "command": "posthog.generateType",
+          "when": "posthog.isAuthenticated && editorTextFocus",
+          "group": "PostHog"
+        }
+      ],
       "view/title": [
         {
           "command": "posthog.scanStaleFlags",
@@ -125,13 +141,17 @@
       "properties": {
         "posthog.additionalClientNames": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "markdownDescription": "Extra variable names to recognize as PostHog clients (e.g. `toolbarPosthogJS`, `telemetry`, `posthoganalytics`)."
         },
         "posthog.additionalFlagFunctions": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "markdownDescription": "Bare function names that accept a feature flag key as the first argument (e.g. `useFeatureFlag`)."
         },
@@ -139,6 +159,21 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Detect PostHog calls through nested member expressions like `window.posthog?.capture()`."
+        },
+        "posthog.showInlineDecorations": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show inline flag status and event volume decorations in the editor."
+        },
+        "posthog.useWorkspaceConfig": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Automatically load team settings from `.posthog.json` in the workspace root."
+        },
+        "posthog.multiProjectNotifications": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Show a notification when opening a file from a workspace folder configured for a different PostHog project."
         }
       }
     }
@@ -171,6 +206,7 @@
     "webpack-cli": "^6.0.1"
   },
   "dependencies": {
+    "posthog-node": "^5.28.9",
     "web-tree-sitter": "^0.24.7"
   },
   "pnpm": {

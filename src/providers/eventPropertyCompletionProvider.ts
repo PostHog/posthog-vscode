@@ -3,6 +3,7 @@ import { EventCacheService } from '../services/eventCacheService';
 import { PostHogService } from '../services/postHogService';
 import { AuthService } from '../services/authService';
 import { TreeSitterService } from '../services/treeSitterService';
+import { TelemetryService } from '../services/telemetryService';
 
 export class EventPropertyCompletionProvider implements vscode.CompletionItemProvider {
     constructor(
@@ -10,6 +11,7 @@ export class EventPropertyCompletionProvider implements vscode.CompletionItemPro
         private readonly postHogService: PostHogService,
         private readonly authService: AuthService,
         private readonly treeSitter: TreeSitterService,
+        private readonly telemetry: TelemetryService,
     ) {}
 
     async provideCompletionItems(
@@ -24,13 +26,19 @@ export class EventPropertyCompletionProvider implements vscode.CompletionItemPro
         const projectId = this.authService.getProjectId();
         if (!projectId) { return undefined; }
 
+        let items: vscode.CompletionItem[] | undefined;
+
         if (ctx.type === 'property_key' && ctx.eventName) {
-            return this.completePropertyKeys(projectId, ctx.eventName);
+            items = await this.completePropertyKeys(projectId, ctx.eventName);
+        } else if (ctx.type === 'property_value' && ctx.eventName && ctx.propertyName) {
+            items = await this.completePropertyValues(projectId, ctx.eventName, ctx.propertyName);
         }
-        if (ctx.type === 'property_value' && ctx.eventName && ctx.propertyName) {
-            return this.completePropertyValues(projectId, ctx.eventName, ctx.propertyName);
+
+        if (items && items.length > 0) {
+            this.telemetry.capture('completion_provided', { type: ctx.type === 'property_key' ? 'property_key' : 'property_value', count: items.length, language: document.languageId });
         }
-        return undefined;
+
+        return items;
     }
 
     private async completePropertyKeys(projectId: number, eventName: string): Promise<vscode.CompletionItem[]> {

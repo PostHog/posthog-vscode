@@ -13,6 +13,15 @@ export const Commands = {
     CLEANUP_STALE_FLAG: 'posthog.cleanupStaleFlag',
     SHOW_SESSIONS: 'posthog.showSessions',
     GENERATE_FLAG_TYPES: 'posthog.generateFlagTypes',
+    LAUNCH_EXPERIMENT: 'posthog.launchExperiment',
+    STOP_EXPERIMENT: 'posthog.stopExperiment',
+    CLEANUP_ALL_STALE_FLAGS: 'posthog.cleanupAllStaleFlags',
+    EXPORT_STALE_FLAGS: 'posthog.exportStaleFlags',
+    TOGGLE_FLAG: 'posthog.toggleFlag',
+    FIND_FLAG: 'posthog.findFlag',
+    WRAP_IN_FLAG: 'posthog.wrapInFlag',
+    FIND_FLAG_REFERENCES: 'posthog.findFlagReferences',
+    GENERATE_TYPE: 'posthog.generateType',
 } as const;
 
 export const Views = {
@@ -28,7 +37,9 @@ export const StorageKeys = {
     API_KEY: 'posthog.apiKey',
     HOST: 'posthog.host',
     PROJECT_ID: 'posthog.projectId',
+    PROJECT_NAME: 'posthog.projectName',
     IS_AUTHENTICATED: 'posthog.isAuthenticated',
+    CAN_WRITE: 'posthog.canWrite',
 } as const;
 
 export const Defaults = {

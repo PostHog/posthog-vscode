@@ -7,6 +7,9 @@ export class EventCacheService {
     private properties: Map<string, EventProperty[]> = new Map();
     private propertyValues: Map<string, { value: string; count: number }[]> = new Map();
     private listeners: Array<() => void> = [];
+    private _lastRefreshed: Date | null = null;
+
+    get lastRefreshed(): Date | null { return this._lastRefreshed; }
 
     getEvents(): EventDefinition[] {
         return this.events;
@@ -35,6 +38,7 @@ export class EventCacheService {
 
     update(events: EventDefinition[]): void {
         this.events = events;
+        this._lastRefreshed = new Date();
         this.notify();
     }
 

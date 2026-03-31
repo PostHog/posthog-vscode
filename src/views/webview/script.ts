@@ -8,6 +8,9 @@ let loadedTabs = new Set();
 let allData = { flags: [], experiments: [], analytics: [] };
 let experimentResults = {};
 let projectId = null;
+let userEmail = null;
+let myFlagsOnly = false;
+let canWrite = true;
 
 // ── Helpers ──
 
@@ -56,6 +59,14 @@ function switchTab(tab) {
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
     document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === 'section-' + tab));
     document.getElementById('search').value = '';
+
+    // Show "Mine" button only on flags tab when user email is known
+    var myFlagsBtn = document.getElementById('my-flags-toggle');
+    if (myFlagsBtn) { myFlagsBtn.style.display = (tab === 'flags' && userEmail) ? '' : 'none'; }
+
+    // Show platform filter only on analytics tab
+    var platformFilter = document.getElementById('platform-filter');
+    if (platformFilter) { platformFilter.style.display = (tab === 'analytics') ? '' : 'none'; }
 
     if (!loadedTabs.has(tab)) {
         loadedTabs.add(tab);
@@ -138,7 +149,13 @@ function renderSection(sectionId, items, renderFn) {
 
 function renderFlags(flags) {
     allData.flags = flags;
-    renderSection('flags', flags, (list, items) => {
+    var filtered = flags;
+    if (myFlagsOnly && userEmail) {
+        filtered = flags.filter(function(f) {
+            return f.created_by && f.created_by.email === userEmail;
+        });
+    }
+    renderSection('flags', filtered, (list, items) => {
         list.innerHTML = items.map(f => {
             const dotClass = f.active ? 'active' : 'inactive';
             return '<div class="item" data-key="' + esc(f.key) + '" style="cursor:pointer;">'
@@ -160,7 +177,22 @@ function renderFlags(flags) {
 function renderExperiments(exps) {
     allData.experiments = exps;
     renderSection('experiments', exps, (list, items) => {
-        list.innerHTML = items.map(exp => {
+        // Summary counts
+        var running = 0, draft = 0, complete = 0;
+        items.forEach(function(exp) {
+            if (exp.end_date) { complete++; }
+            else if (exp.start_date) { running++; }
+            else { draft++; }
+        });
+        var summaryParts = [];
+        if (running > 0) summaryParts.push(running + ' Running');
+        if (draft > 0) summaryParts.push(draft + ' Draft');
+        if (complete > 0) summaryParts.push(complete + ' Complete');
+        var summaryHtml = summaryParts.length > 0
+            ? '<div class="exp-summary">' + summaryParts.join(' &middot; ') + '</div>'
+            : '';
+
+        list.innerHTML = summaryHtml + items.map(exp => {
             let status, dotClass;
             if (exp.end_date) { status = 'Complete'; dotClass = 'complete'; }
             else if (exp.start_date) { status = 'Running'; dotClass = 'running'; }
@@ -250,6 +282,40 @@ function renderInsights(insights) {
 
     grid.querySelectorAll('.insight-card').forEach(card => {
         card.addEventListener('click', () => send({ type: 'openInsightPanel', id: Number(card.dataset.id) }));
+    });
+}
+
+function filterInsightsByPlatform(platform) {
+    var grid = document.getElementById('analytics-list');
+    if (!grid) return;
+    var cards = grid.querySelectorAll('.insight-card');
+    var platformKeywords = {
+        web: ['web', 'pageview', 'page_view', '$pageview', 'browser', 'click', 'dom', 'url', 'session_recording', 'autocapture'],
+        ios: ['ios', 'swift', 'iphone', 'ipad', 'apple', 'mobile'],
+        android: ['android', 'kotlin', 'java', 'mobile']
+    };
+    cards.forEach(function(card) {
+        if (platform === 'all') {
+            card.style.display = '';
+            return;
+        }
+        var text = card.textContent.toLowerCase();
+        var id = Number(card.dataset.id);
+        var insight = allData.analytics.find(function(a) { return a.id === id; });
+        var searchText = text;
+        if (insight) {
+            searchText += ' ' + (insight.name || '').toLowerCase();
+            searchText += ' ' + (insight.description || '').toLowerCase();
+            // Check series event names
+            if (insight.query && insight.query.source && insight.query.source.series) {
+                insight.query.source.series.forEach(function(s) {
+                    if (s.event) searchText += ' ' + s.event.toLowerCase();
+                });
+            }
+        }
+        var keywords = platformKeywords[platform] || [];
+        var matches = keywords.some(function(kw) { return searchText.includes(kw); });
+        card.style.display = matches ? '' : 'none';
     });
 }
 
@@ -575,11 +641,15 @@ function showFlagDetail(key) {
     });
     html += '</div>';
 
-    // ── Save button ──
-    html += '<div class="flag-save-row">'
-        + '<button class="detail-btn primary flag-save-btn" id="flag-save-btn" data-flag-id="' + f.id + '">Save Changes</button>'
-        + '<span class="flag-save-status" id="flag-save-status"></span>'
-        + '</div>';
+    // ── Save button (only shown for write access) ──
+    if (canWrite) {
+        html += '<div class="flag-save-row">'
+            + '<button class="detail-btn primary flag-save-btn" id="flag-save-btn" data-flag-id="' + f.id + '">Save Changes</button>'
+            + '<span class="flag-save-status" id="flag-save-status"></span>'
+            + '</div>';
+    } else {
+        html += '<div class="flag-save-row" style="opacity:0.6;font-size:11px;padding:6px 0;">Read-only access &mdash; editing disabled</div>';
+    }
 
     // ── Meta + actions ──
     html += detailField('Created', created + ' by ' + esc(createdBy))
@@ -590,6 +660,15 @@ function showFlagDetail(key) {
         + '</div>';
 
     showDetail(f.key, html);
+
+    // ── Disable controls for read-only access ──
+    if (!canWrite) {
+        document.querySelectorAll('.flag-toggle, .flag-rollout-slider, .flag-rollout-num, .flag-variant-key, .flag-variant-pct, .flag-variant-remove, .flag-add-variant, .flag-payload-editor').forEach(function(el) {
+            el.disabled = true;
+            el.style.pointerEvents = 'none';
+            el.style.opacity = '0.5';
+        });
+    }
 
     // ── Bind controls ──
     const toggle = document.getElementById('flag-toggle');
@@ -630,51 +709,79 @@ function showFlagDetail(key) {
     }
     bindRemoveButtons();
 
-    // Save
-    document.getElementById('flag-save-btn').addEventListener('click', function() {
-        const flagId = Number(this.dataset.flagId);
-        const active = document.getElementById('flag-toggle').classList.contains('active');
+    // Save — with confirmation dialog
+    var saveBtn = document.getElementById('flag-save-btn');
+    if (saveBtn) {
+    saveBtn.addEventListener('click', function() {
+        var saveBtnEl = this;
+        var flagId = Number(saveBtnEl.dataset.flagId);
 
-        const variantRows = document.querySelectorAll('.flag-variant-row');
-        let filters = {};
+        // Gather the changes first
+        function gatherChanges() {
+            var active = document.getElementById('flag-toggle').classList.contains('active');
+            var variantRows = document.querySelectorAll('.flag-variant-row');
+            var filters = {};
 
-        if (variantRows.length > 0) {
-            const newVariants = [];
-            variantRows.forEach(function(row) {
-                const k = row.querySelector('[data-field="key"]').value.trim();
-                const p = Number(row.querySelector('[data-field="pct"]').value) || 0;
-                if (k) newVariants.push({ key: k, rollout_percentage: p });
+            if (variantRows.length > 0) {
+                var newVariants = [];
+                variantRows.forEach(function(row) {
+                    var k = row.querySelector('[data-field="key"]').value.trim();
+                    var p = Number(row.querySelector('[data-field="pct"]').value) || 0;
+                    if (k) newVariants.push({ key: k, rollout_percentage: p });
+                });
+                filters.multivariate = { variants: newVariants };
+                filters.groups = (f.filters && f.filters.groups) || [{ properties: [], rollout_percentage: 100 }];
+            } else {
+                var pct = Number(document.getElementById('flag-rollout-num').value);
+                filters.groups = [{ properties: [], rollout_percentage: pct }];
+            }
+
+            var payloadEditors = document.querySelectorAll('.flag-payload-editor');
+            var newPayloads = {};
+            var hasPayloads = false;
+            payloadEditors.forEach(function(ta) {
+                var val = ta.value.trim();
+                if (val) {
+                    try {
+                        newPayloads[ta.dataset.payloadKey] = JSON.parse(val);
+                    } catch(e) {
+                        newPayloads[ta.dataset.payloadKey] = val;
+                    }
+                    hasPayloads = true;
+                }
             });
-            filters.multivariate = { variants: newVariants };
-            filters.groups = (f.filters && f.filters.groups) || [{ properties: [], rollout_percentage: 100 }];
-        } else {
-            const pct = Number(document.getElementById('flag-rollout-num').value);
-            filters.groups = [{ properties: [], rollout_percentage: pct }];
+            if (hasPayloads) filters.payloads = newPayloads;
+
+            return { active: active, filters: filters };
         }
 
-        // Payloads
-        const payloadEditors = document.querySelectorAll('.flag-payload-editor');
-        const newPayloads = {};
-        let hasPayloads = false;
-        payloadEditors.forEach(function(ta) {
-            const val = ta.value.trim();
-            if (val) {
-                try {
-                    newPayloads[ta.dataset.payloadKey] = JSON.parse(val);
-                } catch(e) {
-                    newPayloads[ta.dataset.payloadKey] = val;
-                }
-                hasPayloads = true;
-            }
+        // Remove any existing confirm bar
+        var existing = document.querySelector('.confirm-bar');
+        if (existing) existing.remove();
+
+        // Show inline confirmation bar
+        var bar = document.createElement('div');
+        bar.className = 'confirm-bar';
+        bar.innerHTML = '<span class="confirm-text">Apply changes to \\'<strong>' + esc(f.key) + '</strong>\\'? This affects production.</span>'
+            + '<div class="confirm-actions">'
+            + '<button class="btn-cancel">Cancel</button>'
+            + '<button class="btn-confirm">Confirm</button>'
+            + '</div>';
+
+        var saveRow = saveBtnEl.closest('.flag-save-row');
+        saveRow.parentNode.insertBefore(bar, saveRow);
+
+        bar.querySelector('.btn-cancel').addEventListener('click', function() { bar.remove(); });
+        bar.querySelector('.btn-confirm').addEventListener('click', function() {
+            bar.remove();
+            var changes = gatherChanges();
+            var status = document.getElementById('flag-save-status');
+            status.textContent = 'Saving...';
+            status.className = 'flag-save-status';
+            send({ type: 'updateFlag', flagId: flagId, active: changes.active, filters: changes.filters });
         });
-        if (hasPayloads) filters.payloads = newPayloads;
-
-        const status = document.getElementById('flag-save-status');
-        status.textContent = 'Saving...';
-        status.className = 'flag-save-status';
-
-        send({ type: 'updateFlag', flagId: flagId, active: active, filters: filters });
     });
+    }
 }
 
 function fmtPct(n) { return (n * 100).toFixed(1) + '%'; }
@@ -796,18 +903,26 @@ function renderMetricTable(label, metrics, metricResults) {
             // Credible intervals
             var hasCi = variants.some(function(v) { return v.credible_interval; });
             if (hasCi) {
+                // Collect all CI bounds for this metric for dynamic normalization
+                var allBounds = [];
+                variants.forEach(function(v) {
+                    if (v.credible_interval) { allBounds.push(v.credible_interval[0] * 100, v.credible_interval[1] * 100); }
+                });
+                var dataMin = Math.min.apply(null, allBounds.concat([0]));
+                var dataMax = Math.max.apply(null, allBounds.concat([0]));
+                var ciPadding = Math.max(Math.abs(dataMax - dataMin) * 0.2, 1);
+                var rangeMin = dataMin - ciPadding;
+                var rangeMax = dataMax + ciPadding;
+                var rangeSpan = rangeMax - rangeMin;
+
                 html += '<div class="exp-ci-section">';
                 variants.forEach(function(v) {
                     if (!v.credible_interval) return;
                     var ciLow = (v.credible_interval[0] * 100).toFixed(1);
                     var ciHigh = (v.credible_interval[1] * 100).toFixed(1);
-                    // Normalize CI to a visual range
-                    var minVal = Math.min(v.credible_interval[0] * 100, -50);
-                    var maxVal = Math.max(v.credible_interval[1] * 100, 50);
-                    var rangeSpan = maxVal - minVal;
-                    var leftPct = ((v.credible_interval[0] * 100 - minVal) / rangeSpan * 100);
+                    var leftPct = ((v.credible_interval[0] * 100 - rangeMin) / rangeSpan * 100);
                     var widthPct = ((v.credible_interval[1] - v.credible_interval[0]) * 100 / rangeSpan * 100);
-                    var zeroPct = ((0 - minVal) / rangeSpan * 100);
+                    var zeroPct = ((0 - rangeMin) / rangeSpan * 100);
                     var barCls = v.credible_interval[0] > 0 ? 'positive' : v.credible_interval[1] < 0 ? 'negative' : 'neutral';
 
                     html += '<div class="exp-ci-row">'
@@ -853,6 +968,25 @@ function showExperimentDetail(id) {
         const end = exp.end_date ? new Date(exp.end_date) : new Date();
         const days = Math.ceil((end.getTime() - start.getTime()) / 86400000);
         html += detailField('Duration', days + ' day' + (days !== 1 ? 's' : '') + (exp.end_date ? '' : ' (running)'));
+    }
+
+    // Sample size progress
+    const recSampleSize = exp.parameters && exp.parameters.recommended_sample_size;
+    if (exp.start_date && recSampleSize && recSampleSize > 0) {
+        const results = experimentResults[exp.id];
+        if (results && results.primary && results.primary.results && results.primary.results[0] && results.primary.results[0].data) {
+            const d = results.primary.results[0].data;
+            let totalSamples = d.baseline.number_of_samples;
+            if (d.variant_results) {
+                d.variant_results.forEach(function(v) { totalSamples += v.number_of_samples; });
+            }
+            const pct = Math.min(Math.round((totalSamples / recSampleSize) * 100), 100);
+            html += '<div class="detail-field"><div class="detail-label">Sample progress</div>'
+                + '<div class="exp-progress">'
+                + '<div class="exp-progress-bar"><div class="exp-progress-fill" style="width:' + pct + '%"></div></div>'
+                + '<div class="exp-progress-text">' + fmtNum(totalSamples) + ' / ' + fmtNum(recSampleSize) + ' samples (' + pct + '%)</div>'
+                + '</div></div>';
+        }
     }
 
     // Conclusion
@@ -927,9 +1061,18 @@ function showInsightDetail(id) {
 
 document.getElementById('btn-sign-in-oauth').addEventListener('click', () => send({ type: 'signInOAuth' }));
 document.getElementById('btn-sign-in').addEventListener('click', () => send({ type: 'signIn' }));
+document.getElementById('btn-get-api-key').addEventListener('click', (e) => { e.preventDefault(); send({ type: 'open-api-key-page' }); });
 document.getElementById('btn-select-project').addEventListener('click', () => send({ type: 'selectProject' }));
 document.getElementById('btn-sign-out').addEventListener('click', () => send({ type: 'signOut' }));
 document.getElementById('search').addEventListener('input', filterItems);
+document.getElementById('my-flags-toggle').addEventListener('click', function() {
+    myFlagsOnly = !myFlagsOnly;
+    this.classList.toggle('active', myFlagsOnly);
+    if (allData.flags.length) { renderFlags(allData.flags); }
+});
+document.getElementById('platform-select').addEventListener('change', function() {
+    filterInsightsByPlatform(this.value);
+});
 document.getElementById('detail-back').addEventListener('click', hideDetail);
 document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.addEventListener('click', () => { hideDetail(); switchTab(tab.dataset.tab); });
@@ -949,18 +1092,41 @@ window.addEventListener('message', e => {
                 switchTab('flags');
                 send({ type: 'loadFlags' });
             }
+            // Update project name + host in header
+            var projNameEl = document.getElementById('project-name');
+            if (projNameEl) {
+                var host = msg.posthogHost || '';
+                var hostShort = host.includes('us.posthog.com') ? 'US' : host.includes('eu.posthog.com') ? 'EU' : host ? new URL(host).hostname : '';
+                var projLabel = msg.projectName ? msg.projectName + ' [' + hostShort + ']' : hostShort;
+                projNameEl.textContent = projLabel;
+                projNameEl.title = (msg.projectName || '') + ' — ' + host;
+            }
+            // Update RBAC badge
+            canWrite = msg.canWrite !== false;
+            var rbacBadge = document.getElementById('rbac-badge');
+            if (rbacBadge) { rbacBadge.style.display = canWrite ? 'none' : ''; }
             break;
         case 'loading': {
             const loader = document.getElementById(msg.section + '-loading');
             const list = document.getElementById(msg.section + '-list');
             const empty = document.getElementById(msg.section + '-empty');
-            if (loader) loader.style.display = '';
+            if (loader) {
+                loader.style.display = '';
+                // Remove any prior error state
+                var prevError = loader.parentNode ? loader.parentNode.querySelector('.error-state') : null;
+                if (prevError) prevError.remove();
+            }
             if (list) list.style.display = 'none';
             if (empty) empty.style.display = 'none';
             break;
         }
         case 'flags':
             projectId = msg.projectId;
+            if (msg.userEmail) {
+                userEmail = msg.userEmail;
+                var myBtn = document.getElementById('my-flags-toggle');
+                if (myBtn && currentTab === 'flags') { myBtn.style.display = ''; }
+            }
             renderFlags(msg.data);
             break;
         case 'experiments':
@@ -1004,7 +1170,28 @@ window.addEventListener('message', e => {
         }
         case 'error': {
             const errLoader = document.getElementById(msg.section + '-loading');
-            if (errLoader) errLoader.textContent = msg.message;
+            const errList = document.getElementById(msg.section + '-list');
+            const errEmpty = document.getElementById(msg.section + '-empty');
+            if (errLoader) errLoader.style.display = 'none';
+            if (errList) errList.style.display = 'none';
+            if (errEmpty) errEmpty.style.display = 'none';
+            // Insert error state UI after the loading element
+            var errContainer = errLoader ? errLoader.parentNode : null;
+            if (errContainer) {
+                var oldError = errContainer.querySelector('.error-state');
+                if (oldError) oldError.remove();
+                var errDiv = document.createElement('div');
+                errDiv.className = 'error-state';
+                errDiv.innerHTML = '<span class="error-icon">&#x26A0;</span>'
+                    + '<span class="error-message">' + esc(msg.message) + '</span>'
+                    + '<button class="error-retry" data-section="' + esc(msg.section) + '">Retry</button>';
+                errContainer.appendChild(errDiv);
+                errDiv.querySelector('.error-retry').addEventListener('click', function() {
+                    var section = this.dataset.section;
+                    errDiv.remove();
+                    send({ type: 'retry', section: section });
+                });
+            }
             break;
         }
     }

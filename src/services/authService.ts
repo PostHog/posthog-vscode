@@ -39,6 +39,26 @@ export class AuthService {
         await this.globalState.update(StorageKeys.PROJECT_ID, undefined);
     }
 
+    getProjectName(): string | undefined {
+        return this.globalState.get<string>(StorageKeys.PROJECT_NAME);
+    }
+
+    async setProjectName(name: string): Promise<void> {
+        await this.globalState.update(StorageKeys.PROJECT_NAME, name);
+    }
+
+    async clearProjectName(): Promise<void> {
+        await this.globalState.update(StorageKeys.PROJECT_NAME, undefined);
+    }
+
+    getCanWrite(): boolean {
+        return this.globalState.get<boolean>(StorageKeys.CAN_WRITE) ?? true;
+    }
+
+    async setCanWrite(value: boolean): Promise<void> {
+        await this.globalState.update(StorageKeys.CAN_WRITE, value);
+    }
+
     isAuthenticated(): boolean {
         return this.globalState.get<boolean>(StorageKeys.IS_AUTHENTICATED) ?? false;
     }

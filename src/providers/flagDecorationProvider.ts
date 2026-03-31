@@ -53,6 +53,10 @@ export class FlagDecorationProvider {
         return disposables;
     }
 
+    refresh(): void {
+        this.triggerUpdate();
+    }
+
     private triggerUpdate() {
         if (this.debounceTimer) {
             clearTimeout(this.debounceTimer);
@@ -63,6 +67,13 @@ export class FlagDecorationProvider {
     private async updateDecorations() {
         const editor = vscode.window.activeTextEditor;
         if (!editor) { return; }
+
+        const config = vscode.workspace.getConfiguration('posthog');
+        if (!config.get<boolean>('showInlineDecorations', true)) {
+            editor.setDecorations(this.decoration, []);
+            editor.setDecorations(this.unknownFlagDecoration, []);
+            return;
+        }
 
         const doc = editor.document;
         if (!this.treeSitter.isSupported(doc.languageId)) { return; }
@@ -229,6 +240,21 @@ export class FlagDecorationProvider {
             const end = experiment.end_date ? new Date(experiment.end_date) : new Date();
             const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
             md.appendMarkdown(`⏱ ${days} day${days !== 1 ? 's' : ''}${experiment.end_date ? '' : ' so far'}\n\n`);
+        }
+
+        // Sample size progress
+        const recommendedSampleSize = experiment.parameters?.recommended_sample_size;
+        if (experiment.start_date && recommendedSampleSize && recommendedSampleSize > 0) {
+            const results = this.experimentCache.getResults(experiment.id);
+            if (results?.primary?.results?.[0]?.data) {
+                const data = results.primary.results[0].data;
+                let totalSamples = data.baseline.number_of_samples;
+                for (const v of (data.variant_results || [])) {
+                    totalSamples += v.number_of_samples;
+                }
+                const pct = Math.min(Math.round((totalSamples / recommendedSampleSize) * 100), 100);
+                md.appendMarkdown(`**Progress**: ${this.formatNum(totalSamples)} / ${this.formatNum(recommendedSampleSize)} samples (${pct}%)\n\n`);
+            }
         }
 
         if (experiment.conclusion) {

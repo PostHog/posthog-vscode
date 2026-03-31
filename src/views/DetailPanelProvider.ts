@@ -3,6 +3,7 @@ import { AuthService } from '../services/authService';
 import { PostHogService } from '../services/postHogService';
 import { FlagCacheService } from '../services/flagCacheService';
 import { FeatureFlag, Experiment, ExperimentResults, Insight, SessionReplayEntry } from '../models/types';
+import { TelemetryService } from '../services/telemetryService';
 
 function getNonce(): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -23,21 +24,24 @@ export class DetailPanelProvider {
         private readonly authService: AuthService,
         private readonly postHogService: PostHogService,
         private readonly flagCache: FlagCacheService,
+        private readonly telemetry?: TelemetryService,
     ) {}
 
     showFlag(flag: FeatureFlag) {
+        this.telemetry?.capture('flag_detail_opened', { flag_key: flag.key, source: 'detail_panel' });
         const panel = this.getOrCreatePanel('flag-' + flag.id, flag.key, 'Flag');
         panel.webview.html = this.buildHtml(panel.webview, 'flag', { flag, host: this.getHost(), projectId: this.authService.getProjectId() });
         this.bindFlagMessages(panel);
     }
 
     showExperiment(experiment: Experiment, results?: ExperimentResults) {
+        this.telemetry?.capture('experiment_detail_opened', { experiment_id: experiment.id });
         const panel = this.getOrCreatePanel('exp-' + experiment.id, experiment.name, 'Experiment');
         panel.webview.html = this.buildHtml(panel.webview, 'experiment', {
             experiment, results,
             host: this.getHost(), projectId: this.authService.getProjectId(),
         });
-        this.bindCommonMessages(panel);
+        this.bindExperimentMessages(panel, experiment);
     }
 
     showInsight(insight: Insight) {
@@ -70,6 +74,7 @@ export class DetailPanelProvider {
     }
 
     async showSessions(key: string, type: 'event' | 'flag') {
+        this.telemetry?.capture('sessions_viewed', { key, type });
         const projectId = this.authService.getProjectId();
         if (!projectId) { return; }
 
@@ -134,13 +139,16 @@ export class DetailPanelProvider {
         panel.webview.onDidReceiveMessage(async (msg: { type: string; [k: string]: unknown }) => {
             switch (msg.type) {
                 case 'watchReplay':
+                    this.telemetry?.capture('replay_watched', { session_id: (msg.session as SessionReplayEntry)?.sessionId });
                     this.showReplay(msg.session as SessionReplayEntry);
                     break;
                 case 'copy':
+                    this.telemetry?.capture('text_copied', { source: 'detail_panel' });
                     await vscode.env.clipboard.writeText(msg.text as string);
                     vscode.window.showInformationMessage(`Copied: ${msg.text}`);
                     break;
                 case 'openExternal':
+                    this.telemetry?.capture('external_link_opened', { source: 'detail_panel' });
                     vscode.env.openExternal(vscode.Uri.parse(msg.url as string));
                     break;
                 case 'findReferences':
@@ -157,10 +165,12 @@ export class DetailPanelProvider {
         panel.webview.onDidReceiveMessage(async (msg: { type: string; [k: string]: unknown }) => {
             switch (msg.type) {
                 case 'copy':
+                    this.telemetry?.capture('text_copied', { source: 'detail_panel' });
                     await vscode.env.clipboard.writeText(msg.text as string);
                     vscode.window.showInformationMessage(`Copied: ${msg.text}`);
                     break;
                 case 'openExternal':
+                    this.telemetry?.capture('external_link_opened', { source: 'detail_panel' });
                     vscode.env.openExternal(vscode.Uri.parse(msg.url as string));
                     break;
                 case 'findReferences':
@@ -173,14 +183,54 @@ export class DetailPanelProvider {
         });
     }
 
+    private bindExperimentMessages(panel: vscode.WebviewPanel, experiment: Experiment) {
+        this.bindCommonMessages(panel);
+        panel.webview.onDidReceiveMessage(async (msg: { type: string; [k: string]: unknown }) => {
+            const projectId = this.authService.getProjectId();
+            if (!projectId) { return; }
+            switch (msg.type) {
+                case 'launch-experiment': {
+                    try {
+                        const updated = await this.postHogService.launchExperiment(projectId, msg.experimentId as number);
+                        const results = await this.postHogService.getExperimentResults(projectId, updated.id).catch(() => null);
+                        this.showExperiment(updated, results ?? undefined);
+                        panel.webview.postMessage({ type: 'experimentUpdated' });
+                        this.telemetry?.capture('experiment_launched', { experiment_id: msg.experimentId });
+                    } catch (err) {
+                        const detail = err instanceof Error ? err.message : String(err);
+                        panel.webview.postMessage({ type: 'experimentError', message: detail });
+                        this.telemetry?.capture('experiment_launch_failed', { experiment_id: msg.experimentId });
+                    }
+                    break;
+                }
+                case 'stop-experiment': {
+                    try {
+                        const updated = await this.postHogService.stopExperiment(projectId, msg.experimentId as number);
+                        const results = await this.postHogService.getExperimentResults(projectId, updated.id).catch(() => null);
+                        this.showExperiment(updated, results ?? undefined);
+                        panel.webview.postMessage({ type: 'experimentUpdated' });
+                        this.telemetry?.capture('experiment_stopped', { experiment_id: msg.experimentId });
+                    } catch (err) {
+                        const detail = err instanceof Error ? err.message : String(err);
+                        panel.webview.postMessage({ type: 'experimentError', message: detail });
+                        this.telemetry?.capture('experiment_stop_failed', { experiment_id: msg.experimentId });
+                    }
+                    break;
+                }
+            }
+        });
+    }
+
     private bindFlagMessages(panel: vscode.WebviewPanel) {
         panel.webview.onDidReceiveMessage(async (msg: { type: string; [k: string]: unknown }) => {
             switch (msg.type) {
                 case 'copy':
+                    this.telemetry?.capture('text_copied', { source: 'detail_panel' });
                     await vscode.env.clipboard.writeText(msg.text as string);
                     vscode.window.showInformationMessage(`Copied: ${msg.text}`);
                     break;
                 case 'openExternal':
+                    this.telemetry?.capture('external_link_opened', { source: 'detail_panel' });
                     vscode.env.openExternal(vscode.Uri.parse(msg.url as string));
                     break;
                 case 'findReferences':
@@ -199,9 +249,11 @@ export class DetailPanelProvider {
                         const flags = await this.postHogService.getFeatureFlags(projectId);
                         this.flagCache.update(flags);
                         panel.webview.postMessage({ type: 'flagSaved', flag: updated });
+                        this.telemetry?.capture('flag_saved', { flag_id: msg.flagId, source: 'detail_panel' });
                     } catch (err) {
                         const detail = err instanceof Error ? err.message : String(err);
                         panel.webview.postMessage({ type: 'flagSaveError', message: detail });
+                        this.telemetry?.capture('flag_save_failed', { flag_id: msg.flagId });
                     }
                     break;
                 }
@@ -218,6 +270,7 @@ export class DetailPanelProvider {
                 try {
                     const insight = await this.postHogService.refreshInsight(projectId, msg.insightId as number);
                     panel.webview.postMessage({ type: 'insightRefreshed', data: insight });
+                    this.telemetry?.capture('insight_refreshed', { insight_id: msg.insightId, source: 'detail_panel' });
                 } catch {
                     vscode.window.showErrorMessage('Failed to refresh insight.');
                 }
@@ -899,14 +952,37 @@ function getExperimentScript(): string {
         var days = Math.ceil((end.getTime() - start.getTime()) / 86400000);
         html += '<span class="badge draft">' + days + ' day' + (days !== 1 ? 's' : '') + '</span>';
     }
-    html += '</div></div><div class="hero-actions">'
-        + '<button class="btn btn-secondary"' + act({type:'findReferences',key:exp.feature_flag_key}) + '>Find References</button>'
+    html += '</div></div><div class="hero-actions">';
+    // Launch / Stop buttons
+    if (!exp.start_date) {
+        html += '<button class="btn btn-primary" id="launch-exp-btn">Launch Experiment</button>';
+    } else if (!exp.end_date) {
+        html += '<button class="btn btn-secondary" id="stop-exp-btn" style="color:var(--ph-red);border:1px solid var(--ph-red);">Stop Experiment</button>';
+    }
+    html += '<button class="btn btn-secondary"' + act({type:'findReferences',key:exp.feature_flag_key}) + '>Find References</button>'
         + '<button class="btn btn-secondary"' + act({type:'copy',text:exp.feature_flag_key}) + '>Copy Flag Key</button>'
         + '<button class="btn btn-ghost"' + act({type:'openExternal',url:host+'/project/'+projectId+'/experiments/'+exp.id}) + '>Open in PostHog &#x2197;</button>'
         + '</div></div>';
 
     if (exp.description) {
         html += '<div class="field"><div class="field-value">' + esc(exp.description) + '</div></div>';
+    }
+
+    // Sample size progress
+    var recSample = exp.parameters && exp.parameters.recommended_sample_size;
+    if (exp.start_date && recSample && recSample > 0 && results) {
+        var sampleData = null;
+        if (results.primary && results.primary.results && results.primary.results[0]) sampleData = results.primary.results[0].data;
+        if (sampleData) {
+            var totalSamples = sampleData.baseline.number_of_samples;
+            (sampleData.variant_results || []).forEach(function(v) { totalSamples += v.number_of_samples; });
+            var samplePct = Math.min(Math.round((totalSamples / recSample) * 100), 100);
+            html += '<div class="card"><div class="card-title">Sample Progress</div>'
+                + '<div style="height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;">'
+                + '<div style="height:100%;width:' + samplePct + '%;background:var(--ph-blue);border-radius:3px;transition:width 0.3s;"></div></div>'
+                + '<div style="font-size:11px;opacity:0.5;margin-top:4px;">' + fmtNum(totalSamples) + ' / ' + fmtNum(recSample) + ' samples (' + samplePct + '%)</div>'
+                + '</div>';
+        }
     }
 
     // Conclusion
@@ -975,12 +1051,21 @@ function getExperimentScript(): string {
 
                 // CI bars
                 if (vrs.some(function(v) { return v.credible_interval; })) {
+                    // Collect all CI bounds for dynamic normalization
+                    var allBounds = [];
+                    vrs.forEach(function(v) { if (v.credible_interval) { allBounds.push(v.credible_interval[0]*100, v.credible_interval[1]*100); } });
+                    var dataMin = Math.min.apply(null, allBounds.concat([0]));
+                    var dataMax = Math.max.apply(null, allBounds.concat([0]));
+                    var ciPad = Math.max(Math.abs(dataMax - dataMin) * 0.2, 1);
+                    var ciRangeMin = dataMin - ciPad;
+                    var ciRangeMax = dataMax + ciPad;
+                    var ciSpan = ciRangeMax - ciRangeMin;
+
                     h += '<div class="ci-section">';
                     vrs.forEach(function(v) {
                         if (!v.credible_interval) return;
                         var lo = v.credible_interval[0]*100, hi = v.credible_interval[1]*100;
-                        var mn = Math.min(lo, -50), mx = Math.max(hi, 50), sp = mx - mn;
-                        var lp = (lo-mn)/sp*100, wp2 = (hi-lo)/sp*100, zp = (0-mn)/sp*100;
+                        var lp = (lo-ciRangeMin)/ciSpan*100, wp2 = (hi-lo)/ciSpan*100, zp = (0-ciRangeMin)/ciSpan*100;
                         var cls = lo > 0 ? 'pos' : hi < 0 ? 'neg' : 'neu';
                         h += '<div class="ci-row"><span class="ci-label">' + esc(v.key) + '</span>'
                             + '<div class="ci-track"><div class="ci-zero" style="left:'+zp+'%"></div><div class="ci-bar '+cls+'" style="left:'+lp+'%;width:'+Math.max(wp2,1)+'%"></div></div>'
@@ -1011,6 +1096,34 @@ function getExperimentScript(): string {
     html += '</div>';
     document.body.innerHTML = html;
     bindClicks();
+
+    // Launch / Stop experiment buttons
+    var launchBtn = document.getElementById('launch-exp-btn');
+    if (launchBtn) {
+        launchBtn.addEventListener('click', function() {
+            launchBtn.textContent = 'Launching...';
+            launchBtn.disabled = true;
+            send({ type: 'launch-experiment', experimentId: exp.id });
+        });
+    }
+    var stopBtn = document.getElementById('stop-exp-btn');
+    if (stopBtn) {
+        stopBtn.addEventListener('click', function() {
+            stopBtn.textContent = 'Stopping...';
+            stopBtn.disabled = true;
+            send({ type: 'stop-experiment', experimentId: exp.id });
+        });
+    }
+
+    window.addEventListener('message', function(ev) {
+        if (ev.data.type === 'experimentUpdated') {
+            location.reload();
+        } else if (ev.data.type === 'experimentError') {
+            var msg = ev.data.message || 'Operation failed';
+            if (launchBtn) { launchBtn.textContent = msg; launchBtn.disabled = false; }
+            if (stopBtn) { stopBtn.textContent = msg; stopBtn.disabled = false; }
+        }
+    });
 })();
 `;
 }

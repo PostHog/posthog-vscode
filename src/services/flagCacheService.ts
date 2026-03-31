@@ -3,6 +3,9 @@ import { FeatureFlag } from '../models/types';
 export class FlagCacheService {
     private flags: FeatureFlag[] = [];
     private listeners: Array<() => void> = [];
+    private _lastRefreshed: Date | null = null;
+
+    get lastRefreshed(): Date | null { return this._lastRefreshed; }
 
     getFlags(): FeatureFlag[] {
         return this.flags;
@@ -22,6 +25,7 @@ export class FlagCacheService {
 
     update(flags: FeatureFlag[]): void {
         this.flags = flags;
+        this._lastRefreshed = new Date();
         for (const listener of this.listeners) {
             listener();
         }

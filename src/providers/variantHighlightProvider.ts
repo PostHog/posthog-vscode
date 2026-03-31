@@ -4,6 +4,8 @@ import { ExperimentCacheService } from '../services/experimentCacheService';
 import { FeatureFlag, Experiment } from '../models/types';
 import { TreeSitterService } from '../services/treeSitterService';
 
+type FlagType = 'boolean' | 'multivariate' | 'remote_config';
+
 const PALETTE = [
     { bg: 'rgba(29, 74, 255, 0.07)', border: '#1D4AFF', text: '#6B9BFF' },
     { bg: 'rgba(76, 187, 23, 0.07)', border: '#4CBB17', text: '#7DE852' },
@@ -13,9 +15,17 @@ const PALETTE = [
     { bg: 'rgba(249, 189, 43, 0.07)', border: '#F9BD2B', text: '#FCD462' },
 ];
 
+/** Green for boolean "enabled" branch */
+const BOOLEAN_ENABLED = { bg: 'rgba(76, 187, 23, 0.07)', border: '#4CBB17', text: '#7DE852' };
+/** Muted gray for boolean "disabled" branch */
+const BOOLEAN_DISABLED = { bg: 'rgba(128, 128, 128, 0.05)', border: '#808080', text: '#999999' };
+/** Neutral style for remote config truthiness checks */
+const REMOTE_CONFIG_NEUTRAL = { bg: 'rgba(29, 74, 255, 0.04)', border: '#1D4AFF40', text: '#6B9BFF80' };
+
 export class VariantHighlightProvider {
     private readonly blockDecorations: vscode.TextEditorDecorationType[];
     private readonly labelDecoration: vscode.TextEditorDecorationType;
+    private dynamicDecorations: vscode.TextEditorDecorationType[] = [];
     private debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
     constructor(
@@ -36,7 +46,11 @@ export class VariantHighlightProvider {
     }
 
     register(): vscode.Disposable[] {
-        const disposables: vscode.Disposable[] = [...this.blockDecorations, this.labelDecoration];
+        const disposables: vscode.Disposable[] = [
+            ...this.blockDecorations,
+            this.labelDecoration,
+            { dispose: () => { for (const dt of this.dynamicDecorations) { dt.dispose(); } } },
+        ];
 
         disposables.push(
             vscode.window.onDidChangeActiveTextEditor(() => this.triggerUpdate()),
@@ -51,6 +65,10 @@ export class VariantHighlightProvider {
         this.triggerUpdate();
 
         return disposables;
+    }
+
+    refresh(): void {
+        this.triggerUpdate();
     }
 
     private triggerUpdate() {
@@ -73,6 +91,28 @@ export class VariantHighlightProvider {
         this.apply(editor, doc, branches);
     }
 
+    private classifyFlag(flagKey: string): FlagType {
+        const flag = this.flagCache.getFlag(flagKey);
+        if (!flag) { return 'boolean'; }
+
+        const filters = flag.filters as Record<string, unknown> | undefined;
+
+        // Check for multivariate
+        if (filters?.multivariate && typeof filters.multivariate === 'object') {
+            const mv = filters.multivariate as { variants?: unknown[] };
+            if (mv.variants && mv.variants.length > 0) { return 'multivariate'; }
+        }
+
+        // Check for remote config (payload without multivariate)
+        if (filters?.payloads && typeof filters.payloads === 'object') {
+            const payloads = filters.payloads as Record<string, unknown>;
+            const hasPayload = Object.values(payloads).some(v => v !== null && v !== undefined);
+            if (hasPayload) { return 'remote_config'; }
+        }
+
+        return 'boolean';
+    }
+
     private apply(
         editor: vscode.TextEditor,
         doc: vscode.TextDocument,
@@ -84,6 +124,7 @@ export class VariantHighlightProvider {
         for (const block of blocks) {
             const flag = this.flagCache.getFlag(block.flagKey);
             const experiment = this.experimentCache.getByFlagKey(block.flagKey);
+            const flagType = this.classifyFlag(block.flagKey);
 
             const allVariants = this.getAllVariantKeys(block.flagKey);
 
@@ -99,23 +140,44 @@ export class VariantHighlightProvider {
                 }
             }
 
-            let ci = allVariants.indexOf(resolvedVariantKey);
-            if (ci < 0) { ci = allVariants.length; }
-            ci = ci % PALETTE.length;
+            // Select styling based on flag type
+            let style: { bg: string; border: string; text: string };
+            let ci: number;
+
+            if (flagType === 'boolean') {
+                // Boolean: green for enabled, muted gray for disabled
+                const isEnabled = resolvedVariantKey === 'true';
+                style = isEnabled ? BOOLEAN_ENABLED : BOOLEAN_DISABLED;
+                // Use palette index -1 and -2 as sentinel for boolean styles
+                // We'll use unique color indices beyond the palette range
+                ci = isEnabled ? PALETTE.length : PALETTE.length + 1;
+            } else if (flagType === 'remote_config') {
+                // Remote config: if used in a truthiness check, show neutral highlight
+                // For `if(config)` treat like boolean-lite
+                const isTrue = resolvedVariantKey === 'true';
+                style = isTrue ? REMOTE_CONFIG_NEUTRAL : BOOLEAN_DISABLED;
+                ci = isTrue ? PALETTE.length + 2 : PALETTE.length + 1;
+            } else {
+                // Multivariate: colorful palette per variant
+                ci = allVariants.indexOf(resolvedVariantKey);
+                if (ci < 0) { ci = allVariants.length; }
+                ci = ci % PALETTE.length;
+                style = PALETTE[ci];
+            }
 
             if (!byColor.has(ci)) { byColor.set(ci, []); }
             for (let line = block.startLine; line <= block.endLine; line++) {
                 byColor.get(ci)!.push({ range: new vscode.Range(line, 0, line, 0) });
             }
 
-            const label = this.buildLabel(block.flagKey, resolvedVariantKey, flag, experiment);
+            const label = this.buildLabel(block.flagKey, resolvedVariantKey, flag, experiment, flagType);
             const condLine = doc.lineAt(block.conditionLine);
             labels.push({
                 range: new vscode.Range(block.conditionLine, condLine.text.length, block.conditionLine, condLine.text.length),
                 renderOptions: {
                     after: {
                         contentText: `  ${label}`,
-                        color: PALETTE[ci].text,
+                        color: style.text,
                         fontStyle: 'italic',
                     },
                 },
@@ -125,10 +187,75 @@ export class VariantHighlightProvider {
         for (let i = 0; i < this.blockDecorations.length; i++) {
             editor.setDecorations(this.blockDecorations[i], byColor.get(i) || []);
         }
+
+        // Apply boolean/remote_config styles using dynamic decoration types
+        this.applyDynamicDecorations(editor, byColor);
+
         editor.setDecorations(this.labelDecoration, labels);
     }
 
-    private buildLabel(flagKey: string, variantKey: string, flag: FeatureFlag | undefined, experiment: Experiment | undefined): string {
+    /** Apply decorations for indices beyond the PALETTE range using inline styles */
+    private applyDynamicDecorations(
+        editor: vscode.TextEditor,
+        byColor: Map<number, vscode.DecorationOptions[]>,
+    ): void {
+        const dynamicStyles: Array<{ index: number; style: { bg: string; border: string } }> = [
+            { index: PALETTE.length, style: BOOLEAN_ENABLED },
+            { index: PALETTE.length + 1, style: BOOLEAN_DISABLED },
+            { index: PALETTE.length + 2, style: REMOTE_CONFIG_NEUTRAL },
+        ];
+
+        // Dispose previous dynamic decorations
+        for (const dt of this.dynamicDecorations) { dt.dispose(); }
+        this.dynamicDecorations = [];
+
+        for (const { index, style } of dynamicStyles) {
+            const ranges = byColor.get(index);
+            if (!ranges || ranges.length === 0) { continue; }
+
+            const dt = vscode.window.createTextEditorDecorationType({
+                backgroundColor: style.bg,
+                borderWidth: '0 0 0 3px',
+                borderStyle: 'solid',
+                borderColor: style.border,
+                isWholeLine: true,
+                overviewRulerColor: style.border,
+                overviewRulerLane: vscode.OverviewRulerLane.Left,
+            });
+            editor.setDecorations(dt, ranges);
+            this.dynamicDecorations.push(dt);
+        }
+    }
+
+    private buildLabel(
+        flagKey: string,
+        variantKey: string,
+        flag: FeatureFlag | undefined,
+        experiment: Experiment | undefined,
+        flagType: FlagType,
+    ): string {
+        // Boolean flags: simple enabled/disabled labels
+        if (flagType === 'boolean') {
+            const isEnabled = variantKey === 'true';
+            if (flag) {
+                const rollout = this.getVariantRollout(flag, variantKey);
+                if (isEnabled) {
+                    return rollout !== null ? `enabled \u00b7 ${rollout}%` : 'enabled';
+                } else {
+                    return rollout !== null ? `disabled \u00b7 ${rollout}%` : 'disabled';
+                }
+            }
+            return isEnabled ? 'enabled' : 'disabled';
+        }
+
+        // Remote config: lightweight labels
+        if (flagType === 'remote_config') {
+            if (variantKey === 'true') { return 'has config'; }
+            if (variantKey === 'false') { return 'no config'; }
+            return variantKey;
+        }
+
+        // Multivariate: per-variant labels with experiment results
         const parts: string[] = [variantKey];
 
         if (flag) {
@@ -143,7 +270,7 @@ export class VariantHighlightProvider {
                 if (vr) {
                     const pct = Math.round(vr.chance_to_win * 100);
                     parts.push(`${pct}% win`);
-                    if (vr.significant) { parts.push('★'); }
+                    if (vr.significant) { parts.push('\u2605'); }
                 }
                 if (variantKey === results.primary.results[0].data.baseline.key) {
                     const n = results.primary.results[0].data.baseline.number_of_samples;
@@ -152,7 +279,7 @@ export class VariantHighlightProvider {
             }
         }
 
-        return parts.join(' · ');
+        return parts.join(' \u00b7 ');
     }
 
     private getAllVariantKeys(flagKey: string): string[] {

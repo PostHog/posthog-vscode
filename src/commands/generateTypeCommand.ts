@@ -76,7 +76,7 @@ export function registerGenerateTypeCommand(
     });
 }
 
-function inferFlagTypeForMethod(method: string, flagKey: string, flag: FeatureFlag | undefined): string {
+export function inferFlagTypeForMethod(method: string, flagKey: string, flag: FeatureFlag | undefined): string {
     if (BOOLEAN_METHODS.has(method)) {
         return 'boolean';
     }
@@ -109,7 +109,7 @@ function inferFlagTypeForMethod(method: string, flagKey: string, flag: FeatureFl
  * - Multivariate: `'control' | 'test' | 'variant-a' | undefined`
  * - Boolean release: `boolean | undefined`
  */
-function inferVariantReturnType(flag: FeatureFlag): string {
+export function inferVariantReturnType(flag: FeatureFlag): string {
     const filters = flag.filters as Record<string, unknown> | undefined;
     if (filters?.multivariate && typeof filters.multivariate === 'object') {
         const mv = filters.multivariate as { variants?: { key: string }[] };
@@ -124,7 +124,7 @@ function inferVariantReturnType(flag: FeatureFlag): string {
 /**
  * For getFeatureFlagPayload() / getRemoteConfig(): infers type from payload data.
  */
-function inferPayloadType(flag: FeatureFlag): string {
+export function inferPayloadType(flag: FeatureFlag): string {
     const filters = flag.filters as Record<string, unknown> | undefined;
     const payloads = filters?.payloads as Record<string, unknown> | undefined | null;
 

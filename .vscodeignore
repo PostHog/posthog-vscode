@@ -1,24 +1,45 @@
-.vscode/**
-.vscode-test/**
-out/**
+# Source and development files
 src/**
+out/**
 scripts/**
 grammars/**
 playgrounds/**
+node_modules/**
+
+# Config and tooling
+.vscode/**
+.vscode-test/**
+.github/**
+.planning/**
+.claude/**
 .gitignore
+.npmrc
 .yarnrc
+.vscode-test.mjs
 webpack.config.js
-vsc-extension-quickstart.md
+tsconfig.json
+eslint.config.mjs
 pnpm-lock.yaml
+vsc-extension-quickstart.md
+language-configuration.json
+
+# Build artifacts and secrets
 token.txt
-**/tsconfig.json
-**/eslint.config.mjs
+*.vsix
 **/*.map
 **/*.ts
 **/.vscode-test.*
 
-# Exclude all node_modules
-node_modules/**
+# Documentation (keep only README and CHANGELOG)
+ROADMAP.md
+CLAUDE.md
+UX_RESEARCH.md
 
-# Include WASM grammars
+# Tests
+*.test.js
+*.test.ts
+out/test/**
+src/test/**
+
+# Include WASM grammars (override src/** exclusion)
 !wasm/**

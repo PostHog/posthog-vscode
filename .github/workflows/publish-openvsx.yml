@@ -1,0 +1,42 @@
+name: Publish to Open VSX
+
+on:
+  workflow_run:
+    workflows: ["Publish to VS Code Marketplace"]
+    types:
+      - completed
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+        with:
+          version: latest
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+
+      - name: Download VSIX artifact
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4
+        with:
+          name: codehog-vsix
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/artifacts
+
+      - name: Publish to Open VSX Registry
+        run: |
+          VSIX_PATH="${{ runner.temp }}/artifacts/codehog.vsix"
+          if [ ! -f "$VSIX_PATH" ]; then
+            echo "VSIX file not found at $VSIX_PATH"
+            exit 1
+          fi
+          pnpm dlx ovsx publish "$VSIX_PATH" -p "$OVSX_PAT"
+        env:
+          OVSX_PAT: ${{ secrets.OPEN_VSX_TOKEN }}

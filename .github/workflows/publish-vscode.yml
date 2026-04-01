@@ -1,4 +1,4 @@
-name: Publish Extension
+name: Publish to VS Code Marketplace
 
 on:
   push:
@@ -71,12 +71,13 @@ jobs:
       - name: Package extension
         run: pnpm dlx @vscode/vsce package --no-dependencies -o codehog.vsix
 
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: codehog-vsix
+          path: codehog.vsix
+
       - name: Publish to VS Code Marketplace
         run: pnpm dlx @vscode/vsce publish --no-dependencies --packagePath codehog.vsix -p "$VSCE_PAT"
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-
-      - name: Publish to Open VSX Registry
-        run: pnpm dlx ovsx publish codehog.vsix -p "$OVSX_PAT"
-        env:
-          OVSX_PAT: ${{ secrets.OPEN_VSX_TOKEN }}

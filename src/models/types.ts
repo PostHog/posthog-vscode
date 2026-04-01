@@ -2,6 +2,7 @@ export interface Project {
     id: number;
     name: string;
     uuid: string;
+    api_token?: string;
 }
 
 export interface FeatureFlag {

@@ -31,6 +31,7 @@ import { registerGenerateTypeCommand } from './commands/generateTypeCommand';
 import { ConfigService } from './services/configService';
 import { TelemetryService } from './services/telemetryService';
 import { DebugTreeProvider } from './providers/debugTreeProvider';
+import { InitDecorationProvider } from './providers/initDecorationProvider';
 import { FeatureFlag } from './models/types';
 import { Views, Commands, ContextKeys } from './constants';
 
@@ -128,6 +129,7 @@ export function activate(context: vscode.ExtensionContext) {
     const staleFlagService = new StaleFlagService(flagCache, experimentCache, treeSitter);
     const staleFlagTreeProvider = new StaleFlagTreeProvider(staleFlagService);
     const staleFlagCodeActionProvider = new StaleFlagCodeActionProvider(flagCache, experimentCache, treeSitter);
+    const initDecorationProvider = new InitDecorationProvider(authService, postHogService, treeSitter);
     const sessionCodeLensProvider = new SessionCodeLensProvider(authService, postHogService, treeSitter, telemetry);
     const flagToggleCodeActionProvider = new FlagToggleCodeActionProvider(flagCache, treeSitter);
     const eventNamingDiagnosticProvider = new EventNamingDiagnosticProvider(eventCache, treeSitter, telemetry);
@@ -345,6 +347,7 @@ export function activate(context: vscode.ExtensionContext) {
         }),
         ...flagDecorationProvider.register(),
         ...eventDecorationProvider.register(),
+        ...initDecorationProvider.register(),
         ...variantHighlightProvider.register(),
         vscode.languages.registerCodeLensProvider(languageSelector, sessionCodeLensProvider),
         sessionCodeLensProvider.startAutoRefresh(),

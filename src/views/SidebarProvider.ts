@@ -161,6 +161,15 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 if (section === 'analytics') { return this.loadInsights(); }
                 return;
             }
+            case 'sendFeedback': {
+                this.telemetry?.capture('feedback_sent', {
+                    rating: msg.rating as string,
+                    message_length: (msg.message as string).length,
+                    message: msg.message as string,
+                });
+                this.postMessage({ type: 'feedbackSent' });
+                return;
+            }
             case 'openExternal': {
                 this.telemetry?.capture('external_link_opened', { source: 'sidebar' });
                 const host = this.authService.getHost().replace(/\/+$/, '');

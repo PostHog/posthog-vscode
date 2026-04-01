@@ -553,8 +553,8 @@ export class TreeSitterService {
         const allClients = this.getEffectiveClients();
         const results: PostHogInitCall[] = [];
 
-        // Query: posthog.init('token', { ... })
-        const queryStr = `
+        // Pattern 1: posthog.init('token', { ... })
+        const initQueryStr = `
             (call_expression
                 function: (member_expression
                     object: (_) @client
@@ -564,57 +564,82 @@ export class TreeSitterService {
                     (object)? @config)) @call
         `;
 
-        const query = this.getQuery(lang, queryStr);
-        if (!query) { return []; }
+        const initQuery = this.getQuery(lang, initQueryStr);
+        if (initQuery) {
+            for (const match of initQuery.matches(tree.rootNode)) {
+                const clientNode = match.captures.find(c => c.name === 'client');
+                const methodNode = match.captures.find(c => c.name === 'method');
+                const tokenNode = match.captures.find(c => c.name === 'token');
+                const configNode = match.captures.find(c => c.name === 'config');
 
-        for (const match of query.matches(tree.rootNode)) {
-            const clientNode = match.captures.find(c => c.name === 'client');
-            const methodNode = match.captures.find(c => c.name === 'method');
-            const tokenNode = match.captures.find(c => c.name === 'token');
-            const configNode = match.captures.find(c => c.name === 'config');
+                if (!clientNode || !methodNode || !tokenNode) { continue; }
+                if (methodNode.node.text !== 'init') { continue; }
 
-            if (!clientNode || !methodNode || !tokenNode) { continue; }
-            if (methodNode.node.text !== 'init') { continue; }
+                const clientName = this.extractClientName(clientNode.node);
+                if (!clientName || !allClients.has(clientName)) { continue; }
 
-            const clientName = this.extractClientName(clientNode.node);
-            if (!clientName || !allClients.has(clientName)) { continue; }
-
-            const token = this.cleanStringValue(tokenNode.node.text);
-            const configProperties = new Map<string, string>();
-            let apiHost: string | null = null;
-
-            // Extract config object properties
-            if (configNode) {
-                for (const child of configNode.node.namedChildren) {
-                    if (child.type === 'pair') {
-                        const keyNode = child.childForFieldName('key');
-                        const valueNode = child.childForFieldName('value');
-                        if (keyNode && valueNode) {
-                            const key = keyNode.text.replace(/['"]/g, '');
-                            let value = valueNode.text;
-                            // Clean string values
-                            if (valueNode.type === 'string') {
-                                const frag = valueNode.namedChildren.find(c => c.type === 'string_fragment');
-                                if (frag) { value = frag.text; }
-                            }
-                            configProperties.set(key, value);
-                            if (key === 'api_host') { apiHost = value; }
-                        }
-                    }
-                }
+                results.push(this.buildInitCall(tokenNode.node, configNode?.node));
             }
+        }
 
-            results.push({
-                token,
-                tokenLine: tokenNode.node.startPosition.row,
-                tokenStartCol: tokenNode.node.startPosition.column,
-                tokenEndCol: tokenNode.node.endPosition.column,
-                apiHost,
-                configProperties,
-            });
+        // Pattern 2: new PostHog('token', { ... }) — Node SDK
+        const constructorQueryStr = `
+            (new_expression
+                constructor: (identifier) @class_name
+                arguments: (arguments
+                    (string (string_fragment) @token)
+                    (object)? @config)) @call
+        `;
+
+        const ctorQuery = this.getQuery(lang, constructorQueryStr);
+        if (ctorQuery) {
+            for (const match of ctorQuery.matches(tree.rootNode)) {
+                const classNode = match.captures.find(c => c.name === 'class_name');
+                const tokenNode = match.captures.find(c => c.name === 'token');
+                const configNode = match.captures.find(c => c.name === 'config');
+
+                if (!classNode || !tokenNode) { continue; }
+                if (classNode.node.text !== 'PostHog') { continue; }
+
+                results.push(this.buildInitCall(tokenNode.node, configNode?.node));
+            }
         }
 
         return results;
+    }
+
+    private buildInitCall(tokenNode: Parser.SyntaxNode, configNode: Parser.SyntaxNode | undefined): PostHogInitCall {
+        const token = this.cleanStringValue(tokenNode.text);
+        const configProperties = new Map<string, string>();
+        let apiHost: string | null = null;
+
+        if (configNode) {
+            for (const child of configNode.namedChildren) {
+                if (child.type === 'pair') {
+                    const keyN = child.childForFieldName('key');
+                    const valueN = child.childForFieldName('value');
+                    if (keyN && valueN) {
+                        const key = keyN.text.replace(/['"]/g, '');
+                        let value = valueN.text;
+                        if (valueN.type === 'string') {
+                            const frag = valueN.namedChildren.find(c => c.type === 'string_fragment');
+                            if (frag) { value = frag.text; }
+                        }
+                        configProperties.set(key, value);
+                        if (key === 'api_host' || key === 'host') { apiHost = value; }
+                    }
+                }
+            }
+        }
+
+        return {
+            token,
+            tokenLine: tokenNode.startPosition.row,
+            tokenStartCol: tokenNode.startPosition.column,
+            tokenEndCol: tokenNode.endPosition.column,
+            apiHost,
+            configProperties,
+        };
     }
 
     async findFunctions(doc: vscode.TextDocument): Promise<FunctionInfo[]> {

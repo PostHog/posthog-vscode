@@ -33,6 +33,7 @@ import { TelemetryService } from './services/telemetryService';
 import { DebugTreeProvider } from './providers/debugTreeProvider';
 import { VariantDiagnosticProvider } from './providers/variantDiagnosticProvider';
 import { InitDecorationProvider } from './providers/initDecorationProvider';
+import { FeedbackViewProvider } from './views/FeedbackViewProvider';
 import { FeatureFlag } from './models/types';
 import { Views, Commands, ContextKeys } from './constants';
 
@@ -43,7 +44,7 @@ export function activate(context: vscode.ExtensionContext) {
     const eventCache = new EventCacheService();
     const experimentCache = new ExperimentCacheService();
     const configService = new ConfigService();
-    const telemetry = new TelemetryService(context.extensionMode);
+    const telemetry = new TelemetryService();
     telemetry.setAuthService(authService);
     setTelemetryRef(telemetry);
 
@@ -141,9 +142,18 @@ export function activate(context: vscode.ExtensionContext) {
     // All languages supported by tree-sitter grammars
     const languageSelector = treeSitter.supportedLanguages.map(lang => ({ language: lang, scheme: 'file' }));
 
-    // Set initial auth context
+    // Set auth context from Memento (fast, for cache loading + sidebar)
     const authed = authService.isAuthenticated();
     vscode.commands.executeCommand('setContext', ContextKeys.IS_AUTHENTICATED, authed);
+
+    // posthog.hasApiKey controls panel visibility (stale flags, feedback, debug)
+    // Mirrors auth state but verified via SecretStorage
+    vscode.commands.executeCommand('setContext', 'posthog.hasApiKey', false);
+    if (authed) {
+        authService.getApiKey().then(key => {
+            vscode.commands.executeCommand('setContext', 'posthog.hasApiKey', !!key);
+        });
+    }
 
     // Debug tree — only visible in development mode
     const isDev = context.extensionMode !== vscode.ExtensionMode.Production;
@@ -240,9 +250,15 @@ export function activate(context: vscode.ExtensionContext) {
         telemetry.identify();
         const projectId = authService.getProjectId();
         if (projectId) {
-            loadFlags(projectId).catch(() => {});
-            loadEvents(projectId).catch(() => {});
-            loadExperiments(projectId).catch(() => {});
+            const startupLoad = Promise.all([
+                loadFlags(projectId),
+                loadEvents(projectId),
+                loadExperiments(projectId),
+            ]).catch(err => {
+                const msg = err instanceof Error ? err.message : 'Connection failed';
+                vscode.window.showWarningMessage(`PostHog: ${msg}`);
+                updateStatusBar(true);
+            });
         }
         updateStatusBar();
     }
@@ -305,6 +321,7 @@ export function activate(context: vscode.ExtensionContext) {
         { dispose: () => clearInterval(eventRefreshInterval) },
         { dispose: () => clearInterval(experimentRefreshInterval) },
         vscode.window.registerWebviewViewProvider(Views.SIDEBAR, sidebarProvider),
+        vscode.window.registerWebviewViewProvider('posthog-feedback-v2', new FeedbackViewProvider(context.globalState, telemetry, isDev)),
         vscode.languages.registerCompletionItemProvider(languageSelector, completionProvider, "'", '"', '`'),
         vscode.languages.registerCompletionItemProvider(languageSelector, eventCompletionProvider, "'", '"', '`'),
         vscode.languages.registerCompletionItemProvider(languageSelector, eventPropertyCompletionProvider, "'", '"', '`', '{', ',', ' '),
@@ -334,7 +351,7 @@ export function activate(context: vscode.ExtensionContext) {
             }
         }),
         vscode.window.registerTreeDataProvider(Views.STALE_FLAGS, staleFlagTreeProvider),
-        vscode.window.registerTreeDataProvider('posthog-debug', debugTreeProvider),
+        vscode.window.registerTreeDataProvider('posthog-debug-v2', debugTreeProvider),
         vscode.commands.registerCommand('posthog.debugCopy', (value: string) => {
             vscode.env.clipboard.writeText(value);
             vscode.window.showInformationMessage(`Copied: ${value}`);

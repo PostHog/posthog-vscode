@@ -92,17 +92,23 @@ export function registerAuthCommands(
             await authService.setProjectName(selectedProject.name);
             await authService.setAuthenticated(true);
             await vscode.commands.executeCommand('setContext', ContextKeys.IS_AUTHENTICATED, true);
-            // Check API key permissions
-            const perms = await postHogService.checkPermissions(selectedProject.id);
-            await authService.setCanWrite(perms.canWrite);
+            await vscode.commands.executeCommand('setContext', 'posthog.hasApiKey', true);
             sidebar.refresh();
             telemetry.capture('sign_in_completed', { host_type, project_count: projects.length });
             telemetry.identify();
             vscode.window.showInformationMessage(`PostHog: Signed in to ${selectedProject.name}`);
-        } catch {
+            // Check API key permissions (non-blocking)
+            postHogService.checkPermissions(selectedProject.id).then(perms => {
+                authService.setCanWrite(perms.canWrite);
+            }).catch(() => {});
+        } catch (err) {
             telemetry.capture('sign_in_failed', { host_type });
-            vscode.window.showErrorMessage('PostHog: Failed to connect. Check your API key and host.');
+            const detail = err instanceof Error ? err.message : 'Unknown error';
+            vscode.window.showErrorMessage(`PostHog: Failed to connect — ${detail}`);
             await authService.deleteApiKey();
+            await authService.setAuthenticated(false);
+            await vscode.commands.executeCommand('setContext', ContextKeys.IS_AUTHENTICATED, false);
+            await vscode.commands.executeCommand('setContext', 'posthog.hasApiKey', false);
         }
     });
 
@@ -125,6 +131,7 @@ export function registerAuthCommands(
         await authService.clearProjectName();
         await authService.setAuthenticated(false);
         await vscode.commands.executeCommand('setContext', ContextKeys.IS_AUTHENTICATED, false);
+        await vscode.commands.executeCommand('setContext', 'posthog.hasApiKey', false);
         telemetry.reset();
         sidebar.refresh();
         vscode.window.showInformationMessage('PostHog: Signed out.');

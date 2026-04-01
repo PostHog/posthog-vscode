@@ -161,15 +161,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 if (section === 'analytics') { return this.loadInsights(); }
                 return;
             }
-            case 'sendFeedback': {
-                this.telemetry?.capture('feedback_sent', {
-                    rating: msg.rating as string,
-                    message_length: (msg.message as string).length,
-                    message: msg.message as string,
-                });
-                this.postMessage({ type: 'feedbackSent' });
-                return;
-            }
             case 'openExternal': {
                 this.telemetry?.capture('external_link_opened', { source: 'sidebar' });
                 const host = this.authService.getHost().replace(/\/+$/, '');
@@ -197,7 +188,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             canWrite: this.authService.getCanWrite(),
         });
         if (authed) {
-            await this.loadInsights();
+            this.loadInsights().catch(() => {});
         }
     }
 
@@ -223,8 +214,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 return a.key.localeCompare(b.key);
             });
             this.postMessage({ type: 'flags', data: active, projectId, userEmail: this.userEmail });
-        } catch {
-            this.postMessage({ type: 'error', section: 'flags', message: 'Failed to load feature flags' });
+        } catch (err) {
+            const detail = err instanceof Error ? err.message : 'Unknown error';
+            this.postMessage({ type: 'error', section: 'flags', message: `Failed to load feature flags: ${detail}` });
         }
     }
 
@@ -244,8 +236,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 }
             }
             this.postMessage({ type: 'experiments', data: experiments, results: resultsMap, projectId });
-        } catch {
-            this.postMessage({ type: 'error', section: 'experiments', message: 'Failed to load experiments' });
+        } catch (err) {
+            const detail = err instanceof Error ? err.message : 'Unknown error';
+            this.postMessage({ type: 'error', section: 'experiments', message: `Failed to load experiments: ${detail}` });
         }
     }
 
@@ -279,8 +272,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                     this.postMessage({ type: 'insights', data: insights, projectId });
                 }
             }
-        } catch {
-            this.postMessage({ type: 'error', section: 'analytics', message: 'Failed to load insights' });
+        } catch (err) {
+            const detail = err instanceof Error ? err.message : 'Unknown error';
+            this.postMessage({ type: 'error', section: 'analytics', message: `Failed to load insights: ${detail}` });
         }
     }
 

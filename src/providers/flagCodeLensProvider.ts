@@ -13,6 +13,7 @@ const FLAG_METHODS = new Set([
     'getFeatureFlagResult', 'isFeatureFlagEnabled', 'getRemoteConfig',
     'get_feature_flag', 'is_feature_enabled', 'get_feature_flag_payload', 'get_remote_config',
     'GetFeatureFlag', 'IsFeatureEnabled', 'GetFeatureFlagPayload',
+    'useFeatureFlag', 'useFeatureFlagPayload', 'useFeatureFlagVariantKey', 'useActiveFeatureFlags',
 ]);
 
 export class FlagCodeLensProvider implements vscode.CodeLensProvider {
@@ -36,8 +37,10 @@ export class FlagCodeLensProvider implements vscode.CodeLensProvider {
         const lenses: vscode.CodeLens[] = [];
         const seenFlags = new Set<string>();
 
+        const additionalFns = new Set(vscode.workspace.getConfiguration('posthog').get<string[]>('additionalFlagFunctions', []));
+
         for (const call of calls) {
-            if (!FLAG_METHODS.has(call.method)) { continue; }
+            if (!FLAG_METHODS.has(call.method) && !additionalFns.has(call.method)) { continue; }
 
             const flagKey = call.key;
             // Only show one lens per flag key (the first occurrence)

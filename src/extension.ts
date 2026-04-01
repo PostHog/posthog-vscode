@@ -31,6 +31,7 @@ import { registerGenerateTypeCommand } from './commands/generateTypeCommand';
 import { ConfigService } from './services/configService';
 import { TelemetryService } from './services/telemetryService';
 import { DebugTreeProvider } from './providers/debugTreeProvider';
+import { VariantDiagnosticProvider } from './providers/variantDiagnosticProvider';
 import { InitDecorationProvider } from './providers/initDecorationProvider';
 import { FeatureFlag } from './models/types';
 import { Views, Commands, ContextKeys } from './constants';
@@ -129,6 +130,7 @@ export function activate(context: vscode.ExtensionContext) {
     const staleFlagService = new StaleFlagService(flagCache, experimentCache, treeSitter);
     const staleFlagTreeProvider = new StaleFlagTreeProvider(staleFlagService);
     const staleFlagCodeActionProvider = new StaleFlagCodeActionProvider(flagCache, experimentCache, treeSitter);
+    const variantDiagnosticProvider = new VariantDiagnosticProvider(flagCache, treeSitter);
     const initDecorationProvider = new InitDecorationProvider(authService, postHogService, treeSitter);
     const sessionCodeLensProvider = new SessionCodeLensProvider(authService, postHogService, treeSitter, telemetry);
     const flagToggleCodeActionProvider = new FlagToggleCodeActionProvider(flagCache, treeSitter);
@@ -349,6 +351,7 @@ export function activate(context: vscode.ExtensionContext) {
         ...eventDecorationProvider.register(),
         ...initDecorationProvider.register(),
         ...variantHighlightProvider.register(),
+        ...variantDiagnosticProvider.register(),
         vscode.languages.registerCodeLensProvider(languageSelector, sessionCodeLensProvider),
         sessionCodeLensProvider.startAutoRefresh(),
         vscode.languages.registerCodeActionsProvider(languageSelector, flagToggleCodeActionProvider, {

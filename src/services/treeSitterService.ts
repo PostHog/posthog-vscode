@@ -708,6 +708,48 @@ export class TreeSitterService {
             }
         }
 
+        // 1b. Find bare function call assignments: const x = useFeatureFlag("key")
+        const bareFlagFunctions = new Set([
+            ...this.config.additionalFlagFunctions,
+            'useFeatureFlag', 'useFeatureFlagPayload', 'useFeatureFlagVariantKey',
+        ]);
+        if (bareFlagFunctions.size > 0 && family.queries.bareFunctionCalls) {
+            const bareAssignQuery = this.getQuery(lang, `
+                (lexical_declaration
+                    (variable_declarator
+                        name: (identifier) @var_name
+                        value: (call_expression
+                            function: (identifier) @func_name
+                            arguments: (arguments . (string (string_fragment) @flag_key))))) @assignment
+
+                (variable_declaration
+                    (variable_declarator
+                        name: (identifier) @var_name
+                        value: (call_expression
+                            function: (identifier) @func_name
+                            arguments: (arguments . (string (string_fragment) @flag_key))))) @assignment
+            `);
+            if (bareAssignQuery) {
+                const matches = bareAssignQuery.matches(tree.rootNode);
+                for (const match of matches) {
+                    const varNode = match.captures.find(c => c.name === 'var_name');
+                    const funcNode = match.captures.find(c => c.name === 'func_name');
+                    const keyNode = match.captures.find(c => c.name === 'flag_key');
+                    const assignNode = match.captures.find(c => c.name === 'assignment');
+
+                    if (!varNode || !funcNode || !keyNode) { continue; }
+                    if (!bareFlagFunctions.has(funcNode.node.text)) { continue; }
+
+                    const varName = varNode.node.text;
+                    const flagKey = this.cleanStringValue(keyNode.node.text);
+                    const afterNode = assignNode?.node || varNode.node;
+
+                    this.findIfChainsForVar(tree.rootNode, varName, flagKey, afterNode, branches);
+                    this.findSwitchForVar(tree.rootNode, varName, flagKey, afterNode, branches);
+                }
+            }
+        }
+
         // 2. Find inline flag checks: if (posthog.getFeatureFlag("key") === "variant")
         this.findInlineFlagIfs(tree.rootNode, allClients, family, branches);
 

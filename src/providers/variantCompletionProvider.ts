@@ -3,7 +3,10 @@ import { FlagCacheService } from '../services/flagCacheService';
 import { TreeSitterService } from '../services/treeSitterService';
 import { TelemetryService } from '../services/telemetryService';
 
-const FLAG_METHODS = new Set(['getFeatureFlag', 'isFeatureEnabled', 'feature_enabled', 'get_feature_flag']);
+const FLAG_METHODS = new Set([
+    'getFeatureFlag', 'isFeatureEnabled', 'feature_enabled', 'get_feature_flag',
+    'useFeatureFlag', 'useFeatureFlagVariantKey', 'useFeatureFlagPayload',
+]);
 
 export class VariantCompletionProvider implements vscode.CompletionItemProvider {
     constructor(
@@ -66,7 +69,7 @@ export class VariantCompletionProvider implements vscode.CompletionItemProvider 
         if (!quoteMatch) { return undefined; }
 
         // Check inline: posthog.getFeatureFlag('key') === '|cursor|'
-        const inlinePattern = /(?:getFeatureFlag|isFeatureEnabled|feature_enabled|get_feature_flag)\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/;
+        const inlinePattern = /(?:getFeatureFlag|isFeatureEnabled|feature_enabled|get_feature_flag|useFeatureFlag|useFeatureFlagVariantKey)\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/;
         const inlineMatch = lineText.match(inlinePattern);
         if (inlineMatch) { return inlineMatch[1]; }
 
@@ -74,19 +77,27 @@ export class VariantCompletionProvider implements vscode.CompletionItemProvider 
         const scanStart = Math.max(0, position.line - 15);
         const scanEnd = position.line;
 
-        // Look for variable comparisons on current line: varName === '|'
-        const comparisonMatch = lineText.match(/(\w+)\s*(?:===?|!==?)\s*['"`]/);
-        if (comparisonMatch) {
-            const varName = comparisonMatch[1];
-            // Scan backwards for: const varName = posthog.getFeatureFlag('key')
-            for (let i = scanEnd - 1; i >= scanStart; i--) {
-                const text = document.lineAt(i).text;
-                const assignPattern = new RegExp(
-                    `(?:const|let|var|val)\\s+${this.escapeRegex(varName)}\\s*=.*?` +
-                    `(?:getFeatureFlag|isFeatureEnabled|feature_enabled|get_feature_flag)\\s*\\(\\s*['"\`]([^'"\`]+)['"\`]`
-                );
-                const assignMatch = text.match(assignPattern);
-                if (assignMatch) { return assignMatch[1]; }
+        // Look for a known flag variable on the current line (comparison, assignment, or any reference)
+        // Match: varName === '|', varName = '|', varName == '|', case '|' with switch(varName), etc.
+        const varRefMatch = lineText.match(/(\w+)\s*(?:===?|!==?|=)\s*['"`]/);
+        if (varRefMatch) {
+            const varName = varRefMatch[1];
+            // Skip language keywords
+            if (['const', 'let', 'var', 'return', 'if', 'else', 'case', 'switch', 'typeof'].includes(varName)) { /* skip */ }
+            else {
+                const found = this.findFlagKeyForVar(document, varName, scanStart, scanEnd);
+                if (found) { return found; }
+            }
+        }
+
+        // Also check if any identifier before the cursor is a flag variable
+        // Handles patterns like: someObj.prop = flagVar where flagVar is nearby
+        const identifiers = before.match(/\b(\w+)\b/g);
+        if (identifiers) {
+            for (const id of identifiers.reverse()) {
+                if (['const', 'let', 'var', 'return', 'if', 'else'].includes(id)) { continue; }
+                const found = this.findFlagKeyForVar(document, id, scanStart, scanEnd);
+                if (found) { return found; }
             }
         }
 
@@ -99,6 +110,19 @@ export class VariantCompletionProvider implements vscode.CompletionItemProvider 
             if (switchMatch) { return switchMatch[1]; }
         }
 
+        return undefined;
+    }
+
+    private findFlagKeyForVar(document: vscode.TextDocument, varName: string, scanStart: number, scanEnd: number): string | undefined {
+        for (let i = scanEnd; i >= scanStart; i--) {
+            const text = document.lineAt(i).text;
+            const assignPattern = new RegExp(
+                `(?:const|let|var|val)\\s+${this.escapeRegex(varName)}\\s*(?::[^=]*)?=.*?` +
+                `(?:getFeatureFlag|isFeatureEnabled|feature_enabled|get_feature_flag|useFeatureFlag|useFeatureFlagVariantKey)\\s*\\(\\s*['"\`]([^'"\`]+)['"\`]`
+            );
+            const assignMatch = text.match(assignPattern);
+            if (assignMatch) { return assignMatch[1]; }
+        }
         return undefined;
     }
 

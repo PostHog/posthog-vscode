@@ -8,6 +8,7 @@ const FLAG_METHODS = new Set([
     'getFeatureFlagResult', 'isFeatureFlagEnabled', 'getRemoteConfig',
     'get_feature_flag', 'is_feature_enabled', 'get_feature_flag_payload', 'get_remote_config',
     'GetFeatureFlag', 'IsFeatureEnabled', 'GetFeatureFlagPayload',
+    'useFeatureFlag', 'useFeatureFlagPayload', 'useFeatureFlagVariantKey', 'useActiveFeatureFlags',
 ]);
 
 export class FlagCodeActionProvider implements vscode.CodeActionProvider {

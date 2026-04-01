@@ -201,8 +201,6 @@ export class InitDecorationProvider {
             if (hostname === 'eu.posthog.com' || hostname === 'eu.i.posthog.com') { return 'EU Cloud'; }
             return hostname;
         } catch {
-            if (host.includes('us.posthog.com') || host.includes('us.i.posthog.com')) { return 'US Cloud'; }
-            if (host.includes('eu.posthog.com') || host.includes('eu.i.posthog.com')) { return 'EU Cloud'; }
             return host;
         }
     }

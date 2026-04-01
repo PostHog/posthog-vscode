@@ -124,6 +124,10 @@ export class VariantHighlightProvider {
 
         for (const block of blocks) {
             const flag = this.flagCache.getFlag(block.flagKey);
+
+            // Don't highlight branches for flags that don't exist in PostHog
+            if (!flag) { continue; }
+
             const experiment = this.experimentCache.getByFlagKey(block.flagKey);
             const flagType = this.classifyFlag(block.flagKey);
 
@@ -133,17 +137,31 @@ export class VariantHighlightProvider {
             let resolvedVariantKey = block.variantKey;
             if (resolvedVariantKey === 'else' || resolvedVariantKey === 'default') {
                 if (flagType === 'boolean' || flagType === 'remote_config') {
-                    // Boolean/remote config: else means false
                     resolvedVariantKey = 'false';
                 } else {
-                    // Multivariate: infer the remaining variant
+                    // Multivariate: infer from remaining unchecked variants
                     const seen = blocks
                         .filter(b => b.flagKey === block.flagKey && b.variantKey !== 'else' && b.variantKey !== 'default')
                         .map(b => b.variantKey);
+                    // If any sibling branch checks an invalid variant, don't highlight the else
+                    const hasInvalidSibling = seen.some(v => !allVariants.includes(v));
+                    if (hasInvalidSibling) { continue; }
                     const remaining = allVariants.filter(v => !seen.includes(v));
                     if (remaining.length === 1) {
                         resolvedVariantKey = remaining[0];
                     }
+                }
+            }
+
+            // For multivariate flags, only highlight blocks that check actual variant values
+            if (flagType === 'multivariate') {
+                if (resolvedVariantKey === 'true' || resolvedVariantKey === 'false') {
+                    // Truthiness check on a multivariate flag — not a proper variant comparison, skip
+                    continue;
+                }
+                if (resolvedVariantKey !== 'else' && resolvedVariantKey !== 'default' && !allVariants.includes(resolvedVariantKey)) {
+                    // Comparing against a value that's not a valid variant, skip
+                    continue;
                 }
             }
 

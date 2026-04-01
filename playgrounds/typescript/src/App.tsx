@@ -12,11 +12,16 @@ export default function App() {
 
   posthog.capture('annotation created')
 
-  const var1: boolean | undefined = posthog.getFeatureFlag('alerts-anomaly-detection')
+  const var1 = posthog.getFeatureFlag('file-engagement-v2')
 
-  const var2: 'control' | 'test' | undefined = posthog.getFeatureFlag('ai-session-summary')
+  if(var1 === 'control') {
 
-  const payload1 = posthog.getFeatureFlagPayload('ai-session-summary')
+  } else if(var1 === 'blue') {
+
+  } else {
+
+  }
+
 
 
   const demos: Record<string, { label: string; description: string; component: React.ReactNode }> = {

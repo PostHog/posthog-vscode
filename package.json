@@ -40,12 +40,23 @@
         {
           "id": "posthog-stale-flags",
           "name": "Stale Flags",
-          "when": "posthog.isAuthenticated"
+          "when": "posthog.hasApiKey",
+          "visibility": "collapsed",
+          "initialSize": 0
         },
         {
-          "id": "posthog-debug",
+          "type": "webview",
+          "id": "posthog-feedback-v2",
+          "name": "Feedback",
+          "when": "posthog.hasApiKey",
+          "visibility": "collapsed",
+          "initialSize": 0
+        },
+        {
+          "id": "posthog-debug-v2",
           "name": "Debug",
-          "when": "posthog.isDevelopment"
+          "when": "posthog.isDevelopment && posthog.hasApiKey",
+          "visibility": "collapsed"
         }
       ]
     },

@@ -8,15 +8,13 @@ const POSTHOG_HOST = 'https://us.i.posthog.com';
 export class TelemetryService {
     private client: PostHog;
     private enabled: boolean;
-    private isDev: boolean;
     private distinctId: string;
     private authService: AuthService | null = null;
     private extensionVersion: string;
     private identified = false;
 
-    constructor(extensionMode: vscode.ExtensionMode) {
-        this.isDev = extensionMode !== vscode.ExtensionMode.Production;
-        this.enabled = vscode.env.isTelemetryEnabled && !this.isDev;
+    constructor() {
+        this.enabled = vscode.env.isTelemetryEnabled;
         this.distinctId = vscode.env.machineId;
         this.extensionVersion = vscode.extensions.getExtension('PostHog.posthog-vscode')?.packageJSON?.version ?? 'unknown';
 
@@ -28,7 +26,7 @@ export class TelemetryService {
         });
 
         vscode.env.onDidChangeTelemetryEnabled(enabled => {
-            this.enabled = enabled && !this.isDev;
+            this.enabled = enabled;
         });
     }
 
@@ -39,10 +37,13 @@ export class TelemetryService {
     capture(event: string, properties?: Record<string, unknown>): void {
         if (!this.enabled) { return; }
 
+        // Survey events should be sent clean — no super properties
+        const isSurvey = event === 'survey sent';
+
         this.client.capture({
             distinctId: this.distinctId,
             event,
-            properties: {
+            properties: isSurvey ? properties : {
                 ...this.getSuperProperties(),
                 ...properties,
             },

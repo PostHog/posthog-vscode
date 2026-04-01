@@ -55,7 +55,6 @@ export function getLayout(logoUri: vscode.Uri): string {
         <button class="nav-tab active" data-tab="flags">Flags</button>
         <button class="nav-tab" data-tab="experiments">Experiments</button>
         <button class="nav-tab" data-tab="analytics">Analytics</button>
-        <button class="nav-tab" data-tab="feedback">&#x1F4AC; Feedback</button>
     </div>
 
     <div class="search-bar" style="display:flex;gap:6px;align-items:center;">
@@ -125,49 +124,6 @@ export function getLayout(logoUri: vscode.Uri): string {
             <div class="empty-state" id="analytics-empty" style="display:none;">
                 <div class="icon">&#x1F4CA;</div>
                 <p>No saved insights found</p>
-            </div>
-        </div>
-
-        <!-- Feedback -->
-        <div id="section-feedback" class="section">
-            <div class="feedback-container">
-                <h3 class="feedback-heading">Share your feedback</h3>
-                <p class="feedback-subtitle">Help us improve PostHog for VS Code</p>
-
-                <div class="feedback-rating-section">
-                    <p class="feedback-rating-label">How are you finding the extension?</p>
-                    <div class="feedback-rating-buttons">
-                        <button class="feedback-emoji" data-rating="love" title="Love it">
-                            <span class="feedback-emoji-icon">&#x1F60D;</span>
-                            <span class="feedback-emoji-text">Love it</span>
-                        </button>
-                        <button class="feedback-emoji" data-rating="okay" title="It's okay">
-                            <span class="feedback-emoji-icon">&#x1F610;</span>
-                            <span class="feedback-emoji-text">It's okay</span>
-                        </button>
-                        <button class="feedback-emoji" data-rating="frustrated" title="Frustrated">
-                            <span class="feedback-emoji-icon">&#x1F624;</span>
-                            <span class="feedback-emoji-text">Frustrated</span>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="feedback-message-section">
-                    <textarea id="feedback-message" class="feedback-textarea" placeholder="Tell us what you think... What's working well? What could be better?" rows="5"></textarea>
-                </div>
-
-                <button class="feedback-send-btn" id="feedback-send-btn">Send Feedback</button>
-
-                <div class="feedback-success" id="feedback-success" style="display:none;">
-                    <span class="feedback-success-icon">&#x2714;</span>
-                    Thanks for your feedback!
-                </div>
-
-                <div class="feedback-links">
-                    <a class="feedback-link" href="https://github.com/PostHog/posthog-vscode/issues" target="_blank">Report a bug</a>
-                    <span class="feedback-link-separator">&middot;</span>
-                    <a class="feedback-link" href="https://github.com/PostHog/posthog-vscode/issues/new" target="_blank">Request a feature</a>
-                </div>
             </div>
         </div>
 

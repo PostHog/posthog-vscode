@@ -127,36 +127,43 @@ All commands are available via the Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+
 
 ---
 
-## Settings
+## Configuration
 
-Configure the extension under `posthog.*` in VS Code settings:
+### VS Code Settings
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `posthog.additionalClientNames` | `[]` | Extra variable names to recognize as PostHog clients (e.g. `toolbarPosthogJS`, `telemetry`) |
-| `posthog.additionalFlagFunctions` | `[]` | Bare function names that accept a flag key as the first argument (e.g. `useFeatureFlag`) |
-| `posthog.detectNestedClients` | `true` | Detect PostHog calls through nested member expressions like `window.posthog?.capture()` |
-| `posthog.showInlineDecorations` | `true` | Show inline flag status and event volume decorations in the editor |
-| `posthog.useWorkspaceConfig` | `true` | Automatically load team settings from `.posthog.json` in the workspace root |
-| `posthog.multiProjectNotifications` | `true` | Show a notification when a file belongs to a different PostHog project |
+All settings live under `posthog.*` in VS Code settings (JSON or UI).
 
----
+**Code detection**
 
-## Supported Languages
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `posthog.additionalClientNames` | `string[]` | `[]` | Extra variable names to recognize as PostHog clients (e.g. `analytics`, `telemetry`, `phClient`). The built-in names `posthog`, `client`, and `ph` are always detected, plus any variable assigned from `new PostHog(...)`. |
+| `posthog.additionalFlagFunctions` | `string[]` | `[]` | Extra bare function names that accept a flag key as the first argument. React hooks (`useFeatureFlag`, `useFeatureFlagPayload`, `useFeatureFlagVariantKey`, `useActiveFeatureFlags`) are detected automatically. |
+| `posthog.detectNestedClients` | `boolean` | `true` | Detect PostHog calls through nested member expressions like `window.posthog?.capture()`. |
 
-Code intelligence (autocomplete, decorations, diagnostics, code actions) works in:
+**Display**
 
-- JavaScript
-- TypeScript
-- JSX / TSX
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `posthog.showInlineDecorations` | `boolean` | `true` | Show inline flag status and event volume decorations in the editor. Set to `false` to hide all inline annotations. |
 
-Powered by [tree-sitter](https://tree-sitter.github.io/tree-sitter/) for accurate AST-based detection. React hooks like `useFeatureFlag` are auto-detected.
+**Stale flag detection**
 
----
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `posthog.staleFlagAgeDays` | `number` | `30` | Minimum age in days before a fully-rolled-out flag is considered stale. Flags rolled out more recently than this are not flagged. |
+| `posthog.staleFlagExcludePatterns` | `string[]` | `[]` | Additional glob patterns to exclude from stale flag scanning (e.g. `**/tests/**`, `**/fixtures/**`). `node_modules`, `dist`, and `build` are always excluded. |
 
-## Team Setup
+**Workspace**
 
-Share PostHog configuration with your team by committing a `.posthog.json` file to your workspace root:
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `posthog.useWorkspaceConfig` | `boolean` | `true` | Automatically load team settings from `.posthog.json` in the workspace root. |
+| `posthog.multiProjectNotifications` | `boolean` | `true` | Show a notification when opening a file from a workspace folder configured for a different PostHog project. |
+
+### Team Configuration (`.posthog.json`)
+
+Share PostHog settings across your team by committing a `.posthog.json` file to your workspace root:
 
 ```json
 {
@@ -167,7 +174,21 @@ Share PostHog configuration with your team by committing a `.posthog.json` file 
 }
 ```
 
-When present, the extension reads this file on startup and applies the settings automatically. In a multi-root workspace, each folder can have its own `.posthog.json` targeting a different project.
+When present, the extension loads this file on startup and merges the settings with your VS Code configuration. Each developer still authenticates individually with their own API key.
+
+In a multi-root workspace, each folder can have its own `.posthog.json` targeting a different project — the extension detects project switches as you navigate between folders.
+
+### Supported Languages
+
+Code intelligence (autocomplete, decorations, diagnostics, code actions) works in:
+
+| Language | File Types | SDKs |
+|----------|-----------|------|
+| JavaScript | `.js`, `.jsx` | posthog-js, posthog-node |
+| TypeScript | `.ts`, `.tsx` | posthog-js, posthog-node |
+| React Native | `.jsx`, `.tsx` | posthog-react-native |
+
+Powered by [tree-sitter](https://tree-sitter.github.io/tree-sitter/) for accurate AST-based detection. Both client-side (`posthog.capture('event')`) and server-side (`client.capture({ event: 'event' })`) patterns are recognized.
 
 ---
 

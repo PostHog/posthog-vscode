@@ -77,6 +77,62 @@
 			"preLaunchTask": "${defaultBuildTask}"
 		},
 		{
+			"name": "Playground: React Native (JS)",
+			"type": "extensionHost",
+			"request": "launch",
+			"args": [
+				"--extensionDevelopmentPath=${workspaceFolder}",
+				"${workspaceFolder}/playgrounds/react-native-js",
+				"${workspaceFolder}/playgrounds/react-native-js/App.jsx"
+			],
+			"outFiles": [
+				"${workspaceFolder}/dist/**/*.js"
+			],
+			"preLaunchTask": "${defaultBuildTask}"
+		},
+		{
+			"name": "Playground: React Native (TS)",
+			"type": "extensionHost",
+			"request": "launch",
+			"args": [
+				"--extensionDevelopmentPath=${workspaceFolder}",
+				"${workspaceFolder}/playgrounds/react-native-ts",
+				"${workspaceFolder}/playgrounds/react-native-ts/App.tsx"
+			],
+			"outFiles": [
+				"${workspaceFolder}/dist/**/*.js"
+			],
+			"preLaunchTask": "${defaultBuildTask}"
+		},
+		{
+			"name": "Playground: Node.js (JS)",
+			"type": "extensionHost",
+			"request": "launch",
+			"args": [
+				"--extensionDevelopmentPath=${workspaceFolder}",
+				"${workspaceFolder}/playgrounds/node-js",
+				"${workspaceFolder}/playgrounds/node-js/server.js"
+			],
+			"outFiles": [
+				"${workspaceFolder}/dist/**/*.js"
+			],
+			"preLaunchTask": "${defaultBuildTask}"
+		},
+		{
+			"name": "Playground: Node.js (TS)",
+			"type": "extensionHost",
+			"request": "launch",
+			"args": [
+				"--extensionDevelopmentPath=${workspaceFolder}",
+				"${workspaceFolder}/playgrounds/node-ts",
+				"${workspaceFolder}/playgrounds/node-ts/server.ts"
+			],
+			"outFiles": [
+				"${workspaceFolder}/dist/**/*.js"
+			],
+			"preLaunchTask": "${defaultBuildTask}"
+		},
+		{
 			"name": "PostHog Repo",
 			"type": "extensionHost",
 			"request": "launch",

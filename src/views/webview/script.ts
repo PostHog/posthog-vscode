@@ -68,6 +68,10 @@ function switchTab(tab) {
     var platformFilter = document.getElementById('platform-filter');
     if (platformFilter) { platformFilter.style.display = (tab === 'analytics') ? '' : 'none'; }
 
+    // Hide search bar on feedback tab
+    var searchBar = document.querySelector('.search-bar');
+    if (searchBar) { searchBar.style.display = (tab === 'feedback') ? 'none' : ''; }
+
     if (!loadedTabs.has(tab)) {
         loadedTabs.add(tab);
         if (tab === 'flags') send({ type: 'loadFlags' });
@@ -1201,6 +1205,45 @@ window.addEventListener('message', e => {
             break;
         }
     }
+});
+
+// ── Feedback ──
+
+var feedbackRating = null;
+
+document.querySelectorAll('.feedback-emoji').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        feedbackRating = btn.dataset.rating;
+        document.querySelectorAll('.feedback-emoji').forEach(function(b) {
+            b.classList.toggle('selected', b.dataset.rating === feedbackRating);
+        });
+    });
+});
+
+document.getElementById('feedback-send-btn').addEventListener('click', function() {
+    var message = document.getElementById('feedback-message').value.trim();
+    if (!feedbackRating && !message) { return; }
+
+    send({
+        type: 'sendFeedback',
+        message: message,
+        rating: feedbackRating || 'none'
+    });
+
+    // Show success, reset form
+    document.getElementById('feedback-message').value = '';
+    document.querySelectorAll('.feedback-emoji').forEach(function(b) { b.classList.remove('selected'); });
+    feedbackRating = null;
+
+    var successEl = document.getElementById('feedback-success');
+    var sendBtn = document.getElementById('feedback-send-btn');
+    successEl.style.display = '';
+    sendBtn.style.display = 'none';
+
+    setTimeout(function() {
+        successEl.style.display = 'none';
+        sendBtn.style.display = '';
+    }, 3000);
 });
 
 // ── Init ──

@@ -120,23 +120,48 @@ export class VariantHighlightProvider {
     ) {
         const byColor: Map<number, vscode.DecorationOptions[]> = new Map();
         const labels: vscode.DecorationOptions[] = [];
+        const labelledConditionLines = new Set<string>();
 
         for (const block of blocks) {
             const flag = this.flagCache.getFlag(block.flagKey);
+
+            // Don't highlight branches for flags that don't exist in PostHog
+            if (!flag) { continue; }
+
             const experiment = this.experimentCache.getByFlagKey(block.flagKey);
             const flagType = this.classifyFlag(block.flagKey);
 
             const allVariants = this.getAllVariantKeys(block.flagKey);
 
-            // Infer variant for 'else'/'default' blocks if only one variant remains
+            // Infer variant for 'else'/'default' blocks
             let resolvedVariantKey = block.variantKey;
             if (resolvedVariantKey === 'else' || resolvedVariantKey === 'default') {
-                const seen = blocks
-                    .filter(b => b.flagKey === block.flagKey && b.variantKey !== 'else' && b.variantKey !== 'default')
-                    .map(b => b.variantKey);
-                const remaining = allVariants.filter(v => !seen.includes(v));
-                if (remaining.length === 1) {
-                    resolvedVariantKey = remaining[0];
+                if (flagType === 'boolean' || flagType === 'remote_config') {
+                    resolvedVariantKey = 'false';
+                } else {
+                    // Multivariate: infer from remaining unchecked variants
+                    const seen = blocks
+                        .filter(b => b.flagKey === block.flagKey && b.variantKey !== 'else' && b.variantKey !== 'default')
+                        .map(b => b.variantKey);
+                    // If any sibling branch checks an invalid variant, don't highlight the else
+                    const hasInvalidSibling = seen.some(v => !allVariants.includes(v));
+                    if (hasInvalidSibling) { continue; }
+                    const remaining = allVariants.filter(v => !seen.includes(v));
+                    if (remaining.length === 1) {
+                        resolvedVariantKey = remaining[0];
+                    }
+                }
+            }
+
+            // For multivariate flags, only highlight blocks that check actual variant values
+            if (flagType === 'multivariate') {
+                if (resolvedVariantKey === 'true' || resolvedVariantKey === 'false') {
+                    // Truthiness check on a multivariate flag — not a proper variant comparison, skip
+                    continue;
+                }
+                if (resolvedVariantKey !== 'else' && resolvedVariantKey !== 'default' && !allVariants.includes(resolvedVariantKey)) {
+                    // Comparing against a value that's not a valid variant, skip
+                    continue;
                 }
             }
 
@@ -170,18 +195,23 @@ export class VariantHighlightProvider {
                 byColor.get(ci)!.push({ range: new vscode.Range(line, 0, line, 0) });
             }
 
-            const label = this.buildLabel(block.flagKey, resolvedVariantKey, flag, experiment, flagType);
-            const condLine = doc.lineAt(block.conditionLine);
-            labels.push({
-                range: new vscode.Range(block.conditionLine, condLine.text.length, block.conditionLine, condLine.text.length),
-                renderOptions: {
-                    after: {
-                        contentText: `  ${label}`,
-                        color: style.text,
-                        fontStyle: 'italic',
+            // Only one label per condition line per flag (avoid "disabled disabled disabled")
+            const labelKey = `${block.flagKey}:${block.conditionLine}`;
+            if (!labelledConditionLines.has(labelKey)) {
+                labelledConditionLines.add(labelKey);
+                const label = this.buildLabel(block.flagKey, resolvedVariantKey, flag, experiment, flagType);
+                const condLine = doc.lineAt(block.conditionLine);
+                labels.push({
+                    range: new vscode.Range(block.conditionLine, condLine.text.length, block.conditionLine, condLine.text.length),
+                    renderOptions: {
+                        after: {
+                            contentText: `  ${label}`,
+                            color: style.text,
+                            fontStyle: 'italic',
+                        },
                     },
-                },
-            });
+                });
+            }
         }
 
         for (let i = 0; i < this.blockDecorations.length; i++) {

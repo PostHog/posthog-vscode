@@ -9,16 +9,20 @@ import { Commands } from '../constants';
 const FLAG_METHODS = new Set([
     'getFeatureFlag', 'isFeatureEnabled', 'getFeatureFlagPayload',
     'getFeatureFlagResult', 'isFeatureFlagEnabled', 'getRemoteConfig',
+    // React hooks
+    'useFeatureFlag', 'useFeatureFlagPayload', 'useFeatureFlagVariantKey',
 ]);
 
 /** Methods that return a variant key string */
-const VARIANT_METHODS = new Set(['getFeatureFlag']);
+const VARIANT_METHODS = new Set(['getFeatureFlag', 'useFeatureFlag', 'useFeatureFlagVariantKey']);
 
 /** Methods that return a payload */
-const PAYLOAD_METHODS = new Set(['getFeatureFlagPayload', 'getRemoteConfig']);
+const PAYLOAD_METHODS = new Set(['getFeatureFlagPayload', 'getRemoteConfig', 'useFeatureFlagPayload']);
 
 /** Methods that return boolean */
 const BOOLEAN_METHODS = new Set(['isFeatureEnabled', 'isFeatureFlagEnabled']);
+
+const TS_LANGUAGES = new Set(['typescript', 'typescriptreact']);
 
 export function registerGenerateTypeCommand(
     flagCache: FlagCacheService,
@@ -38,8 +42,11 @@ export function registerGenerateTypeCommand(
         const line = editor.selection.active.line;
         const calls = await treeSitter.findPostHogCalls(doc);
 
+        // Also accept user-configured additional flag functions
+        const additionalFns = new Set(vscode.workspace.getConfiguration('posthog').get<string[]>('additionalFlagFunctions', []));
+
         // Find a flag call on the cursor line
-        const call = calls.find(c => c.line === line && FLAG_METHODS.has(c.method));
+        const call = calls.find(c => c.line === line && (FLAG_METHODS.has(c.method) || additionalFns.has(c.method)));
         if (!call) {
             vscode.window.showWarningMessage('PostHog: Place your cursor on a line with a PostHog flag call.');
             return;
@@ -53,26 +60,47 @@ export function registerGenerateTypeCommand(
             return;
         }
 
-        // Check if there's already a type annotation
-        const alreadyTyped = lineText.match(/^\s*(?:const|let|var)\s+\w+\s*:/);
-        if (alreadyTyped) {
-            vscode.window.showInformationMessage('PostHog: This variable already has a type annotation.');
-            return;
-        }
-
         const varName = assignMatch[1];
         const flag = flagCache.getFlag(call.key);
         const typeStr = inferFlagTypeForMethod(call.method, call.key, flag);
+        const isTS = TS_LANGUAGES.has(doc.languageId);
 
-        // Find the position right after the variable name to insert `: type`
-        const varNameIndex = lineText.indexOf(varName, lineText.indexOf(varName.charAt(0)));
-        const insertPos = new vscode.Position(line, varNameIndex + varName.length);
+        if (isTS) {
+            // TypeScript: insert `: type` after the variable name
+            const alreadyTyped = lineText.match(/^\s*(?:const|let|var)\s+\w+\s*:/);
+            if (alreadyTyped) {
+                vscode.window.showInformationMessage('PostHog: This variable already has a type annotation.');
+                return;
+            }
 
-        await editor.edit(editBuilder => {
-            editBuilder.insert(insertPos, `: ${typeStr}`);
-        });
+            const varNameIndex = lineText.indexOf(varName, lineText.indexOf(varName.charAt(0)));
+            const insertPos = new vscode.Position(line, varNameIndex + varName.length);
 
-        telemetry.capture('type_generated', { flag_key: call.key, method: call.method, language: doc.languageId });
+            await editor.edit(editBuilder => {
+                editBuilder.insert(insertPos, `: ${typeStr}`);
+            });
+        } else {
+            // JavaScript: insert /** @type {X} */ comment above the line
+            const indent = lineText.match(/^(\s*)/)?.[1] ?? '';
+
+            // Check if there's already a JSDoc @type above
+            if (line > 0) {
+                const prevLine = doc.lineAt(line - 1).text.trim();
+                if (prevLine.includes('@type')) {
+                    vscode.window.showInformationMessage('PostHog: This variable already has a @type annotation.');
+                    return;
+                }
+            }
+
+            await editor.edit(editBuilder => {
+                editBuilder.insert(
+                    new vscode.Position(line, 0),
+                    `${indent}/** @type {${typeStr}} */\n`,
+                );
+            });
+        }
+
+        telemetry.capture('type_generated', { flag_key: call.key, method: call.method, language: doc.languageId, mode: isTS ? 'annotation' : 'jsdoc' });
     });
 }
 
@@ -82,7 +110,6 @@ export function inferFlagTypeForMethod(method: string, flagKey: string, flag: Fe
     }
 
     if (!flag) {
-        // Unknown flag — can't infer, use safe defaults
         if (VARIANT_METHODS.has(method)) { return 'boolean | undefined'; }
         if (PAYLOAD_METHODS.has(method)) { return 'unknown'; }
         return 'boolean';
@@ -96,7 +123,6 @@ export function inferFlagTypeForMethod(method: string, flagKey: string, flag: Fe
         return inferVariantReturnType(flag);
     }
 
-    // getFeatureFlagResult, getRemoteConfig fallback
     if (method === 'getRemoteConfig') {
         return inferPayloadType(flag);
     }
@@ -105,9 +131,7 @@ export function inferFlagTypeForMethod(method: string, flagKey: string, flag: Fe
 }
 
 /**
- * For getFeatureFlag(): returns a type based on the actual flag values.
- * - Multivariate: `'control' | 'test' | 'variant-a' | undefined`
- * - Boolean release: `boolean | undefined`
+ * For getFeatureFlag() / useFeatureFlag(): type based on actual flag values.
  */
 export function inferVariantReturnType(flag: FeatureFlag): string {
     const filters = flag.filters as Record<string, unknown> | undefined;
@@ -122,7 +146,7 @@ export function inferVariantReturnType(flag: FeatureFlag): string {
 }
 
 /**
- * For getFeatureFlagPayload() / getRemoteConfig(): infers type from payload data.
+ * For getFeatureFlagPayload() / getRemoteConfig() / useFeatureFlagPayload(): type from payload.
  */
 export function inferPayloadType(flag: FeatureFlag): string {
     const filters = flag.filters as Record<string, unknown> | undefined;
@@ -137,7 +161,6 @@ export function inferPayloadType(flag: FeatureFlag): string {
         return 'unknown';
     }
 
-    // Collect types from all payload variants
     const types: string[] = [];
     for (const key of keys) {
         const raw = payloads[key];

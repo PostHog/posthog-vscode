@@ -94,8 +94,8 @@ function main() {
 
     let built = 0;
 
-    // JavaScript
-    if (buildGrammar('tree-sitter-javascript', 'tree-sitter-javascript.wasm')) built++;
+    // JavaScript — pinned to 0.23.1 for ABI v14 compatibility with web-tree-sitter@0.24.x
+    if (buildGrammar('tree-sitter-javascript@0.23.1', 'tree-sitter-javascript.wasm')) built++;
 
     // TypeScript (has typescript/ and tsx/ sub-directories)
     if (buildGrammar('tree-sitter-typescript', 'tree-sitter-typescript.wasm', 'typescript')) built++;

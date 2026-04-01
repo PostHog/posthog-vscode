@@ -59,6 +59,9 @@ export class SessionCodeLensProvider implements vscode.CodeLensProvider {
                 else { needsFetch.flags.add(key); }
             }
 
+            // Only show CodeLens when there's actual session data, or while loading
+            if (cached && cached.sessions === 0) { continue; }
+
             const lens = new vscode.CodeLens(range) as SessionCodeLens;
             lens.data = { key, type };
 
@@ -103,14 +106,6 @@ export class SessionCodeLensProvider implements vscode.CodeLensProvider {
     }
 
     private buildCommand(key: string, type: 'event' | 'flag', sessions: number, users: number): vscode.Command {
-        if (sessions === 0) {
-            return {
-                title: '$(eye)  no sessions in 24h',
-                command: Commands.SHOW_SESSIONS,
-                arguments: [key, type],
-            };
-        }
-
         const sessionStr = sessions === 1 ? '1 session' : `${this.fmtNum(sessions)} sessions`;
         const userStr = users === 1 ? '1 user' : `${this.fmtNum(users)} users`;
 

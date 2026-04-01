@@ -40,6 +40,15 @@ export interface FlagAssignment {
     hasTypeAnnotation: boolean;
 }
 
+export interface PostHogInitCall {
+    token: string;
+    tokenLine: number;
+    tokenStartCol: number;
+    tokenEndCol: number;
+    apiHost: string | null;
+    configProperties: Map<string, string>;
+}
+
 export interface CompletionContext {
     type: 'capture_event' | 'flag_key' | 'property_key' | 'property_value';
     eventName?: string;
@@ -81,9 +90,11 @@ interface LangFamily {
 
 interface QueryStrings {
     postHogCalls: string;
+    nodeCaptureCalls: string;
     flagAssignments: string;
     functions: string;
     clientAliases: string;
+    constructorAliases: string;
     destructuredMethods: string;
     bareFunctionCalls: string;
 }
@@ -103,6 +114,18 @@ const JS_QUERIES: QueryStrings = {
                 object: (_) @client
                 property: (property_identifier) @method)
             arguments: (arguments . (template_string (string_fragment) @key))) @call
+    `,
+
+    nodeCaptureCalls: `
+        (call_expression
+            function: (member_expression
+                object: (_) @client
+                property: (property_identifier) @method)
+            arguments: (arguments .
+                (object
+                    (pair
+                        key: (property_identifier) @prop_name
+                        value: (string (string_fragment) @key))))) @call
     `,
 
     flagAssignments: `
@@ -167,6 +190,20 @@ const JS_QUERIES: QueryStrings = {
             (variable_declarator
                 name: (identifier) @alias
                 value: (identifier) @source))
+    `,
+
+    constructorAliases: `
+        (lexical_declaration
+            (variable_declarator
+                name: (identifier) @alias
+                value: (new_expression
+                    constructor: (identifier) @class_name)))
+
+        (variable_declaration
+            (variable_declarator
+                name: (identifier) @alias
+                value: (new_expression
+                    constructor: (identifier) @class_name)))
     `,
 
     destructuredMethods: `
@@ -344,6 +381,19 @@ export class TreeSitterService {
             }
         }
 
+        // Constructor aliases: const client = new PostHog('phc_...')
+        const constructorQuery = this.getQuery(lang, family.queries.constructorAliases);
+        if (constructorQuery) {
+            const matches = constructorQuery.matches(tree.rootNode);
+            for (const match of matches) {
+                const aliasNode = match.captures.find(c => c.name === 'alias');
+                const classNode = match.captures.find(c => c.name === 'class_name');
+                if (aliasNode && classNode && classNode.node.text === 'PostHog') {
+                    clientAliases.add(aliasNode.node.text);
+                }
+            }
+        }
+
         // Destructured methods: const { capture, getFeatureFlag } = posthog
         if (family.queries.destructuredMethods) {
             const destructQuery = this.getQuery(lang, family.queries.destructuredMethods);
@@ -412,6 +462,35 @@ export class TreeSitterService {
             }
         }
 
+        // Node SDK capture calls: client.capture({ event: 'purchase', ... })
+        const nodeCaptureQuery = this.getQuery(lang, family.queries.nodeCaptureCalls);
+        if (nodeCaptureQuery) {
+            const matches = nodeCaptureQuery.matches(tree.rootNode);
+            for (const match of matches) {
+                const clientNode = match.captures.find(c => c.name === 'client');
+                const methodNode = match.captures.find(c => c.name === 'method');
+                const propNameNode = match.captures.find(c => c.name === 'prop_name');
+                const keyNode = match.captures.find(c => c.name === 'key');
+
+                if (!clientNode || !methodNode || !propNameNode || !keyNode) { continue; }
+
+                const clientName = this.extractClientName(clientNode.node);
+                const method = methodNode.node.text;
+
+                if (!clientName || !allClients.has(clientName)) { continue; }
+                if (method !== 'capture') { continue; }
+                if (propNameNode.node.text !== 'event') { continue; }
+
+                calls.push({
+                    method,
+                    key: this.cleanStringValue(keyNode.node.text),
+                    line: keyNode.node.startPosition.row,
+                    keyStartCol: keyNode.node.startPosition.column,
+                    keyEndCol: keyNode.node.endPosition.column,
+                });
+            }
+        }
+
         // Bare function calls from destructured methods: capture("event")
         if (destructuredCapture.size > 0 || destructuredFlag.size > 0) {
             const bareQuery = this.getQuery(lang, family.queries.bareFunctionCalls);
@@ -461,6 +540,81 @@ export class TreeSitterService {
         }
 
         return calls;
+    }
+
+    async findInitCalls(doc: vscode.TextDocument): Promise<PostHogInitCall[]> {
+        const ready = await this.ensureReady(doc.languageId);
+        if (!ready) { return []; }
+
+        const { lang } = ready;
+        const tree = this.parse(doc.getText(), lang);
+        if (!tree) { return []; }
+
+        const allClients = this.getEffectiveClients();
+        const results: PostHogInitCall[] = [];
+
+        // Query: posthog.init('token', { ... })
+        const queryStr = `
+            (call_expression
+                function: (member_expression
+                    object: (_) @client
+                    property: (property_identifier) @method)
+                arguments: (arguments
+                    (string (string_fragment) @token)
+                    (object)? @config)) @call
+        `;
+
+        const query = this.getQuery(lang, queryStr);
+        if (!query) { return []; }
+
+        for (const match of query.matches(tree.rootNode)) {
+            const clientNode = match.captures.find(c => c.name === 'client');
+            const methodNode = match.captures.find(c => c.name === 'method');
+            const tokenNode = match.captures.find(c => c.name === 'token');
+            const configNode = match.captures.find(c => c.name === 'config');
+
+            if (!clientNode || !methodNode || !tokenNode) { continue; }
+            if (methodNode.node.text !== 'init') { continue; }
+
+            const clientName = this.extractClientName(clientNode.node);
+            if (!clientName || !allClients.has(clientName)) { continue; }
+
+            const token = this.cleanStringValue(tokenNode.node.text);
+            const configProperties = new Map<string, string>();
+            let apiHost: string | null = null;
+
+            // Extract config object properties
+            if (configNode) {
+                for (const child of configNode.node.namedChildren) {
+                    if (child.type === 'pair') {
+                        const keyNode = child.childForFieldName('key');
+                        const valueNode = child.childForFieldName('value');
+                        if (keyNode && valueNode) {
+                            const key = keyNode.text.replace(/['"]/g, '');
+                            let value = valueNode.text;
+                            // Clean string values
+                            if (valueNode.type === 'string') {
+                                const frag = valueNode.namedChildren.find(c => c.type === 'string_fragment');
+                                if (frag) { value = frag.text; }
+                            }
+                            configProperties.set(key, value);
+                            if (key === 'api_host') { apiHost = value; }
+                        }
+                    }
+                }
+            }
+
+            results.push({
+                token,
+                tokenLine: tokenNode.node.startPosition.row,
+                tokenStartCol: tokenNode.node.startPosition.column,
+                tokenEndCol: tokenNode.node.endPosition.column,
+                apiHost,
+                configProperties,
+            });
+        }
+
+        return results;
     }
 
     async findFunctions(doc: vscode.TextDocument): Promise<FunctionInfo[]> {
@@ -551,6 +705,48 @@ export class TreeSitterService {
                 // Find if-chains and switches using this variable
                 this.findIfChainsForVar(tree.rootNode, varName, flagKey, afterNode, branches);
                 this.findSwitchForVar(tree.rootNode, varName, flagKey, afterNode, branches);
+            }
+        }
+
+        // 1b. Find bare function call assignments: const x = useFeatureFlag("key")
+        const bareFlagFunctions = new Set([
+            ...this.config.additionalFlagFunctions,
+            'useFeatureFlag', 'useFeatureFlagPayload', 'useFeatureFlagVariantKey',
+        ]);
+        if (bareFlagFunctions.size > 0 && family.queries.bareFunctionCalls) {
+            const bareAssignQuery = this.getQuery(lang, `
+                (lexical_declaration
+                    (variable_declarator
+                        name: (identifier) @var_name
+                        value: (call_expression
+                            function: (identifier) @func_name
+                            arguments: (arguments . (string (string_fragment) @flag_key))))) @assignment
+
+                (variable_declaration
+                    (variable_declarator
+                        name: (identifier) @var_name
+                        value: (call_expression
+                            function: (identifier) @func_name
+                            arguments: (arguments . (string (string_fragment) @flag_key))))) @assignment
+            `);
+            if (bareAssignQuery) {
+                const matches = bareAssignQuery.matches(tree.rootNode);
+                for (const match of matches) {
+                    const varNode = match.captures.find(c => c.name === 'var_name');
+                    const funcNode = match.captures.find(c => c.name === 'func_name');
+                    const keyNode = match.captures.find(c => c.name === 'flag_key');
+                    const assignNode = match.captures.find(c => c.name === 'assignment');
+
+                    if (!varNode || !funcNode || !keyNode) { continue; }
+                    if (!bareFlagFunctions.has(funcNode.node.text)) { continue; }
+
+                    const varName = varNode.node.text;
+                    const flagKey = this.cleanStringValue(keyNode.node.text);
+                    const afterNode = assignNode?.node || varNode.node;
+
+                    this.findIfChainsForVar(tree.rootNode, varName, flagKey, afterNode, branches);
+                    this.findSwitchForVar(tree.rootNode, varName, flagKey, afterNode, branches);
+                }
             }
         }
 

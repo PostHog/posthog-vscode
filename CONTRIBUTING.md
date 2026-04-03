@@ -22,7 +22,7 @@ pnpm compile
 
 ### Running the Extension
 
-Press **F5** in VS Code to launch the Extension Development Host. This opens a new VS Code window with the extension loaded from source.
+Press **F5** in VS Code to launch the Extension Development Host OR open the "Run and Debug" panel. This opens a new VS Code window with the extension loaded from source.
 
 ### Useful Commands
 
@@ -164,13 +164,13 @@ Each provider defines its own `FLAG_METHODS` Set. This is intentional -- do not 
 
 ### Colors
 
-| Purpose | Hex       | CSS Variable   |
-|---------|-----------|----------------|
-| Active  | `#4CBB17` | `--ph-green`   |
-| Warning | `#F9BD2B` | `--ph-yellow`  |
-| Brand   | `#1D4AFF` | `--ph-blue`    |
-| Error   | `#E53E3E` | `--ph-red`     |
-| Accent  | `#F54E00` | `--ph-orange`  |
+| Purpose | Hex       | CSS Variable  |
+| ------- | --------- | ------------- |
+| Active  | `#4CBB17` | `--ph-green`  |
+| Warning | `#F9BD2B` | `--ph-yellow` |
+| Brand   | `#1D4AFF` | `--ph-blue`   |
+| Error   | `#E53E3E` | `--ph-red`    |
+| Accent  | `#F54E00` | `--ph-orange` |
 
 For backgrounds, use VS Code theme variables (`--vscode-*`).
 
@@ -190,18 +190,43 @@ The extension is instrumented with PostHog via `TelemetryService`. Telemetry is 
 To capture a new event:
 
 ```typescript
-telemetry.capture('event_name', { key: 'value' });
+telemetry.capture("event_name", { key: "value" })
 ```
 
 Add telemetry events for meaningful user actions (sign in, flag toggle, scan initiated, etc.). Do not instrument internal implementation details.
 
-## Publishing
+## Releasing
 
-Publishing is automated via GitHub Actions:
+This project uses [changesets](https://github.com/changesets/changesets) for version management and automated releases.
 
-1. Push to `main` triggers the publish workflow (`.github/workflows/publish.yml`)
-2. Version is determined from conventional commit messages
-3. The workflow runs `vsce publish` to push to the VS Code Marketplace
+### Adding a changeset
+
+When you make a change that should be released, run:
+
+```bash
+pnpm changeset
+```
+
+This prompts you to select the change type (patch/minor/major) and write a summary. A markdown file is created in `.changeset/` describing your change.
+
+### Version types
+
+- **patch** — bug fixes, small improvements, documentation
+- **minor** — new features, non-breaking changes
+- **major** — breaking changes
+
+### Automated release process
+
+When PRs with changesets are merged to `main`, the release workflow automatically:
+
+1. Consumes all pending changesets
+2. Bumps the version in `package.json`
+3. Updates `CHANGELOG.md` with the changeset summaries
+4. Commits the version bump to `main`
+5. Creates a git tag (`v{version}`)
+6. Creates a GitHub Release with the changelog
+7. Builds and packages the extension
+8. Publishes to both VS Code Marketplace and Open VSX Registry
 
 Do not manually bump the version in `package.json`. The CI pipeline handles it.
 

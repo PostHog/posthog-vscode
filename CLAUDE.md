@@ -142,7 +142,7 @@ All providers are constructed in `activate()`, passed their dependencies, and pu
 - **Debounce**: 200ms on all decoration/highlight updates
 - **Error handling**: `.catch(() => {})` on startup cache loads; `try/catch` with `console.warn` in services
 - **Build**: `pnpm`, webpack → `dist/extension.js`, WASM files in `wasm/`
-- **Publish**: push to main triggers auto-version-bump + vsce publish via GitHub Actions
+- **Publish**: changesets + GitHub Actions → VS Code Marketplace + Open VSX (see CONTRIBUTING.md)
 - **Commit style**: conventional commits (`feat:`, `fix:`, `ci:`)
 
 ## Development

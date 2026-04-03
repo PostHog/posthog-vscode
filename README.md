@@ -25,7 +25,7 @@ PostHog for VS Code brings your product analytics stack into the editor. See fea
 ## Quick Start
 
 1. **Install** the extension from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=PostHog.posthog-vscode)
-2. **Sign in** — open the PostHog sidebar (hedgehog icon in the activity bar) and authenticate with a [personal API key](https://posthog.com/docs/api#personal-api-keys) (`phx_...`) or sign in with your PostHog account
+2. **Sign in** — open the PostHog sidebar (hedgehog icon in the activity bar) and click "Sign In with PostHog" to authenticate with your PostHog account
 3. **Select your project** when prompted
 4. **Done** — the sidebar populates with your flags, experiments, and analytics. Inline decorations appear in your code automatically.
 
@@ -97,7 +97,7 @@ Share PostHog settings across your team and manage multi-project workspaces.
 
 - **Shared `.posthog.json` config** — commit project settings to your repo so the whole team connects automatically
 - **Multi-project workspace support** — different workspace folders can target different PostHog projects
-- **RBAC awareness** — read-only mode when your API key lacks write permissions
+- **RBAC awareness** — read-only mode when your account lacks write permissions
 - **Status bar indicator** — shows active project, host, and last sync time. Click to switch projects.
 - **Periodic cache refresh** — flags, events, and experiments stay in sync automatically
 
@@ -109,8 +109,7 @@ All commands are available via the Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+
 
 | Command | Description |
 |---------|-------------|
-| `PostHog: Sign In` | Connect with a personal API key |
-| `PostHog: Sign In with PostHog` | Connect via OAuth |
+| `PostHog: Sign In` | Authenticate with your PostHog account |
 | `PostHog: Sign Out` | Disconnect from PostHog |
 | `PostHog: Select Project` | Switch between projects |
 | `PostHog: Refresh Feature Flags` | Re-fetch flags, events, and experiments |
@@ -119,11 +118,13 @@ All commands are available via the Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+
 | `PostHog: Open in PostHog` | Open the flag in the PostHog dashboard |
 | `PostHog: Show Flag Detail` | Open flag detail panel in an editor tab |
 | `PostHog: Show Experiment Detail` | Open experiment detail panel in an editor tab |
+| `PostHog: Find Flag References` | Find all usages of a flag in the codebase |
 | `PostHog: Watch Sessions` | Open session replay for a flag or event |
 | `PostHog: Generate Flag Types` | Generate TypeScript types from all flag configs |
 | `PostHog: Generate Type` | Generate TypeScript type for a specific flag (context menu) |
 | `PostHog: Scan for Stale Flags` | Find stale flag references across the codebase |
 | `PostHog: Clean Up Stale Flag` | Remove a stale flag check from code |
+| `PostHog: Run Setup Wizard` | Launch the PostHog setup wizard in a terminal |
 
 ---
 
@@ -192,54 +193,6 @@ Powered by [tree-sitter](https://tree-sitter.github.io/tree-sitter/) for accurat
 
 ---
 
-## Development
-
-```bash
-pnpm install          # install dependencies
-pnpm compile          # webpack build
-pnpm watch            # webpack watch mode
-pnpm lint             # run eslint
-pnpm test             # run tests
-# Press F5 in VS Code to launch the Extension Development Host
-```
-
----
-
-## Releasing
-
-This project uses [changesets](https://github.com/changesets/changesets) for version management and automated releases.
-
-### Adding a changeset
-
-When you make a change that should be released, run:
-
-```bash
-pnpm changeset
-```
-
-This prompts you to select the change type (patch/minor/major) and write a summary. A markdown file is created in `.changeset/` describing your change.
-
-### Version types
-
-- **patch** — bug fixes, small improvements, documentation
-- **minor** — new features, non-breaking changes
-- **major** — breaking changes
-
-### Automated release process
-
-When PRs with changesets are merged to `main`, the release workflow automatically:
-
-1. Consumes all pending changesets
-2. Bumps the version in `package.json`
-3. Updates `CHANGELOG.md` with the changeset summaries
-4. Commits the version bump to `main`
-5. Creates a git tag (`v{version}`)
-6. Creates a GitHub Release with the changelog
-7. Builds and packages the extension
-8. Publishes to both VS Code Marketplace and Open VSX Registry
-
----
-
 ## Requirements
 
 - VS Code 1.109.0 or later
@@ -249,7 +202,7 @@ When PRs with changesets are merged to `main`, the release workflow automaticall
 
 ## Contributing
 
-Contributions are welcome. Open an issue or pull request on [GitHub](https://github.com/PostHog/posthog-vscode).
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
 
 ---
 

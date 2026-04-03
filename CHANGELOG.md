@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1
+
+### Patch Changes
+
+- a0dcc8e: Release new minor version to test new release process
+
 All notable changes to the PostHog VS Code extension will be documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
@@ -11,6 +17,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 #### Inline Code Intelligence
+
 - Flag decorations: rollout percentage, variant count, and experiment status shown inline after feature flag calls
 - Event decorations: 7-day sparkline and volume count shown inline after `capture()` calls
 - Session CodeLens: "X sessions / Y users in 24h" lens above event and flag calls with auto-refresh
@@ -20,18 +27,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Event naming diagnostics: warn on typos and close matches in `capture()` event names via Levenshtein distance
 
 #### Autocomplete
+
 - Flag key autocomplete inside `isFeatureEnabled()`, `getFeatureFlag()`, and related methods
 - Event name autocomplete inside `capture()` calls
 - Event property name and top value autocomplete inside capture properties
 - Variant key autocomplete for multivariate flags
 
 #### Code Actions and Quick Fixes
+
 - "Create flag in PostHog" quick fix when a flag key is not found in the project
 - "Toggle flag" quick fix to enable/disable a flag directly from the editor
 - "Clean up stale flag" quick fix to remove references to fully-rolled-out or inactive flags
 - "Wrap in feature flag" refactor action to wrap selected code in an `isFeatureEnabled` guard
 
 #### Commands
+
 - `PostHog: Sign In` / `Sign Out` / `Sign In with PostHog` (OAuth)
 - `PostHog: Select Project` for multi-project switching
 - `PostHog: Refresh Feature Flags` to force a cache refresh
@@ -51,6 +61,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `PostHog: Launch Experiment` / `Stop Experiment`
 
 #### Sidebar and Detail Views
+
 - Branded welcome screen with PostHog logo and dual sign-in (API key + OAuth)
 - Sidebar with Flags, Experiments, and Analytics tabs with search and filter
 - No-results feedback message when search returns empty
@@ -62,6 +73,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Chart theme support with light/dark CSS overrides and automatic theme detection
 
 #### Stale Flag Detection
+
 - Codebase-wide scan for flags that are fully rolled out, inactive, or experiment-complete
 - Stale flags tree view in the sidebar with per-flag references
 - Single flag cleanup with regex-based code removal
@@ -70,6 +82,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Scan glob limited to actually supported languages (JS/TS only)
 
 #### Team Configuration
+
 - `.posthog.json` workspace config for shared team settings (host, projectId, client names, flag functions)
 - Multi-project support: detects when a file belongs to a different project and offers to switch
 - Configurable additional client names (e.g., `toolbarPosthogJS`, `telemetry`)
@@ -80,11 +93,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `multiProjectNotifications` toggle
 
 #### Code Generation
+
 - `generateFlagTypes` pure function to generate TypeScript interfaces from flag payloads
 - Recursive type inference with safe property name quoting
 - Generate Flag Types command with guards and auto-open of generated file
 
 #### Authentication
+
 - API key authentication with SecretStorage
 - OAuth PKCE flow with `posthog.signInOAuth` command
 - Dual sign-in buttons on the welcome screen (API key and OAuth)
@@ -93,6 +108,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - RBAC-aware: stores `canWrite` permission from API
 
 #### Infrastructure
+
 - Tree-sitter powered code intelligence via web-tree-sitter (JS/TS grammars)
 - In-memory caches with onChange listener pattern for flags, events, and experiments
 - Periodic cache refresh: flags every 1 min, events and experiments every 5 min
@@ -105,6 +121,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - GitHub Actions publish workflow with conventional-commit version bumping
 
 ### Fixed
+
 - HogQL escaping bug in `getEventVolumes` (CodeQL alert)
 - Incomplete URL substring sanitization (CodeQL alert)
 - `buildCleanupEdit` returning null on edge cases
@@ -114,11 +131,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Stale flag scan glob limited to actually supported languages (JS/TS)
 
 ### Changed
+
 - React hooks detected automatically without requiring manual configuration
 - ExperimentCacheService now follows the onChange listener pattern (consistent with other caches)
 - Flag methods in stale flag service scoped to JS/TS only
 
 ### Removed
+
 - HogQL editor feature (`.hogql` language, `HogQLEditorProvider`)
 - Error tracking feature (`errorCacheService`, `errorDecorationProvider`)
 - Smart capture insertion (`captureCodeActionProvider`)
@@ -127,6 +146,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.1.0] - 2025-03-08
 
 ### Added
+
 - Feature flag sidebar with search and detail panels
 - Event tracking with autocomplete
 - Experiment monitoring with Bayesian results

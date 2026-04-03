@@ -129,6 +129,10 @@
         "command": "posthog.findFlagReferences",
         "title": "PostHog: Find Flag References",
         "icon": "$(search)"
+      },
+      {
+        "command": "posthog.runWizard",
+        "title": "PostHog: Run Setup Wizard"
       }
     ],
     "menus": {

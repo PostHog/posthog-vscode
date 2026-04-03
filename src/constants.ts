@@ -21,6 +21,7 @@ export const Commands = {
     WRAP_IN_FLAG: 'posthog.wrapInFlag',
     FIND_FLAG_REFERENCES: 'posthog.findFlagReferences',
     GENERATE_TYPE: 'posthog.generateType',
+    RUN_WIZARD: 'posthog.runWizard',
 } as const;
 
 export const Views = {

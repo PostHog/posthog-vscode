@@ -520,6 +520,14 @@ export function activate(context: vscode.ExtensionContext) {
             });
             telemetry.capture('flag_wrapped_in_code', { flag_key: flagKey, language: doc.languageId });
         }),
+        vscode.commands.registerCommand(Commands.RUN_WIZARD, async () => {
+            const terminal = vscode.window.createTerminal({ name: 'PostHog Wizard' });
+            terminal.show();
+            // Maximize the panel so the wizard TUI has enough room
+            await vscode.commands.executeCommand('workbench.action.toggleMaximizedPanel');
+            terminal.sendText('npx @posthog/wizard@latest');
+            telemetry.capture('wizard_terminal_opened');
+        }),
         vscode.commands.registerCommand(Commands.FIND_FLAG_REFERENCES, async (flagKey: string) => {
             telemetry.capture('flag_references_searched', { flag_key: flagKey });
             vscode.commands.executeCommand('workbench.action.findInFiles', {

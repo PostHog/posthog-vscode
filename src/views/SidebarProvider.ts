@@ -96,9 +96,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             case 'signIn':
                 await vscode.commands.executeCommand(Commands.SIGN_IN);
                 return this.sendAuthState();
-            case 'signInOAuth':
-                await vscode.commands.executeCommand(Commands.SIGN_IN_OAUTH);
-                return this.sendAuthState();
             case 'signOut':
                 await vscode.commands.executeCommand(Commands.SIGN_OUT);
                 return this.sendAuthState();
@@ -147,11 +144,6 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             case 'openInsightPanel':
                 this.telemetry?.capture('sidebar_insight_clicked', { insight_id: msg.id });
                 return this.openInsightPanel(msg.id as number);
-            case 'open-api-key-page': {
-                this.telemetry?.capture('api_key_page_opened');
-                const apiKeyHost = this.authService.getHost().replace(/\/+$/, '') || 'https://us.posthog.com';
-                return vscode.env.openExternal(vscode.Uri.parse(`${apiKeyHost}/settings/user-api-keys`));
-            }
             case 'retry': {
                 this.telemetry?.capture('sidebar_retry', { section: msg.section });
                 const section = msg.section as string;
@@ -172,22 +164,17 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     // ── Auth ──
 
     private async sendAuthState() {
-        let authed = this.authService.isAuthenticated();
-        if (!authed) {
-            const hasKey = await this.authService.getApiKey();
-            if (hasKey) {
-                await this.authService.setAuthenticated(true);
-                authed = true;
-            }
-        }
+        const authed = this.authService.isAuthenticated();
+        const hasProject = !!this.authService.getProjectId();
         this.postMessage({
             type: 'authState',
             authenticated: authed,
+            needsProject: authed && !hasProject,
             projectName: this.authService.getProjectName() ?? null,
             posthogHost: this.authService.getHost(),
             canWrite: this.authService.getCanWrite(),
         });
-        if (authed) {
+        if (authed && hasProject) {
             this.loadInsights().catch(() => {});
         }
     }

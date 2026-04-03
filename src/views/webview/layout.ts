@@ -30,10 +30,15 @@ export function getLayout(logoUri: vscode.Uri): string {
             </div>
         </div>
     </div>
-    <button class="sign-in-btn sign-in-btn--primary" id="btn-sign-in-oauth">Sign In with PostHog</button>
-    <button class="sign-in-btn sign-in-btn--secondary" id="btn-sign-in">Sign In with API Key</button>
-    <a class="help-link" href="#" id="btn-get-api-key">Don't have an API key? Get one here</a>
-    <p class="welcome-hint">API key works for self-hosted instances</p>
+    <button class="sign-in-btn sign-in-btn--primary" id="btn-sign-in">Sign In with PostHog</button>
+</div>
+
+<!-- Project selection (authenticated but no project) -->
+<div id="needs-project-screen" class="welcome" style="display:none;">
+    <img src="${logoUri}" alt="PostHog" class="welcome-logo" />
+    <h2 class="welcome-title">Select a Project</h2>
+    <p class="welcome-subtitle">You're signed in! Choose a project to get started.</p>
+    <button class="sign-in-btn sign-in-btn--primary" id="btn-select-project-welcome">Select Project</button>
 </div>
 
 <!-- Main app (authenticated) -->

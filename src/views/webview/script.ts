@@ -1063,9 +1063,8 @@ function showInsightDetail(id) {
 
 // ── Event listeners ──
 
-document.getElementById('btn-sign-in-oauth').addEventListener('click', () => send({ type: 'signInOAuth' }));
 document.getElementById('btn-sign-in').addEventListener('click', () => send({ type: 'signIn' }));
-document.getElementById('btn-get-api-key').addEventListener('click', (e) => { e.preventDefault(); send({ type: 'open-api-key-page' }); });
+document.getElementById('btn-select-project-welcome').addEventListener('click', () => send({ type: 'selectProject' }));
 document.getElementById('btn-select-project').addEventListener('click', () => send({ type: 'selectProject' }));
 document.getElementById('btn-sign-out').addEventListener('click', () => send({ type: 'signOut' }));
 document.getElementById('search').addEventListener('input', filterItems);
@@ -1088,9 +1087,13 @@ window.addEventListener('message', e => {
     const msg = e.data;
     switch (msg.type) {
         case 'authState':
-            document.getElementById('welcome-screen').style.display = msg.authenticated ? 'none' : '';
-            document.getElementById('main-app').style.display = msg.authenticated ? '' : 'none';
-            if (msg.authenticated) {
+            var showWelcome = !msg.authenticated && !msg.needsProject;
+            var showNeedsProject = msg.needsProject;
+            var showApp = msg.authenticated && !msg.needsProject;
+            document.getElementById('welcome-screen').style.display = showWelcome ? '' : 'none';
+            document.getElementById('needs-project-screen').style.display = showNeedsProject ? '' : 'none';
+            document.getElementById('main-app').style.display = showApp ? '' : 'none';
+            if (showApp) {
                 loadedTabs.clear();
                 loadedTabs.add('flags');
                 switchTab('flags');

@@ -1,22 +1,23 @@
 import * as vscode from 'vscode';
 import { StorageKeys, Defaults } from '../constants';
+import { PostHogAuthenticationProvider } from './postHogAuthProvider';
 
 export class AuthService {
     constructor(
-        private readonly secretStorage: vscode.SecretStorage,
-        private readonly globalState: vscode.Memento
+        private readonly globalState: vscode.Memento,
+        private readonly authProvider: PostHogAuthenticationProvider
     ) {}
 
-    async getApiKey(): Promise<string | undefined> {
-        return this.secretStorage.get(StorageKeys.API_KEY);
+    async getAccessToken(): Promise<string | undefined> {
+        try {
+            return await this.authProvider.getValidAccessToken();
+        } catch {
+            return undefined;
+        }
     }
 
-    async setApiKey(key: string): Promise<void> {
-        await this.secretStorage.store(StorageKeys.API_KEY, key);
-    }
-
-    async deleteApiKey(): Promise<void> {
-        await this.secretStorage.delete(StorageKeys.API_KEY);
+    async forceRefreshToken(): Promise<string> {
+        return this.authProvider.forceRefresh();
     }
 
     getHost(): string {

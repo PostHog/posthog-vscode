@@ -34,11 +34,20 @@ import { DebugTreeProvider } from './providers/debugTreeProvider';
 import { VariantDiagnosticProvider } from './providers/variantDiagnosticProvider';
 import { InitDecorationProvider } from './providers/initDecorationProvider';
 import { FeedbackViewProvider } from './views/FeedbackViewProvider';
+import { PostHogAuthenticationProvider, AUTH_PROVIDER_ID, AUTH_PROVIDER_LABEL } from './services/postHogAuthProvider';
 import { FeatureFlag } from './models/types';
 import { Views, Commands, ContextKeys } from './constants';
 
 export function activate(context: vscode.ExtensionContext) {
-    const authService = new AuthService(context.secrets, context.globalState);
+    // OAuth authentication provider
+    const authProvider = new PostHogAuthenticationProvider(context.secrets);
+    context.subscriptions.push(
+        vscode.authentication.registerAuthenticationProvider(AUTH_PROVIDER_ID, AUTH_PROVIDER_LABEL, authProvider, { supportsMultipleAccounts: false }),
+        vscode.window.registerUriHandler(authProvider),
+        authProvider,
+    );
+
+    const authService = new AuthService(context.globalState, authProvider);
     const postHogService = new PostHogService(authService);
     const flagCache = new FlagCacheService();
     const eventCache = new EventCacheService();
@@ -142,18 +151,36 @@ export function activate(context: vscode.ExtensionContext) {
     // All languages supported by tree-sitter grammars
     const languageSelector = treeSitter.supportedLanguages.map(lang => ({ language: lang, scheme: 'file' }));
 
-    // Set auth context from Memento (fast, for cache loading + sidebar)
+    // Guard to prevent duplicate session-expired notifications
+    let sessionLostHandled = false;
+
+    async function handleSessionLost() {
+        if (sessionLostHandled) { return; }
+        sessionLostHandled = true;
+        await authService.setAuthenticated(false);
+        await authService.clearProjectId();
+        await authService.clearProjectName();
+        vscode.commands.executeCommand('setContext', ContextKeys.IS_AUTHENTICATED, false);
+        sidebarProvider.refresh();
+        const choice = await vscode.window.showWarningMessage(
+            'PostHog: Your session has expired. Please sign in again.',
+            'Sign In'
+        );
+        if (choice === 'Sign In') {
+            vscode.commands.executeCommand(Commands.SIGN_IN);
+        }
+    }
+
+    // Set auth context from Memento (fast, for UI)
     const authed = authService.isAuthenticated();
     vscode.commands.executeCommand('setContext', ContextKeys.IS_AUTHENTICATED, authed);
 
-    // posthog.hasApiKey controls panel visibility (stale flags, feedback, debug)
-    // Mirrors auth state but verified via SecretStorage
-    vscode.commands.executeCommand('setContext', 'posthog.hasApiKey', false);
-    if (authed) {
-        authService.getApiKey().then(key => {
-            vscode.commands.executeCommand('setContext', 'posthog.hasApiKey', !!key);
-        });
-    }
+    // Listen for session changes (refresh failure, sign-out from accounts menu)
+    context.subscriptions.push(authProvider.onDidChangeSessions((e: vscode.AuthenticationProviderAuthenticationSessionsChangeEvent) => {
+        if (e.removed && e.removed.length > 0 && authService.isAuthenticated()) {
+            handleSessionLost();
+        }
+    }));
 
     // Debug tree — only visible in development mode
     const isDev = context.extensionMode !== vscode.ExtensionMode.Production;
@@ -246,21 +273,29 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     // ── Pre-load caches on startup if authenticated ──
+    // Verify session actually exists first, then load caches
     if (authed) {
-        telemetry.identify();
-        const projectId = authService.getProjectId();
-        if (projectId) {
-            const startupLoad = Promise.all([
-                loadFlags(projectId),
-                loadEvents(projectId),
-                loadExperiments(projectId),
-            ]).catch(err => {
-                const msg = err instanceof Error ? err.message : 'Connection failed';
-                vscode.window.showWarningMessage(`PostHog: ${msg}`);
-                updateStatusBar(true);
-            });
-        }
-        updateStatusBar();
+        authProvider.getSessions().then(async sessions => {
+            if (sessions.length === 0) {
+                // Memento says authenticated but no session — expired or revoked
+                await handleSessionLost();
+                return;
+            }
+            telemetry.identify();
+            const projectId = authService.getProjectId();
+            if (projectId) {
+                Promise.all([
+                    loadFlags(projectId),
+                    loadEvents(projectId),
+                    loadExperiments(projectId),
+                ]).catch(err => {
+                    const msg = err instanceof Error ? err.message : 'Connection failed';
+                    vscode.window.showWarningMessage(`PostHog: ${msg}`);
+                    updateStatusBar(true);
+                });
+            }
+            updateStatusBar();
+        }).catch(() => {});
     }
 
     // ── Periodic refresh ──
@@ -320,7 +355,7 @@ export function activate(context: vscode.ExtensionContext) {
         { dispose: () => clearInterval(flagRefreshInterval) },
         { dispose: () => clearInterval(eventRefreshInterval) },
         { dispose: () => clearInterval(experimentRefreshInterval) },
-        vscode.window.registerWebviewViewProvider(Views.SIDEBAR, sidebarProvider),
+        vscode.window.registerWebviewViewProvider(Views.SIDEBAR, sidebarProvider, { webviewOptions: { retainContextWhenHidden: true } }),
         vscode.window.registerWebviewViewProvider('posthog-feedback-v2', new FeedbackViewProvider(context.globalState, telemetry, isDev)),
         vscode.languages.registerCompletionItemProvider(languageSelector, completionProvider, "'", '"', '`'),
         vscode.languages.registerCompletionItemProvider(languageSelector, eventCompletionProvider, "'", '"', '`'),
@@ -357,7 +392,7 @@ export function activate(context: vscode.ExtensionContext) {
             vscode.window.showInformationMessage(`Copied: ${value}`);
         }),
         vscode.commands.registerCommand('posthog.debugRefresh', () => debugTreeProvider.refresh()),
-        ...registerAuthCommands(authService, postHogService, sidebarProvider, telemetry),
+        ...registerAuthCommands(authService, postHogService, authProvider, sidebarProvider, telemetry),
         ...registerFeatureFlagCommands(authService, postHogService, sidebarProvider, flagCache, telemetry),
         ...registerStaleFlagCommands(staleFlagService, telemetry),
         registerGenerateTypeCommand(flagCache, treeSitter, telemetry),

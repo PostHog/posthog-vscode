@@ -10,28 +10,40 @@ export class PostHogService {
     }
 
     private async request<T>(path: string, options?: { method?: string; body?: unknown }): Promise<T> {
-        const apiKey = await this.authService.getApiKey();
-        if (!apiKey) {
+        const accessToken = await this.authService.getAccessToken();
+        if (!accessToken) {
             throw new PostHogApiError(401, 'Not authenticated');
         }
 
         const host = this.authService.getHost().replace(/\/+$/, '');
         const url = `${host}${path}`;
 
-        let response: Response;
-        try {
-            response = await fetch(url, {
-                method: options?.method ?? 'GET',
-                headers: {
-                    'Authorization': `Bearer ${apiKey}`,
-                    'Content-Type': 'application/json',
-                },
-                body: options?.body ? JSON.stringify(options.body) : undefined,
-            });
-        } catch (err) {
-            // Network error — server unreachable, DNS failure, connection refused
-            const message = err instanceof Error ? err.message : 'Network error';
-            throw new PostHogApiError(0, `Unable to reach PostHog at ${host}: ${message}`);
+        const doFetch = async (token: string): Promise<Response> => {
+            try {
+                return await fetch(url, {
+                    method: options?.method ?? 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: options?.body ? JSON.stringify(options.body) : undefined,
+                });
+            } catch (err) {
+                const message = err instanceof Error ? err.message : 'Network error';
+                throw new PostHogApiError(0, `Unable to reach PostHog at ${host}: ${message}`);
+            }
+        };
+
+        let response = await doFetch(accessToken);
+
+        // On 401, try refreshing the token once and retry
+        if (response.status === 401) {
+            try {
+                const freshToken = await this.authService.forceRefreshToken();
+                response = await doFetch(freshToken);
+            } catch {
+                // Refresh failed — fall through to the error below
+            }
         }
 
         if (!response.ok) {
@@ -67,6 +79,10 @@ export class PostHogService {
     async getProjects(): Promise<Project[]> {
         const data = await this.request<PaginatedResponse<Project>>('/api/projects/');
         return data.results;
+    }
+
+    async getProject(projectId: number): Promise<Project> {
+        return this.request<Project>(`/api/projects/${projectId}/`);
     }
 
     async getFeatureFlags(projectId: number): Promise<FeatureFlag[]> {

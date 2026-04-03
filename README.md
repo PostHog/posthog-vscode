@@ -30,7 +30,7 @@ PostHog for VS Code - and any other VSCode-based editor - brings your product an
 
 ## Quick Start
 
-1. **Install** the extension from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=PostHog.posthog-vscode)
+1. **Install** the extension from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=PostHog.posthog-vscode) or [VSX Marketplace](https://open-vsx.org/extension/posthog/posthog-vscode)
 2. **Sign in** — open the PostHog sidebar (hedgehog icon in the activity bar) and click "Sign In with PostHog" to authenticate with your PostHog account
 3. **Select your project** when prompted
 4. **Done** — the sidebar populates with your flags, experiments, and analytics. Inline decorations appear in your code automatically.
@@ -113,24 +113,24 @@ Share PostHog settings across your team and manage multi-project workspaces.
 
 All commands are available via the Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`):
 
-| Command | Description |
-|---------|-------------|
-| `PostHog: Sign In` | Authenticate with your PostHog account |
-| `PostHog: Sign Out` | Disconnect from PostHog |
-| `PostHog: Select Project` | Switch between projects |
-| `PostHog: Refresh Feature Flags` | Re-fetch flags, events, and experiments |
-| `PostHog: Create Feature Flag` | Create a new flag in PostHog |
-| `PostHog: Copy Flag Key` | Copy a flag key to clipboard |
-| `PostHog: Open in PostHog` | Open the flag in the PostHog dashboard |
-| `PostHog: Show Flag Detail` | Open flag detail panel in an editor tab |
-| `PostHog: Show Experiment Detail` | Open experiment detail panel in an editor tab |
-| `PostHog: Find Flag References` | Find all usages of a flag in the codebase |
-| `PostHog: Watch Sessions` | Open session replay for a flag or event |
-| `PostHog: Generate Flag Types` | Generate TypeScript types from all flag configs |
-| `PostHog: Generate Type` | Generate TypeScript type for a specific flag (context menu) |
-| `PostHog: Scan for Stale Flags` | Find stale flag references across the codebase |
-| `PostHog: Clean Up Stale Flag` | Remove a stale flag check from code |
-| `PostHog: Run Setup Wizard` | Launch the PostHog setup wizard in a terminal |
+| Command                           | Description                                                 |
+| --------------------------------- | ----------------------------------------------------------- |
+| `PostHog: Sign In`                | Authenticate with your PostHog account                      |
+| `PostHog: Sign Out`               | Disconnect from PostHog                                     |
+| `PostHog: Select Project`         | Switch between projects                                     |
+| `PostHog: Refresh Feature Flags`  | Re-fetch flags, events, and experiments                     |
+| `PostHog: Create Feature Flag`    | Create a new flag in PostHog                                |
+| `PostHog: Copy Flag Key`          | Copy a flag key to clipboard                                |
+| `PostHog: Open in PostHog`        | Open the flag in the PostHog dashboard                      |
+| `PostHog: Show Flag Detail`       | Open flag detail panel in an editor tab                     |
+| `PostHog: Show Experiment Detail` | Open experiment detail panel in an editor tab               |
+| `PostHog: Find Flag References`   | Find all usages of a flag in the codebase                   |
+| `PostHog: Watch Sessions`         | Open session replay for a flag or event                     |
+| `PostHog: Generate Flag Types`    | Generate TypeScript types from all flag configs             |
+| `PostHog: Generate Type`          | Generate TypeScript type for a specific flag (context menu) |
+| `PostHog: Scan for Stale Flags`   | Find stale flag references across the codebase              |
+| `PostHog: Clean Up Stale Flag`    | Remove a stale flag check from code                         |
+| `PostHog: Run Setup Wizard`       | Launch the PostHog setup wizard in a terminal               |
 
 ---
 
@@ -142,31 +142,31 @@ All settings live under `posthog.*` in VS Code settings (JSON or UI).
 
 **Code detection**
 
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `posthog.additionalClientNames` | `string[]` | `[]` | Extra variable names to recognize as PostHog clients (e.g. `analytics`, `telemetry`, `phClient`). The built-in names `posthog`, `client`, and `ph` are always detected, plus any variable assigned from `new PostHog(...)`. |
-| `posthog.additionalFlagFunctions` | `string[]` | `[]` | Extra bare function names that accept a flag key as the first argument. React hooks (`useFeatureFlag`, `useFeatureFlagPayload`, `useFeatureFlagVariantKey`, `useActiveFeatureFlags`) are detected automatically. |
-| `posthog.detectNestedClients` | `boolean` | `true` | Detect PostHog calls through nested member expressions like `window.posthog?.capture()`. |
+| Setting                           | Type       | Default | Description                                                                                                                                                                                                                 |
+| --------------------------------- | ---------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `posthog.additionalClientNames`   | `string[]` | `[]`    | Extra variable names to recognize as PostHog clients (e.g. `analytics`, `telemetry`, `phClient`). The built-in names `posthog`, `client`, and `ph` are always detected, plus any variable assigned from `new PostHog(...)`. |
+| `posthog.additionalFlagFunctions` | `string[]` | `[]`    | Extra bare function names that accept a flag key as the first argument. React hooks (`useFeatureFlag`, `useFeatureFlagPayload`, `useFeatureFlagVariantKey`, `useActiveFeatureFlags`) are detected automatically.            |
+| `posthog.detectNestedClients`     | `boolean`  | `true`  | Detect PostHog calls through nested member expressions like `window.posthog?.capture()`.                                                                                                                                    |
 
 **Display**
 
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `posthog.showInlineDecorations` | `boolean` | `true` | Show inline flag status and event volume decorations in the editor. Set to `false` to hide all inline annotations. |
+| Setting                         | Type      | Default | Description                                                                                                        |
+| ------------------------------- | --------- | ------- | ------------------------------------------------------------------------------------------------------------------ |
+| `posthog.showInlineDecorations` | `boolean` | `true`  | Show inline flag status and event volume decorations in the editor. Set to `false` to hide all inline annotations. |
 
 **Stale flag detection**
 
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `posthog.staleFlagAgeDays` | `number` | `30` | Minimum age in days before a fully-rolled-out flag is considered stale. Flags rolled out more recently than this are not flagged. |
-| `posthog.staleFlagExcludePatterns` | `string[]` | `[]` | Additional glob patterns to exclude from stale flag scanning (e.g. `**/tests/**`, `**/fixtures/**`). `node_modules`, `dist`, and `build` are always excluded. |
+| Setting                            | Type       | Default | Description                                                                                                                                                   |
+| ---------------------------------- | ---------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `posthog.staleFlagAgeDays`         | `number`   | `30`    | Minimum age in days before a fully-rolled-out flag is considered stale. Flags rolled out more recently than this are not flagged.                             |
+| `posthog.staleFlagExcludePatterns` | `string[]` | `[]`    | Additional glob patterns to exclude from stale flag scanning (e.g. `**/tests/**`, `**/fixtures/**`). `node_modules`, `dist`, and `build` are always excluded. |
 
 **Workspace**
 
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `posthog.useWorkspaceConfig` | `boolean` | `true` | Automatically load team settings from `.posthog.json` in the workspace root. |
-| `posthog.multiProjectNotifications` | `boolean` | `true` | Show a notification when opening a file from a workspace folder configured for a different PostHog project. |
+| Setting                             | Type      | Default | Description                                                                                                 |
+| ----------------------------------- | --------- | ------- | ----------------------------------------------------------------------------------------------------------- |
+| `posthog.useWorkspaceConfig`        | `boolean` | `true`  | Automatically load team settings from `.posthog.json` in the workspace root.                                |
+| `posthog.multiProjectNotifications` | `boolean` | `true`  | Show a notification when opening a file from a workspace folder configured for a different PostHog project. |
 
 ### Team Configuration (`.posthog.json`)
 
@@ -174,26 +174,25 @@ Share PostHog settings across your team by committing a `.posthog.json` file to 
 
 ```json
 {
-  "host": "https://us.posthog.com",
   "projectId": 12345,
   "additionalClientNames": ["analytics"],
   "additionalFlagFunctions": ["useMyFlag"]
 }
 ```
 
-When present, the extension loads this file on startup and merges the settings with your VS Code configuration. Each developer still authenticates individually with their own API key.
+When present, the extension loads this file on startup and merges the settings with your VS Code configuration. Each developer still authenticates individually with their own PostHog account. If a `projectId` is specified, the user must have access to that project.
 
-In a multi-root workspace, each folder can have its own `.posthog.json` targeting a different project — the extension detects project switches as you navigate between folders.
+In a multi-root workspace, each folder can have its own `.posthog.json` targeting a different project — the extension prompts to switch projects as you navigate between folders.
 
 ### Supported Languages
 
 Code intelligence (autocomplete, decorations, diagnostics, code actions) works in:
 
-| Language | File Types | SDKs |
-|----------|-----------|------|
-| JavaScript | `.js`, `.jsx` | posthog-js, posthog-node |
-| TypeScript | `.ts`, `.tsx` | posthog-js, posthog-node |
-| React Native | `.jsx`, `.tsx` | posthog-react-native |
+| Language     | File Types     | SDKs                     |
+| ------------ | -------------- | ------------------------ |
+| JavaScript   | `.js`, `.jsx`  | posthog-js, posthog-node |
+| TypeScript   | `.ts`, `.tsx`  | posthog-js, posthog-node |
+| React Native | `.jsx`, `.tsx` | posthog-react-native     |
 
 Powered by [tree-sitter](https://tree-sitter.github.io/tree-sitter/) for accurate AST-based detection. Both client-side (`posthog.capture('event')`) and server-side (`client.capture({ event: 'event' })`) patterns are recognized.
 
@@ -217,5 +216,5 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for development se
 [MIT](LICENSE)
 
 <p align="center">
-  Built by the PostHog community
+  Built by the [🌳 team](https://posthog.com/teams/growth) at [🦔 PostHog](https://posthog.com/)
 </p>

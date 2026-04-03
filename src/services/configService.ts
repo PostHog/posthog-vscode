@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 
 export interface PostHogProjectConfig {
-    host?: string;
     projectId?: number;
     additionalClientNames?: string[];
     additionalFlagFunctions?: string[];

@@ -86,15 +86,20 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     // Load workspace config (.posthog.json) and apply defaults
-    configService.loadWorkspaceConfig().then(projectConfig => {
+    configService.loadWorkspaceConfig().then(async projectConfig => {
         if (projectConfig) {
-            // Apply config host as default if user hasn't set one explicitly
-            if (projectConfig.host && authService.getHost() === 'https://us.posthog.com') {
-                authService.setHost(projectConfig.host).catch(() => {});
-            }
             // Apply config projectId if user hasn't selected one yet
             if (projectConfig.projectId && !authService.getProjectId()) {
-                authService.setProjectId(projectConfig.projectId).catch(() => {});
+                try {
+                    // Validate user has access to this project
+                    const project = await postHogService.getProject(projectConfig.projectId);
+                    await authService.setProjectId(projectConfig.projectId);
+                    await authService.setProjectName(project.name);
+                } catch {
+                    vscode.window.showWarningMessage(
+                        `PostHog: Cannot access project ${projectConfig.projectId} from .posthog.json. You may not have permission to access this project.`
+                    );
+                }
             }
             // Reload detection config with merged values
             treeSitter.updateConfig(loadDetectionConfig());
@@ -579,15 +584,20 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showInformationMessage(
                     `This folder (${folderName}) is configured for a different PostHog project (ID: ${folderConfig.projectId}). Switch project?`,
                     'Switch', 'Ignore'
-                ).then(choice => {
+                ).then(async choice => {
                     if (choice === 'Switch') {
-                        authService.setProjectId(folderConfig.projectId!).then(() => {
-                            if (folderConfig.host) {
-                                authService.setHost(folderConfig.host).catch(() => {});
-                            }
+                        try {
+                            // Validate user has access to this project before switching
+                            const project = await postHogService.getProject(folderConfig.projectId!);
+                            await authService.setProjectId(folderConfig.projectId!);
+                            await authService.setProjectName(project.name);
                             sidebarProvider.refresh();
                             telemetry.capture('project_switched_via_folder', { projectId: folderConfig.projectId });
-                        }).catch(() => {});
+                        } catch {
+                            vscode.window.showErrorMessage(
+                                `PostHog: Cannot switch to project ${folderConfig.projectId}. You may not have permission to access this project.`
+                            );
+                        }
                     }
                 });
             }

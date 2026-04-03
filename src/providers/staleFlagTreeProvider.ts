@@ -80,7 +80,9 @@ export class StaleFlagTreeProvider implements vscode.TreeDataProvider<TreeItem> 
         service.onDidChange(() => {
             this._onDidChangeTreeData.fire(undefined);
             this.updateBadge();
-            vscode.commands.executeCommand('setContext', 'posthog.hasStaleFlagResults', service.getStaleFlags().length > 0);
+            const staleFlags = service.getStaleFlags();
+            vscode.commands.executeCommand('setContext', 'posthog.hasStaleFlagResults', staleFlags.length > 0);
+            vscode.commands.executeCommand('setContext', 'posthog.hasScannedForStaleFlags', true);
         });
     }
 

@@ -171,8 +171,13 @@
     "viewsWelcome": [
       {
         "view": "posthog-stale-flags",
-        "contents": "No stale flags found yet.\n[Scan for Stale Flags](command:posthog.scanStaleFlags)\nEvery feature flag evaluation counts toward your PostHog bill — even for flags that are disabled or fully rolled out. Cleaning up stale flags reduces unnecessary API calls and saves costs.",
-        "when": "posthog.isAuthenticated"
+        "contents": "$(pass) All clear! No stale flags found in your codebase.\n\nYour feature flag usage looks healthy. Run another scan anytime to check for newly stale flags.\n[$(search) Scan Again](command:posthog.scanStaleFlags)",
+        "when": "posthog.isAuthenticated && posthog.hasScannedForStaleFlags && !posthog.hasStaleFlagResults"
+      },
+      {
+        "view": "posthog-stale-flags",
+        "contents": "Scan your codebase for feature flags that can be cleaned up.\n[$(search) Scan for Stale Flags](command:posthog.scanStaleFlags)\nThis will find flags that are:\n$(warning) Not in PostHog — keys not found in your project\n$(circle-slash) Inactive — flags that are turned off\n$(beaker) Experiment complete — linked experiment has ended\n$(check-all) Fully rolled out — 100% rollout, no conditions\n\nEvery flag check is a billed API call — cleaning up stale flags saves costs.\n[$(gear) Configure Settings](command:workbench.action.openSettings?%5B%22posthog.staleFlag%22%5D)\n[$(book) Feature Flags Docs](https://posthog.com/docs/feature-flags)",
+        "when": "posthog.isAuthenticated && !posthog.hasScannedForStaleFlags"
       }
     ],
     "configuration": {

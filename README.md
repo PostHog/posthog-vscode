@@ -9,8 +9,14 @@
 </p>
 
 <p align="center">
-  <a href="https://marketplace.visualstudio.com/items?itemName=PostHog.posthog-vscode"><img src="https://img.shields.io/visual-studio-marketplace/v/PostHog.posthog-vscode?label=marketplace" alt="VS Marketplace" /></a>
-  <a href="https://marketplace.visualstudio.com/items?itemName=PostHog.posthog-vscode"><img src="https://img.shields.io/visual-studio-marketplace/i/PostHog.posthog-vscode" alt="Installs" /></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=PostHog.posthog-vscode"><img src="https://img.shields.io/visual-studio-marketplace/v/PostHog.posthog-vscode?label=VSCode" alt="VSCode Marketplace" /></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=PostHog.posthog-vscode"><img src="https://img.shields.io/visual-studio-marketplace/i/PostHog.posthog-vscode?label=Downloads" alt="VSCode Installs" /></a>
+  <br/>
+  <a href="https://open-vsx.org/extension/posthog/posthog-vscode"><img src="https://img.shields.io/open-vsx/v/posthog/posthog-vscode?label=VSX
+  " alt="VSX Marketplace" /></a>
+  <a href="https://open-vsx.org/extension/posthog/posthog-vscode"><img src="https://img.shields.io/open-vsx/dt/posthog/posthog-vscode?label=Downloads
+  " alt="VSCode Installs" /></a>
+  <br/>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/PostHog/posthog-vscode" alt="License" /></a>
 </p>
 
@@ -18,7 +24,7 @@
 
 ## What it does
 
-PostHog for VS Code brings your product analytics stack into the editor. See feature flag status, experiment results, event volumes, and session replay data right next to the code that uses them — no browser tab required.
+PostHog for VS Code - and any other VSCode-based editor - brings your product analytics stack into the editor. See feature flag status, experiment results, event volumes, and session replay data right next to the code that uses them — no browser tab required.
 
 ---
 

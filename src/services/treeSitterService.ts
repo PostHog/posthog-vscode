@@ -10,6 +10,8 @@ export interface PostHogCall {
     line: number;
     keyStartCol: number;
     keyEndCol: number;
+    /** True when the first argument is a non-literal expression (ternary, variable, etc.) */
+    dynamic?: boolean;
 }
 
 export interface FunctionInfo {
@@ -559,6 +561,84 @@ export class TreeSitterService {
             }
         }
 
+        // Resolve calls with identifier first argument: posthog.capture(MY_CONST) / posthog.getFeatureFlag(FLAG_KEY)
+        const constantMap = this.buildConstantMap(lang, tree);
+        if (constantMap.size > 0) {
+            const identArgQuery = this.getQuery(lang, `
+                (call_expression
+                    function: (member_expression
+                        object: (_) @client
+                        property: (property_identifier) @method)
+                    arguments: (arguments . (identifier) @arg_id)) @call
+            `);
+            if (identArgQuery) {
+                const identMatches = identArgQuery.matches(tree.rootNode);
+                for (const match of identMatches) {
+                    const clientNode = match.captures.find(c => c.name === 'client');
+                    const methodNode = match.captures.find(c => c.name === 'method');
+                    const argNode = match.captures.find(c => c.name === 'arg_id');
+                    if (!clientNode || !methodNode || !argNode) { continue; }
+
+                    const clientName = this.extractClientName(clientNode.node);
+                    const method = methodNode.node.text;
+                    if (!clientName || !allClients.has(clientName)) { continue; }
+                    if (!family.allMethods.has(method)) { continue; }
+
+                    const resolved = constantMap.get(argNode.node.text);
+                    if (!resolved) { continue; }
+
+                    // Skip if already matched with a string literal on this line
+                    const line = argNode.node.startPosition.row;
+                    if (calls.some(c => c.line === line && c.key === resolved)) { continue; }
+
+                    calls.push({
+                        method,
+                        key: resolved,
+                        line,
+                        keyStartCol: argNode.node.startPosition.column,
+                        keyEndCol: argNode.node.endPosition.column,
+                    });
+                }
+            }
+        }
+
+        // Detect dynamic capture calls (non-string first argument)
+        const matchedLines = new Set(calls.map(c => c.line));
+        const dynamicQuery = this.getQuery(lang, `
+            (call_expression
+                function: (member_expression
+                    object: (_) @client
+                    property: (property_identifier) @method)
+                arguments: (arguments . (_) @first_arg)) @call
+        `);
+        if (dynamicQuery) {
+            const matches = dynamicQuery.matches(tree.rootNode);
+            for (const match of matches) {
+                const clientNode = match.captures.find(c => c.name === 'client');
+                const methodNode = match.captures.find(c => c.name === 'method');
+                const firstArgNode = match.captures.find(c => c.name === 'first_arg');
+                if (!clientNode || !methodNode || !firstArgNode) { continue; }
+
+                const clientName = this.extractClientName(clientNode.node);
+                const method = methodNode.node.text;
+                if (!clientName || !allClients.has(clientName)) { continue; }
+                if (!family.captureMethods.has(method)) { continue; }
+
+                const line = firstArgNode.node.startPosition.row;
+                if (matchedLines.has(line)) { continue; } // already matched with a string key
+
+                calls.push({
+                    method,
+                    key: '',
+                    line,
+                    keyStartCol: firstArgNode.node.startPosition.column,
+                    keyEndCol: firstArgNode.node.endPosition.column,
+                    dynamic: true,
+                });
+                matchedLines.add(line);
+            }
+        }
+
         return calls;
     }
 
@@ -750,6 +830,73 @@ export class TreeSitterService {
                 // Find if-chains and switches using this variable
                 this.findIfChainsForVar(tree.rootNode, varName, flagKey, afterNode, branches);
                 this.findSwitchForVar(tree.rootNode, varName, flagKey, afterNode, branches);
+            }
+        }
+
+        // 1a. Resolve flag assignments with identifier arguments: const v = posthog.getFeatureFlag(MY_FLAG)
+        const constantMap = this.buildConstantMap(lang, tree);
+        if (constantMap.size > 0) {
+            const identAssignQuery = this.getQuery(lang, `
+                (lexical_declaration
+                    (variable_declarator
+                        name: (identifier) @var_name
+                        value: (call_expression
+                            function: (member_expression
+                                object: (_) @client
+                                property: (property_identifier) @method)
+                            arguments: (arguments . (identifier) @flag_id)))) @assignment
+
+                (lexical_declaration
+                    (variable_declarator
+                        name: (identifier) @var_name
+                        value: (await_expression
+                            (call_expression
+                                function: (member_expression
+                                    object: (_) @client
+                                    property: (property_identifier) @method)
+                                arguments: (arguments . (identifier) @flag_id))))) @assignment
+
+                (variable_declaration
+                    (variable_declarator
+                        name: (identifier) @var_name
+                        value: (call_expression
+                            function: (member_expression
+                                object: (_) @client
+                                property: (property_identifier) @method)
+                            arguments: (arguments . (identifier) @flag_id)))) @assignment
+
+                (variable_declaration
+                    (variable_declarator
+                        name: (identifier) @var_name
+                        value: (await_expression
+                            (call_expression
+                                function: (member_expression
+                                    object: (_) @client
+                                    property: (property_identifier) @method)
+                                arguments: (arguments . (identifier) @flag_id))))) @assignment
+            `);
+            if (identAssignQuery) {
+                const matches = identAssignQuery.matches(tree.rootNode);
+                for (const match of matches) {
+                    const varNode = match.captures.find(c => c.name === 'var_name');
+                    const clientNode = match.captures.find(c => c.name === 'client');
+                    const methodNode = match.captures.find(c => c.name === 'method');
+                    const argNode = match.captures.find(c => c.name === 'flag_id');
+                    const assignNode = match.captures.find(c => c.name === 'assignment');
+
+                    if (!varNode || !clientNode || !methodNode || !argNode) { continue; }
+                    const varClientName = this.extractClientName(clientNode.node);
+                    if (!varClientName || !allClients.has(varClientName)) { continue; }
+                    if (!family.flagMethods.has(methodNode.node.text)) { continue; }
+
+                    const resolved = constantMap.get(argNode.node.text);
+                    if (!resolved) { continue; }
+
+                    const varName = varNode.node.text;
+                    const afterNode = assignNode?.node || varNode.node;
+                    this.findIfChainsForVar(tree.rootNode, varName, resolved, afterNode, branches);
+                    this.findSwitchForVar(tree.rootNode, varName, resolved, afterNode, branches);
+                }
             }
         }
 
@@ -1345,6 +1492,32 @@ export class TreeSitterService {
             if (inner.type === 'identifier' && inner.text === varName) { return true; }
         }
         return false;
+    }
+
+    /** Build a map of const/let/var identifier → string value from the file */
+    private buildConstantMap(lang: Parser.Language, tree: Parser.Tree): Map<string, string> {
+        const constants = new Map<string, string>();
+        const query = this.getQuery(lang, `
+            (lexical_declaration
+                (variable_declarator
+                    name: (identifier) @name
+                    value: (string (string_fragment) @value)))
+
+            (variable_declaration
+                (variable_declarator
+                    name: (identifier) @name
+                    value: (string (string_fragment) @value)))
+        `);
+        if (!query) { return constants; }
+        const matches = query.matches(tree.rootNode);
+        for (const match of matches) {
+            const nameNode = match.captures.find(c => c.name === 'name');
+            const valueNode = match.captures.find(c => c.name === 'value');
+            if (nameNode && valueNode) {
+                constants.set(nameNode.node.text, valueNode.node.text);
+            }
+        }
+        return constants;
     }
 
     private extractIdentifier(node: Parser.SyntaxNode): string | null {

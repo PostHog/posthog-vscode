@@ -212,9 +212,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             isDev: this.isDev,
             wizardEnabled: !!(wizardFlag && wizardFlag.active),
         });
-        if (authed && hasProject) {
-            this.loadInsights().catch(() => {});
-        }
+        // Don't eagerly load data here — let the webview request what it needs via tab switching
     }
 
     // ── Data loaders ──
@@ -228,6 +226,20 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     private async loadFlags() {
         const projectId = this.authService.getProjectId();
         if (!projectId) { return; }
+
+        // Serve from background cache if available (populated by extension.ts on startup)
+        const cached = this.flagCache.getFlags().filter(f => !f.deleted);
+        if (cached.length > 0) {
+            if (!this.userEmail) {
+                this.userEmail = await this.postHogService.getCurrentUserEmail().catch(() => null);
+            }
+            const sorted = [...cached].sort((a, b) => {
+                if (a.active !== b.active) { return a.active ? -1 : 1; }
+                return a.key.localeCompare(b.key);
+            });
+            this.postMessage({ type: 'flags', data: sorted, projectId, userEmail: this.userEmail, hasMore: false, total: sorted.length });
+            return;
+        }
 
         this.flagsCursor = null;
         this.postMessage({ type: 'loading', section: 'flags' });
@@ -271,12 +283,23 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         const projectId = this.authService.getProjectId();
         if (!projectId) { return; }
 
+        // Serve from background cache if available
+        const cached = this.experimentCache?.getExperiments();
+        if (cached && cached.length > 0) {
+            const resultsMap: Record<number, unknown> = {};
+            for (const exp of cached) {
+                const r = this.experimentCache!.getResults(exp.id);
+                if (r) { resultsMap[exp.id] = r; }
+            }
+            this.postMessage({ type: 'experiments', data: cached, results: resultsMap, projectId, hasMore: false, total: cached.length });
+            return;
+        }
+
         this.experimentsCursor = null;
         this.postMessage({ type: 'loading', section: 'experiments' });
         try {
             const page = await this.postHogService.getExperimentsPage(projectId);
             this.experimentsCursor = page.next;
-            // Build results map from cache (prefetched on startup)
             const resultsMap: Record<number, unknown> = {};
             if (this.experimentCache) {
                 for (const exp of page.results) {
@@ -317,6 +340,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     private async loadInsights() {
         const projectId = this.authService.getProjectId();
         if (!projectId) { return; }
+
+        // Serve from local cache if available
+        if (this.insightsCache && this.insightsCache.length > 0) {
+            this.postMessage({ type: 'insights', data: this.insightsCache, projectId });
+            return;
+        }
 
         this.postMessage({ type: 'loading', section: 'analytics' });
         try {

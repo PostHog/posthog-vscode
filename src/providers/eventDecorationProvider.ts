@@ -73,6 +73,21 @@ export class EventDecorationProvider {
         for (const call of calls) {
             if (!CAPTURE_METHODS.has(call.method)) { continue; }
 
+            if (call.dynamic) {
+                const line = doc.lineAt(call.line);
+                decorations.push({
+                    range: new vscode.Range(call.line, line.text.length, call.line, line.text.length),
+                    renderOptions: {
+                        after: {
+                            contentText: '    ⚠ dynamic event name',
+                            color: new vscode.ThemeColor('editorGhostText.foreground') as unknown as string,
+                            fontStyle: 'italic',
+                        },
+                    },
+                });
+                continue;
+            }
+
             const eventName = call.key;
             const volume = this.eventCache.getVolume(eventName);
             const event = this.eventCache.getEvent(eventName);
@@ -80,21 +95,29 @@ export class EventDecorationProvider {
             let text: string;
             let color: string;
 
+            const sparkline = this.eventCache.getSparkline(eventName);
+
             if (volume && volume.count > 0) {
-                const sparkline = this.eventCache.getSparkline(eventName);
                 const spark = sparkline ? `${buildSparkline(sparkline)} ` : '';
                 text = `${spark}${formatCount(volume.count)} in ${volume.days}d`;
                 color = '#4CBB17';
+            } else if (sparkline) {
+                // Has sparkline data but volume query returned 0 (possible timing mismatch)
+                text = `${buildSparkline(sparkline)} 0 in 7d`;
+                color = new vscode.ThemeColor('editorGhostText.foreground') as unknown as string;
             } else if (event) {
                 const lastSeen = event.last_seen_at;
                 if (lastSeen) {
                     const daysAgo = Math.floor((Date.now() - new Date(lastSeen).getTime()) / 86400000);
                     text = daysAgo === 0 ? 'last seen today' : `last seen ${daysAgo}d ago`;
-                    color = daysAgo <= 7 ? '#4CBB17' : new vscode.ThemeColor('editorGhostText.foreground') as unknown as string;
+                    color = new vscode.ThemeColor('editorGhostText.foreground') as unknown as string;
                 } else {
                     text = 'no events yet';
                     color = '#F9BD2B';
                 }
+            } else if (!this.eventCache.lastRefreshed) {
+                // Cache hasn't loaded yet — skip decoration instead of showing "unknown"
+                continue;
             } else {
                 text = 'unknown event';
                 color = '#F9BD2B';

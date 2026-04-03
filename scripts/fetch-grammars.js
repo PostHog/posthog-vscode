@@ -46,7 +46,9 @@ function buildGrammar(grammarPkg, outputName, subDir) {
         fs.mkdirSync(tempDir, { recursive: true });
     }
 
-    const grammarDir = path.join(tempDir, 'node_modules', grammarPkg);
+    // Strip version specifier from package name for the directory path
+    const dirName = grammarPkg.replace(/@[\d.]+.*$/, '');
+    const grammarDir = path.join(tempDir, 'node_modules', dirName);
     if (!fs.existsSync(grammarDir)) {
         process.stdout.write(`  ↓ Installing ${grammarPkg}...`);
         try {
@@ -73,7 +75,11 @@ function buildGrammar(grammarPkg, outputName, subDir) {
         console.log(` ${size}KB`);
         return true;
     } catch (err) {
+        const stderr = err.stderr ? err.stderr.toString().trim() : '';
+        const stdout = err.stdout ? err.stdout.toString().trim() : '';
+        const msg = stderr || stdout || err.message || '';
         console.log(` FAILED`);
+        if (msg) { console.log(`    → ${msg}`); }
         return false;
     }
 }

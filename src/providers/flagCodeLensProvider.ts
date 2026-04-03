@@ -5,8 +5,7 @@ import { TreeSitterService } from '../services/treeSitterService';
 import { TelemetryService } from '../services/telemetryService';
 import { FeatureFlag } from '../models/types';
 import { Commands } from '../constants';
-
-type FlagType = 'boolean' | 'multivariate' | 'remote_config';
+import { FlagType, classifyFlagType, extractRollout } from '../utils/flagClassification';
 
 const FLAG_METHODS = new Set([
     'getFeatureFlag', 'isFeatureEnabled', 'getFeatureFlagPayload',
@@ -68,11 +67,11 @@ export class FlagCodeLensProvider implements vscode.CodeLensProvider {
             // No flag in cache — skip CodeLens (decoration handles unknown flags)
             if (!flag) { continue; }
 
-            const flagType = this.classifyFlag(flag);
+            const flagType = classifyFlagType(flag);
 
             switch (flagType) {
                 case 'boolean': {
-                    const rollout = this.extractRollout(flag);
+                    const rollout = extractRollout(flag);
                     const statusLabel = flag.active
                         ? `enabled${rollout !== null ? ` \u00b7 ${rollout}%` : ''}`
                         : 'disabled';
@@ -115,41 +114,6 @@ export class FlagCodeLensProvider implements vscode.CodeLensProvider {
         }
 
         return lenses;
-    }
-
-    private classifyFlag(flag: FeatureFlag): FlagType {
-        const filters = flag.filters as Record<string, unknown> | undefined;
-
-        // Check for multivariate
-        if (filters?.multivariate && typeof filters.multivariate === 'object') {
-            const mv = filters.multivariate as { variants?: unknown[] };
-            if (mv.variants && mv.variants.length > 0) { return 'multivariate'; }
-        }
-
-        // Check for remote config (payload without multivariate)
-        if (filters?.payloads && typeof filters.payloads === 'object') {
-            const payloads = filters.payloads as Record<string, unknown>;
-            const hasPayload = Object.values(payloads).some(v => v !== null && v !== undefined);
-            if (hasPayload) { return 'remote_config'; }
-        }
-
-        return 'boolean';
-    }
-
-    private extractRollout(flag: FeatureFlag): number | null {
-        if (flag.rollout_percentage !== null && flag.rollout_percentage !== undefined) {
-            return flag.rollout_percentage;
-        }
-        const filters = flag.filters as Record<string, unknown> | undefined;
-        if (filters?.groups && Array.isArray(filters.groups)) {
-            for (const group of filters.groups) {
-                if (typeof group === 'object' && group !== null) {
-                    const rp = (group as Record<string, unknown>).rollout_percentage;
-                    if (typeof rp === 'number') { return rp; }
-                }
-            }
-        }
-        return null;
     }
 
     private getVariantCount(flag: FeatureFlag): number {

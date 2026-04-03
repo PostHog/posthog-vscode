@@ -10,6 +10,8 @@ const FLAG_METHODS = new Set([
     'getFeatureFlagResult', 'isFeatureFlagEnabled', 'getRemoteConfig',
     'get_feature_flag', 'is_feature_enabled', 'get_feature_flag_payload', 'get_remote_config',
     'GetFeatureFlag', 'IsFeatureEnabled', 'GetFeatureFlagPayload',
+    // React hooks (bare function calls detected by tree-sitter)
+    'useFeatureFlag', 'useFeatureFlagPayload', 'useFeatureFlagVariantKey', 'useActiveFeatureFlags',
 ]);
 
 const CAPTURE_METHODS = new Set(['capture', 'Capture']);

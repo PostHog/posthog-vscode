@@ -2,6 +2,7 @@ import { EventDefinition, EventProperty } from '../models/types';
 
 export class EventCacheService {
     private events: EventDefinition[] = [];
+    private eventsByName: Map<string, EventDefinition> = new Map();
     private volumes: Map<string, { count: number; days: number }> = new Map();
     private sparklines: Map<string, number[]> = new Map();
     private properties: Map<string, EventProperty[]> = new Map();
@@ -16,7 +17,7 @@ export class EventCacheService {
     }
 
     getEvent(name: string): EventDefinition | undefined {
-        return this.events.find(e => e.name === name);
+        return this.eventsByName.get(name);
     }
 
     getEventNames(): string[] {
@@ -38,6 +39,10 @@ export class EventCacheService {
 
     update(events: EventDefinition[]): void {
         this.events = events;
+        this.eventsByName = new Map();
+        for (const e of events) {
+            this.eventsByName.set(e.name, e);
+        }
         this._lastRefreshed = new Date();
         this.notify();
     }
@@ -47,8 +52,14 @@ export class EventCacheService {
         this.notify();
     }
 
-    onChange(listener: () => void): void {
+    onChange(listener: () => void): { dispose(): void } {
         this.listeners.push(listener);
+        return {
+            dispose: () => {
+                const idx = this.listeners.indexOf(listener);
+                if (idx >= 0) { this.listeners.splice(idx, 1); }
+            },
+        };
     }
 
     getProperties(eventName: string): EventProperty[] | undefined {

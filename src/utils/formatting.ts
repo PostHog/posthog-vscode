@@ -5,6 +5,9 @@ export function formatCount(n: number): string {
     return String(n);
 }
 
+/** Alias for formatCount — canonical name used across providers */
+export const formatNumber = formatCount;
+
 /** Format a decimal as percentage string */
 export function formatPct(n: number): string {
     return `${(n * 100).toFixed(1)}%`;

@@ -199,6 +199,11 @@
           "default": true,
           "markdownDescription": "Detect PostHog calls through nested member expressions like `window.posthog?.capture()`."
         },
+        "posthog.detectWrapperFunctions": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Detect functions that wrap a single `posthog.capture()` or feature flag call and annotate their call sites. For example, `trackSignup()` wrapping `posthog.capture('signup')` will show event decorations at `trackSignup()` call sites."
+        },
         "posthog.showInlineDecorations": {
           "type": "boolean",
           "default": true,

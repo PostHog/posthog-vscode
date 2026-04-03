@@ -31,7 +31,13 @@ export class ExperimentCacheService {
         for (const listener of this.listeners) { listener(); }
     }
 
-    onChange(listener: () => void): void {
+    onChange(listener: () => void): { dispose(): void } {
         this.listeners.push(listener);
+        return {
+            dispose: () => {
+                const idx = this.listeners.indexOf(listener);
+                if (idx >= 0) { this.listeners.splice(idx, 1); }
+            },
+        };
     }
 }

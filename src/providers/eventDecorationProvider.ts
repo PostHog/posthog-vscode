@@ -11,6 +11,7 @@ function formatCount(n: number): string {
 }
 
 function buildSparkline(counts: number[]): string {
+    if (counts.length === 0) { return ''; }
     const max = Math.max(...counts);
     if (max === 0) { return SPARK_CHARS[0].repeat(counts.length); }
     return counts.map(v => SPARK_CHARS[Math.min(7, Math.floor((v / max) * 7.99))]).join('');

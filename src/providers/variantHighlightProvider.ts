@@ -3,8 +3,8 @@ import { FlagCacheService } from '../services/flagCacheService';
 import { ExperimentCacheService } from '../services/experimentCacheService';
 import { FeatureFlag, Experiment } from '../models/types';
 import { TreeSitterService } from '../services/treeSitterService';
-
-type FlagType = 'boolean' | 'multivariate' | 'remote_config';
+import { FlagType, classifyFlagType, extractVariants } from '../utils/flagClassification';
+import { formatNumber } from '../utils/formatting';
 
 const PALETTE = [
     { bg: 'rgba(29, 74, 255, 0.07)', border: '#1D4AFF', text: '#6B9BFF' },
@@ -87,30 +87,17 @@ export class VariantHighlightProvider {
             return;
         }
 
+        // TODO: findVariantBranches only detects `if_statement` / `switch_statement` AST nodes.
+        // JSX short-circuit patterns like `{isEnabled && <Component />}` (binary_expression)
+        // and ternary patterns like `variant === 'test' ? <NewFlow /> : <OldFlow />` (ternary_expression)
+        // are NOT detected because they don't produce `if_statement` nodes in the AST.
+        // Supporting these requires tree-sitter query changes in treeSitterService.findVariantBranches().
         const branches = await this.treeSitter.findVariantBranches(doc);
         this.apply(editor, doc, branches);
     }
 
     private classifyFlag(flagKey: string): FlagType {
-        const flag = this.flagCache.getFlag(flagKey);
-        if (!flag) { return 'boolean'; }
-
-        const filters = flag.filters as Record<string, unknown> | undefined;
-
-        // Check for multivariate
-        if (filters?.multivariate && typeof filters.multivariate === 'object') {
-            const mv = filters.multivariate as { variants?: unknown[] };
-            if (mv.variants && mv.variants.length > 0) { return 'multivariate'; }
-        }
-
-        // Check for remote config (payload without multivariate)
-        if (filters?.payloads && typeof filters.payloads === 'object') {
-            const payloads = filters.payloads as Record<string, unknown>;
-            const hasPayload = Object.values(payloads).some(v => v !== null && v !== undefined);
-            if (hasPayload) { return 'remote_config'; }
-        }
-
-        return 'boolean';
+        return classifyFlagType(this.flagCache.getFlag(flagKey));
     }
 
     private apply(
@@ -316,11 +303,8 @@ export class VariantHighlightProvider {
         const flag = this.flagCache.getFlag(flagKey);
         if (!flag) { return []; }
 
-        const filters = flag.filters as Record<string, unknown> | undefined;
-        if (filters?.multivariate && typeof filters.multivariate === 'object') {
-            const mv = filters.multivariate as { variants?: { key: string }[] };
-            if (mv.variants?.length) { return mv.variants.map(v => v.key); }
-        }
+        const variants = extractVariants(flag);
+        if (variants.length > 0) { return variants.map(v => v.key); }
         return ['true', 'false'];
     }
 
@@ -354,8 +338,6 @@ export class VariantHighlightProvider {
     }
 
     private fmtNum(n: number): string {
-        if (n >= 1e6) { return `${(n / 1e6).toFixed(1)}M`; }
-        if (n >= 1e3) { return `${(n / 1e3).toFixed(1)}K`; }
-        return String(n);
+        return formatNumber(n);
     }
 }

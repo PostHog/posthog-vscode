@@ -213,10 +213,22 @@ export class PostHogService {
     }
 
     async getExperiments(projectId: number): Promise<Experiment[]> {
-        const data = await this.request<PaginatedResponse<Experiment>>(
-            `/api/projects/${projectId}/experiments/?limit=50`
-        );
-        return data.results;
+        const experiments: Experiment[] = [];
+        let nextPath: string | null = `/api/projects/${projectId}/experiments/?limit=50`;
+
+        while (nextPath) {
+            const data: PaginatedResponse<Experiment> = await this.request<PaginatedResponse<Experiment>>(nextPath);
+            experiments.push(...data.results);
+
+            if (data.next) {
+                const parsed = new URL(data.next);
+                nextPath = parsed.pathname + parsed.search;
+            } else {
+                nextPath = null;
+            }
+        }
+
+        return experiments;
     }
 
     async getInsights(projectId: number): Promise<Insight[]> {
@@ -368,7 +380,7 @@ export class PostHogService {
         INNER JOIN session_replay_events sr ON sr.session_id = e.$session_id
         WHERE (
             (e.event = '$feature_flag_called' AND e.properties.$feature_flag = '${safeKey}')
-            OR e.properties.$feature.${safeKey} IS NOT NULL
+            OR e.properties['$feature']['${safeKey}'] IS NOT NULL
         )
             AND e.$session_id IS NOT NULL
             AND e.$session_id != ''

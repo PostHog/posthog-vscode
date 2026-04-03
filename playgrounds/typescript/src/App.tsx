@@ -12,7 +12,7 @@ export default function App() {
 
   posthog.capture('annotation created')
 
-  const var1 = posthog.getFeatureFlag('file-engagement-v2')
+  const var1 = posthog.getFeatureFlag('onboarding-wizard-prominence')
 
   if(var1 === 'control') {
 

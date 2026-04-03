@@ -83,6 +83,54 @@ export class StaleFlagService {
             }
         }));
 
+        // Secondary scan: regex-based string matching for non-JS/TS files (Python, Go, Ruby, Java, Kotlin).
+        // Tree-sitter grammars aren't shipped for these languages, so we do simple quoted-string matching
+        // against known flag keys from the cache.
+        const knownFlagKeys = this.flagCache.getFlagKeys();
+        if (knownFlagKeys.length > 0) {
+            const backendFiles = await vscode.workspace.findFiles(
+                '**/*.{py,go,rb,java,kt}',
+                excludePattern,
+            );
+
+            await Promise.all(backendFiles.map(async (uri) => {
+                try {
+                    const doc = await vscode.workspace.openTextDocument(uri);
+                    const text = doc.getText();
+
+                    for (const flagKey of knownFlagKeys) {
+                        // Match flag key as a quoted string (single or double quotes)
+                        if (text.includes(`'${flagKey}'`) || text.includes(`"${flagKey}"`)) {
+                            // Find all occurrences line by line
+                            for (let lineNum = 0; lineNum < doc.lineCount; lineNum++) {
+                                const lineText = doc.lineAt(lineNum).text;
+                                const singleIdx = lineText.indexOf(`'${flagKey}'`);
+                                const doubleIdx = lineText.indexOf(`"${flagKey}"`);
+                                const matchIdx = singleIdx >= 0 ? singleIdx : doubleIdx;
+                                if (matchIdx < 0) { continue; }
+
+                                // Column points to the opening quote
+                                const ref: StaleFlagReference = {
+                                    uri,
+                                    line: lineNum,
+                                    column: matchIdx,
+                                    lineText: lineText.trim(),
+                                    method: 'string_literal',
+                                    flagKey,
+                                };
+
+                                const refs = refsByKey.get(flagKey) || [];
+                                refs.push(ref);
+                                refsByKey.set(flagKey, refs);
+                            }
+                        }
+                    }
+                } catch {
+                    // skip unreadable files
+                }
+            }));
+        }
+
         const staleFlags: StaleFlag[] = [];
 
         for (const [key, references] of refsByKey) {

@@ -2,6 +2,7 @@ import { FeatureFlag } from '../models/types';
 
 export class FlagCacheService {
     private flags: FeatureFlag[] = [];
+    private flagsByKey: Map<string, FeatureFlag> = new Map();
     private listeners: Array<() => void> = [];
     private _lastRefreshed: Date | null = null;
 
@@ -16,22 +17,34 @@ export class FlagCacheService {
     }
 
     hasFlag(key: string): boolean {
-        return this.flags.some(f => f.key === key && !f.deleted);
+        return this.flagsByKey.has(key);
     }
 
     getFlag(key: string): FeatureFlag | undefined {
-        return this.flags.find(f => f.key === key && !f.deleted);
+        return this.flagsByKey.get(key);
     }
 
     update(flags: FeatureFlag[]): void {
         this.flags = flags;
+        this.flagsByKey = new Map();
+        for (const f of flags) {
+            if (!f.deleted) {
+                this.flagsByKey.set(f.key, f);
+            }
+        }
         this._lastRefreshed = new Date();
         for (const listener of this.listeners) {
             listener();
         }
     }
 
-    onChange(listener: () => void): void {
+    onChange(listener: () => void): { dispose(): void } {
         this.listeners.push(listener);
+        return {
+            dispose: () => {
+                const idx = this.listeners.indexOf(listener);
+                if (idx >= 0) { this.listeners.splice(idx, 1); }
+            },
+        };
     }
 }

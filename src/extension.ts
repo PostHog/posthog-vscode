@@ -82,6 +82,7 @@ export function activate(context: vscode.ExtensionContext) {
             additionalClientNames,
             additionalFlagFunctions,
             detectNestedClients: vsConfig.get<boolean>('detectNestedClients', true),
+            detectWrapperFunctions: vsConfig.get<boolean>('detectWrapperFunctions', true),
         };
     }
 
@@ -552,7 +553,8 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.workspace.onDidChangeConfiguration(e => {
             if (e.affectsConfiguration('posthog.additionalClientNames') ||
                 e.affectsConfiguration('posthog.additionalFlagFunctions') ||
-                e.affectsConfiguration('posthog.detectNestedClients')) {
+                e.affectsConfiguration('posthog.detectNestedClients') ||
+                e.affectsConfiguration('posthog.detectWrapperFunctions')) {
                 treeSitter.updateConfig(loadDetectionConfig());
             }
             if (e.affectsConfiguration('posthog.showInlineDecorations')) {

@@ -1,4 +1,4 @@
-name: Publish to VS Code Marketplace
+name: Publish to Open VSX
 
 on:
     workflow_call:
@@ -7,7 +7,7 @@ on:
                 required: true
                 type: string
         secrets:
-            VSCE_PAT:
+            OPEN_VSX_TOKEN:
                 required: true
     workflow_dispatch:
         inputs:
@@ -18,7 +18,7 @@ on:
 
 jobs:
     publish:
-        name: Publish to VS Code Marketplace
+        name: Publish to Open VSX
         runs-on: ubuntu-latest
         steps:
             - name: Checkout repository
@@ -42,7 +42,7 @@ jobs:
                   VERSION: ${{ inputs.version }}
               run: gh release download "v$VERSION" --pattern "codehog.vsix"
 
-            - name: Publish to VS Code Marketplace
-              run: pnpm release:publish:vscode -p "$VSCE_PAT"
+            - name: Publish to Open VSX
+              run: pnpm release:publish:ovsx -p "$OVSX_PAT"
               env:
-                  VSCE_PAT: ${{ secrets.VSCE_PAT }}
+                  OVSX_PAT: ${{ secrets.OPEN_VSX_TOKEN }}

@@ -1,0 +1,192 @@
+name: Release
+
+on:
+    push:
+        branches: [main]
+    workflow_dispatch:
+
+concurrency:
+    group: release
+    cancel-in-progress: false
+
+jobs:
+    check-changesets:
+        name: Check for changesets
+        runs-on: ubuntu-latest
+        outputs:
+            has-changesets: ${{ steps.check.outputs.has-changesets }}
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Check for changesets
+              id: check
+              run: |
+                  if [ ! -d ".changeset" ] || [ -z "$(ls -A .changeset/*.md 2>/dev/null | grep -v README.md)" ]; then
+                    echo "No changesets found. Skipping release."
+                    echo "has-changesets=false" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "Found changesets to process"
+                    echo "has-changesets=true" >> "$GITHUB_OUTPUT"
+                  fi
+
+    version-and-release:
+        name: Version bump and release
+        needs: check-changesets
+        if: needs.check-changesets.outputs.has-changesets == 'true'
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        outputs:
+            new-version: ${{ steps.version.outputs.new-version }}
+            was-released: ${{ steps.version.outputs.was-released }}
+        steps:
+            - name: Get GitHub App token
+              id: releaser
+              uses: actions/create-github-app-token@v1
+              with:
+                  app-id: ${{ secrets.RELEASER_APP_ID }}
+                  private-key: ${{ secrets.RELEASER_PRIVATE_KEY }}
+
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  token: ${{ steps.releaser.outputs.token }}
+
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: pnpm
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Configure git
+              run: |
+                  git config user.name "posthog-releaser[bot]"
+                  git config user.email "posthog-releaser[bot]@users.noreply.github.com"
+
+            - name: Version packages
+              id: version
+              run: |
+                  CURRENT_VERSION=$(node -p "require('./package.json').version")
+
+                  pnpm release:version
+
+                  NEW_VERSION=$(node -p "require('./package.json').version")
+
+                  if [ "$CURRENT_VERSION" = "$NEW_VERSION" ]; then
+                    echo "No version change detected"
+                    echo "was-released=false" >> "$GITHUB_OUTPUT"
+                    exit 0
+                  fi
+
+                  echo "Version bumped: $CURRENT_VERSION → $NEW_VERSION"
+                  echo "new-version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+                  echo "was-released=true" >> "$GITHUB_OUTPUT"
+
+            - name: Commit version bump
+              if: steps.version.outputs.was-released == 'true'
+              run: |
+                  git add -A
+                  git commit -m "chore: release v${{ steps.version.outputs.new-version }}"
+                  git push
+
+            - name: Create Git tag
+              if: steps.version.outputs.was-released == 'true'
+              env:
+                  GH_TOKEN: ${{ steps.releaser.outputs.token }}
+                  VERSION: ${{ steps.version.outputs.new-version }}
+              run: |
+                  git tag "v$VERSION"
+                  git push origin "v$VERSION"
+
+            - name: Extract changelog for release
+              if: steps.version.outputs.was-released == 'true'
+              id: changelog
+              run: |
+                  # Extract the latest version's changelog entry
+                  CHANGELOG=$(awk '/^## [0-9]/{if(found) exit; found=1; next} found' CHANGELOG.md)
+                  if [ -z "$CHANGELOG" ]; then
+                    CHANGELOG="See CHANGELOG.md for details."
+                  fi
+                  # Use heredoc for multiline output
+                  {
+                    echo 'content<<EOF'
+                    echo "$CHANGELOG"
+                    echo 'EOF'
+                  } >> "$GITHUB_OUTPUT"
+
+            - name: Create GitHub Release
+              if: steps.version.outputs.was-released == 'true'
+              env:
+                  GH_TOKEN: ${{ steps.releaser.outputs.token }}
+                  VERSION: ${{ steps.version.outputs.new-version }}
+              run: |
+                  gh release create "v$VERSION" \
+                    --title "v$VERSION" \
+                    --notes "${{ steps.changelog.outputs.content }}"
+
+    build:
+        name: Build and upload VSIX
+        needs: version-and-release
+        if: needs.version-and-release.outputs.was-released == 'true'
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  ref: v${{ needs.version-and-release.outputs.new-version }}
+
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 20
+                  cache: pnpm
+
+            - name: Setup Emscripten
+              uses: mymindstorm/setup-emsdk@v14
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Package extension
+              run: pnpm release:package
+
+            - name: Upload VSIX to GitHub Release
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  VERSION: ${{ needs.version-and-release.outputs.new-version }}
+              run: gh release upload "v$VERSION" codehog.vsix
+
+    publish-vscode:
+        name: Publish to VS Code Marketplace
+        needs: [version-and-release, build]
+        if: needs.version-and-release.outputs.was-released == 'true'
+        uses: ./.github/workflows/publish-vscode.yml
+        with:
+            version: ${{ needs.version-and-release.outputs.new-version }}
+        secrets:
+            VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+    publish-ovsx:
+        name: Publish to Open VSX
+        needs: [version-and-release, build]
+        if: needs.version-and-release.outputs.was-released == 'true'
+        uses: ./.github/workflows/publish-ovsx.yml
+        with:
+            version: ${{ needs.version-and-release.outputs.new-version }}
+        secrets:
+            OPEN_VSX_TOKEN: ${{ secrets.OPEN_VSX_TOKEN }}

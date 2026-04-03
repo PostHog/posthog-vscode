@@ -205,6 +205,41 @@ pnpm test             # run tests
 
 ---
 
+## Releasing
+
+This project uses [changesets](https://github.com/changesets/changesets) for version management and automated releases.
+
+### Adding a changeset
+
+When you make a change that should be released, run:
+
+```bash
+pnpm changeset
+```
+
+This prompts you to select the change type (patch/minor/major) and write a summary. A markdown file is created in `.changeset/` describing your change.
+
+### Version types
+
+- **patch** — bug fixes, small improvements, documentation
+- **minor** — new features, non-breaking changes
+- **major** — breaking changes
+
+### Automated release process
+
+When PRs with changesets are merged to `main`, the release workflow automatically:
+
+1. Consumes all pending changesets
+2. Bumps the version in `package.json`
+3. Updates `CHANGELOG.md` with the changeset summaries
+4. Commits the version bump to `main`
+5. Creates a git tag (`v{version}`)
+6. Creates a GitHub Release with the changelog
+7. Builds and packages the extension
+8. Publishes to both VS Code Marketplace and Open VSX Registry
+
+---
+
 ## Requirements
 
 - VS Code 1.109.0 or later

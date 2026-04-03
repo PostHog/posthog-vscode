@@ -1,10 +1,6 @@
-import * as vscode from 'vscode';
-
-export function getLayout(logoUri: vscode.Uri): string {
-    return /*html*/ `
 <!-- Welcome screen (unauthenticated) -->
 <div id="welcome-screen" class="welcome" style="display:none;">
-    <img src="${logoUri}" alt="PostHog" class="welcome-logo" />
+    <img src="{{LOGO_URI}}" alt="PostHog" class="welcome-logo" />
     <h2 class="welcome-title">PostHog for VS Code</h2>
     <p class="welcome-subtitle">Your feature flags, experiments, and analytics — right in your editor.</p>
     <div class="welcome-features">
@@ -31,11 +27,12 @@ export function getLayout(logoUri: vscode.Uri): string {
         </div>
     </div>
     <button class="sign-in-btn sign-in-btn--primary" id="btn-sign-in">Sign In with PostHog</button>
+    <button class="sign-in-btn sign-in-btn--dev" id="btn-sign-in-dev" style="display:none;">Sign In (localhost:8010)</button>
 </div>
 
 <!-- Project selection (authenticated but no project) -->
 <div id="needs-project-screen" class="welcome" style="display:none;">
-    <img src="${logoUri}" alt="PostHog" class="welcome-logo" />
+    <img src="{{LOGO_URI}}" alt="PostHog" class="welcome-logo" />
     <h2 class="welcome-title">Select a Project</h2>
     <p class="welcome-subtitle">You're signed in! Choose a project to get started.</p>
     <button class="sign-in-btn sign-in-btn--primary" id="btn-select-project-welcome">Select Project</button>
@@ -44,7 +41,7 @@ export function getLayout(logoUri: vscode.Uri): string {
 <!-- Main app (authenticated) -->
 <div id="main-app" style="display:none;">
     <div class="header">
-        <img src="${logoUri}" alt="PostHog" />
+        <img src="{{LOGO_URI}}" alt="PostHog" />
         <div class="header-text">
             <span class="title">PostHog</span>
             <span class="project-name" id="project-name"></span>
@@ -141,5 +138,4 @@ export function getLayout(logoUri: vscode.Uri): string {
             <div class="detail-body" id="detail-body"></div>
         </div>
     </div>
-</div>`;
-}
+</div>

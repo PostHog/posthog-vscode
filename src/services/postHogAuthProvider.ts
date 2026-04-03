@@ -5,7 +5,7 @@ import { StorageKeys } from '../constants';
 export const AUTH_PROVIDER_ID = 'posthog';
 export const AUTH_PROVIDER_LABEL = 'PostHog';
 
-const OAUTH_AUTHORITY = 'https://oauth.posthog.com';
+const DEFAULT_OAUTH_AUTHORITY = 'https://oauth.posthog.com';
 const CLIENT_ID = 'ih1owmVJOIWdlZYiWLMMkjr9zLR3Hik6TojNcqQN';
 export const SCOPES = [
     'event_definition:read',
@@ -48,8 +48,14 @@ export class PostHogAuthenticationProvider implements vscode.AuthenticationProvi
 
     private readonly pendingAuths = new Map<string, PendingAuth>();
     private cachedSession: StoredSession | null | undefined = undefined; // undefined = not yet loaded
+    private oauthAuthority = DEFAULT_OAUTH_AUTHORITY;
 
     constructor(private readonly secretStorage: vscode.SecretStorage) {}
+
+    /** Override the OAuth authority for dev mode (e.g. http://localhost:8010) */
+    async setOAuthAuthority(authority: string): Promise<void> {
+        this.oauthAuthority = authority.replace(/\/+$/, '');
+    }
 
     dispose(): void {
         for (const pending of this.pendingAuths.values()) {
@@ -91,7 +97,7 @@ export class PostHogAuthenticationProvider implements vscode.AuthenticationProvi
             scope: scopes.join(' '),
         });
 
-        const authUrl = vscode.Uri.parse(`${OAUTH_AUTHORITY}/authorize?${params.toString()}`);
+        const authUrl = vscode.Uri.parse(`${this.oauthAuthority}/authorize?${params.toString()}`);
 
         return new Promise<vscode.AuthenticationSession>((resolve, reject) => {
             const timeout = setTimeout(() => {
@@ -196,7 +202,7 @@ export class PostHogAuthenticationProvider implements vscode.AuthenticationProvi
     private async exchangeCodeForSession(code: string, codeVerifier: string): Promise<vscode.AuthenticationSession> {
         const redirectUri = `${vscode.env.uriScheme}://posthog.posthog-vscode/auth/callback`;
 
-        const tokenResponse = await fetch(`${OAUTH_AUTHORITY}/token`, {
+        const tokenResponse = await fetch(`${this.oauthAuthority}/token`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: new URLSearchParams({
@@ -254,7 +260,7 @@ export class PostHogAuthenticationProvider implements vscode.AuthenticationProvi
     private async refreshSession(session: StoredSession): Promise<string> {
         let tokenResponse: Response;
         try {
-            tokenResponse = await fetch(`${OAUTH_AUTHORITY}/token`, {
+            tokenResponse = await fetch(`${this.oauthAuthority}/token`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: new URLSearchParams({

@@ -9,3 +9,4 @@ grammars/
 .grammar-build/
 .DS_Store
 .planning/
+.claude/worktrees/

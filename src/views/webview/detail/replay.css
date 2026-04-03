@@ -1,0 +1,14 @@
+html, body { margin:0; padding:0; height:100%; overflow:hidden; background:var(--vscode-editor-background); color:var(--vscode-editor-foreground); font-family:var(--vscode-font-family); }
+.toolbar { display:flex; align-items:center; gap:8px; padding:8px 16px; border-bottom:1px solid var(--vscode-panel-border); font-size:13px; }
+.toolbar .info { flex:1; display:flex; align-items:center; gap:8px; min-width:0; }
+.toolbar .info span { opacity:0.6; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.toolbar .title { font-weight:600; opacity:1 !important; }
+.btn { background:var(--vscode-button-background); color:var(--vscode-button-foreground); border:none; border-radius:4px; padding:4px 12px; cursor:pointer; font-size:12px; white-space:nowrap; }
+.btn:hover { opacity:0.9; }
+.btn-ghost { background:transparent; color:var(--vscode-foreground); border:1px solid var(--vscode-input-border); }
+iframe { width:100%; height:calc(100vh - 45px); border:none; }
+.center-msg { display:flex; position:absolute; inset:0; top:45px; align-items:center; justify-content:center; flex-direction:column; gap:12px; text-align:center; padding:40px; }
+.center-msg .icon { font-size:48px; margin-bottom:8px; }
+.center-msg p { opacity:0.6; font-size:13px; max-width:400px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner { width:24px; height:24px; border:3px solid var(--vscode-input-border); border-top-color:var(--vscode-button-background); border-radius:50%; animation:spin .8s linear infinite; }

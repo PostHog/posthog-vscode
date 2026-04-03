@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; frame-src {{FRAME_HOST}}; style-src 'nonce-{{NONCE}}'; script-src 'nonce-{{NONCE}}';">
+<style nonce="{{NONCE}}">{{STYLES}}</style>
+</head>
+<body>
+<div class="toolbar">
+    <div class="info">
+        <span class="title">&#x25B6; {{DISTINCT_ID}}</span>
+        <span>{{CURRENT_URL}}</span>
+    </div>
+    <button class="btn btn-ghost" id="btn-open-external">Open in PostHog &#x2197;</button>
+</div>
+{{REPLAY_CONTENT}}
+<script nonce="{{NONCE}}">
+{{SCRIPT}}
+</script>
+</body>
+</html>

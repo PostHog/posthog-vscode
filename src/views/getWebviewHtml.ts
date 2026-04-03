@@ -1,24 +1,18 @@
 import * as vscode from 'vscode';
-import { getStyles } from './webview/styles';
-import { getLayout } from './webview/layout';
-import { getScript } from './webview/script';
+import sidebarShell from './webview/sidebar/index.html';
+import sidebarCss from './webview/sidebar/sidebar.css';
+import sidebarLayout from './webview/sidebar/sidebar.html';
+import sidebarScript from './webview/sidebar/sidebar.js';
 
 export function getWebviewHtml(webview: vscode.Webview, logoUri: vscode.Uri): string {
     const nonce = getNonce();
 
-    return /*html*/ `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource}; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
-<style nonce="${nonce}">${getStyles()}</style>
-</head>
-<body>
-${getLayout(logoUri)}
-<script nonce="${nonce}">${getScript()}</script>
-</body>
-</html>`;
+    return sidebarShell
+        .replace(/\{\{NONCE\}\}/g, nonce)
+        .replace('{{CSP_SOURCE}}', webview.cspSource)
+        .replace('{{STYLES}}', sidebarCss)
+        .replace('{{LAYOUT}}', sidebarLayout.replace(/\{\{LOGO_URI\}\}/g, String(logoUri)))
+        .replace('{{SCRIPT}}', sidebarScript);
 }
 
 function getNonce(): string {

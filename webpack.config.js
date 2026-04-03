@@ -28,6 +28,12 @@ const extensionConfig = {
   module: {
     rules: [
       {
+        // Import webview .html/.css/.js files as raw strings (asset/source)
+        test: /\.(?:html|css|js)$/,
+        include: path.resolve(__dirname, 'src/views/webview'),
+        type: 'asset/source',
+      },
+      {
         test: /\.ts$/,
         exclude: /node_modules/,
         use: [

@@ -4,6 +4,12 @@
 
 ### Patch Changes
 
+- 1c2ddcf: Release new version to launch new release process
+
+## 0.5.1
+
+### Patch Changes
+
 - a0dcc8e: Release new minor version to test new release process
 
 All notable changes to the PostHog VS Code extension will be documented here.

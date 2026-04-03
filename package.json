@@ -2,7 +2,7 @@
   "name": "posthog-vscode",
   "displayName": "PostHog for VSCode",
   "description": "PostHog extension for VSCode",
-  "version": "0.5.1",
+  "version": "0.5.0",
   "license": "MIT",
   "publisher": "PostHog",
   "icon": "resources/icons/ph-logo2.png",

@@ -108,31 +108,12 @@ jobs:
                   git tag "v$VERSION"
                   git push origin "v$VERSION"
 
-            - name: Extract changelog for release
-              if: steps.version.outputs.was-released == 'true'
-              id: changelog
-              run: |
-                  # Extract the latest version's changelog entry
-                  CHANGELOG=$(awk '/^## [0-9]/{if(found) exit; found=1; next} found' CHANGELOG.md)
-                  if [ -z "$CHANGELOG" ]; then
-                    CHANGELOG="See CHANGELOG.md for details."
-                  fi
-                  # Use heredoc for multiline output
-                  {
-                    echo 'content<<EOF'
-                    echo "$CHANGELOG"
-                    echo 'EOF'
-                  } >> "$GITHUB_OUTPUT"
-
             - name: Create GitHub Release
               if: steps.version.outputs.was-released == 'true'
               env:
                   GH_TOKEN: ${{ steps.releaser.outputs.token }}
                   VERSION: ${{ steps.version.outputs.new-version }}
-              run: |
-                  gh release create "v$VERSION" \
-                    --title "v$VERSION" \
-                    --notes "${{ steps.changelog.outputs.content }}"
+              run: gh release create "v$VERSION" --title "v$VERSION" --generate-notes
 
     build:
         name: Build and upload VSIX

@@ -1,7 +1,6 @@
 export const Commands = {
     SIGN_IN: 'posthog.signIn',
     SIGN_OUT: 'posthog.signOut',
-    SIGN_IN_OAUTH: 'posthog.signInOAuth',
     SELECT_PROJECT: 'posthog.selectProject',
     REFRESH_FEATURE_FLAGS: 'posthog.refreshFeatureFlags',
     COPY_FLAG_KEY: 'posthog.copyFlagKey',
@@ -34,7 +33,7 @@ export const ContextKeys = {
 } as const;
 
 export const StorageKeys = {
-    API_KEY: 'posthog.apiKey',
+    OAUTH_SESSION: 'posthog.oauth.session',
     HOST: 'posthog.host',
     PROJECT_ID: 'posthog.projectId',
     PROJECT_NAME: 'posthog.projectName',
@@ -44,9 +43,4 @@ export const StorageKeys = {
 
 export const Defaults = {
     HOST: 'https://us.posthog.com',
-    HOSTS: [
-        { label: 'US Cloud', url: 'https://us.posthog.com' },
-        { label: 'EU Cloud', url: 'https://eu.posthog.com' },
-        { label: 'Self-hosted', url: '' },
-    ],
 } as const;

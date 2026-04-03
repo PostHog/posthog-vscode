@@ -21,7 +21,7 @@ const client = new PostHog('phc_test_token', {
 // Each should show inline flag status decoration
 async function handleRequest(userId) {
     const isEnabled = await client.isFeatureEnabled('new-api-endpoint', userId);
-    const variant = await client.getFeatureFlag('pricing-experiment', userId);
+    const variant = await client.getFeatureFlag('onboarding-wizard-prominence', userId);
     const payload = await client.getFeatureFlagPayload('rate-limits', userId);
 
     // ── Boolean flag branching ──
@@ -36,7 +36,7 @@ async function handleRequest(userId) {
     // Should show color-coded variant highlights
     if (variant === 'control') {
         return { price: 29 };
-    } else if (variant === 'test') {
+    } else if (variant === 'wizard-tab') {
         return { price: 19 };
     }
 

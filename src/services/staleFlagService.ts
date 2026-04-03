@@ -43,10 +43,15 @@ export class StaleFlagService {
     }
 
     async scan(): Promise<StaleFlag[]> {
+        const config = vscode.workspace.getConfiguration('posthog');
+        const extraExcludes = config.get<string[]>('staleFlagExcludePatterns', []);
+        const excludeParts = ['**/node_modules/**', '**/dist/**', '**/build/**', '.git/**', ...extraExcludes];
+        const excludePattern = `{${excludeParts.join(',')}}`;
+
         const files = await vscode.workspace.findFiles(
             // Only JS/TS supported — add more extensions when WASM grammars are shipped
             '**/*.{ts,tsx,js,jsx}',
-            '{**/node_modules/**,**/dist/**,**/build/**,.git/**}',
+            excludePattern,
         );
 
         const refsByKey = new Map<string, StaleFlagReference[]>();
@@ -116,6 +121,15 @@ export class StaleFlagService {
         }
 
         if (this.isFullyRolledOut(flag)) {
+            // Skip if the flag was created too recently
+            const ageDays = vscode.workspace.getConfiguration('posthog').get<number>('staleFlagAgeDays', 30);
+            if (ageDays > 0 && flag.created_at) {
+                const createdAt = new Date(flag.created_at);
+                const ageMs = Date.now() - createdAt.getTime();
+                if (ageMs < ageDays * 86_400_000) {
+                    return null;
+                }
+            }
             return 'fully_rolled_out';
         }
 

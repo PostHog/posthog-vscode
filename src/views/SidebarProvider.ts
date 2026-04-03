@@ -104,9 +104,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             case 'loadFlags':
                 this.telemetry?.capture('sidebar_tab_viewed', { tab: 'flags' });
                 return this.loadFlags();
+            case 'loadMoreFlags':
+                return this.loadMoreFlags();
             case 'loadExperiments':
                 this.telemetry?.capture('sidebar_tab_viewed', { tab: 'experiments' });
                 return this.loadExperiments();
+            case 'loadMoreExperiments':
+                return this.loadMoreExperiments();
             case 'copyFlagKey':
                 this.telemetry?.capture('flag_key_copied', { flag_key: msg.key, source: 'sidebar' });
                 await vscode.env.clipboard.writeText(msg.key as string);
@@ -182,28 +186,50 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     // ── Data loaders ──
 
     private userEmail: string | null = null;
+    private flagsCursor: string | null = null;
+    private flagsLoading = false;
+    private experimentsCursor: string | null = null;
+    private experimentsLoading = false;
 
     private async loadFlags() {
         const projectId = this.authService.getProjectId();
         if (!projectId) { return; }
 
+        this.flagsCursor = null;
         this.postMessage({ type: 'loading', section: 'flags' });
         try {
-            const [flags] = await Promise.all([
-                this.postHogService.getFeatureFlags(projectId),
+            const [page] = await Promise.all([
+                this.postHogService.getFeatureFlagsPage(projectId),
                 // Fetch user email once for the "My flags" filter
                 this.userEmail ? Promise.resolve(null) : this.postHogService.getCurrentUserEmail().then(email => { this.userEmail = email; }),
             ]);
-            this.flagCache.update(flags);
-            const active = flags.filter(f => !f.deleted);
+            this.flagsCursor = page.next;
+            const active = page.results.filter(f => !f.deleted);
             active.sort((a, b) => {
                 if (a.active !== b.active) { return a.active ? -1 : 1; }
                 return a.key.localeCompare(b.key);
             });
-            this.postMessage({ type: 'flags', data: active, projectId, userEmail: this.userEmail });
+            this.postMessage({ type: 'flags', data: active, projectId, userEmail: this.userEmail, hasMore: !!page.next, total: page.total });
         } catch (err) {
             const detail = err instanceof Error ? err.message : 'Unknown error';
             this.postMessage({ type: 'error', section: 'flags', message: `Failed to load feature flags: ${detail}` });
+        }
+    }
+
+    private async loadMoreFlags() {
+        const projectId = this.authService.getProjectId();
+        if (!projectId || !this.flagsCursor || this.flagsLoading) { return; }
+
+        this.flagsLoading = true;
+        try {
+            const page = await this.postHogService.getFeatureFlagsPage(projectId, this.flagsCursor);
+            this.flagsCursor = page.next;
+            const active = page.results.filter(f => !f.deleted);
+            this.postMessage({ type: 'flagsPage', data: active, hasMore: !!page.next, total: page.total });
+        } catch {
+            // Silently fail — user can scroll again to retry
+        } finally {
+            this.flagsLoading = false;
         }
     }
 
@@ -211,21 +237,46 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         const projectId = this.authService.getProjectId();
         if (!projectId) { return; }
 
+        this.experimentsCursor = null;
         this.postMessage({ type: 'loading', section: 'experiments' });
         try {
-            const experiments = await this.postHogService.getExperiments(projectId);
+            const page = await this.postHogService.getExperimentsPage(projectId);
+            this.experimentsCursor = page.next;
             // Build results map from cache (prefetched on startup)
             const resultsMap: Record<number, unknown> = {};
             if (this.experimentCache) {
-                for (const exp of experiments) {
+                for (const exp of page.results) {
                     const r = this.experimentCache.getResults(exp.id);
                     if (r) { resultsMap[exp.id] = r; }
                 }
             }
-            this.postMessage({ type: 'experiments', data: experiments, results: resultsMap, projectId });
+            this.postMessage({ type: 'experiments', data: page.results, results: resultsMap, projectId, hasMore: !!page.next, total: page.total });
         } catch (err) {
             const detail = err instanceof Error ? err.message : 'Unknown error';
             this.postMessage({ type: 'error', section: 'experiments', message: `Failed to load experiments: ${detail}` });
+        }
+    }
+
+    private async loadMoreExperiments() {
+        const projectId = this.authService.getProjectId();
+        if (!projectId || !this.experimentsCursor || this.experimentsLoading) { return; }
+
+        this.experimentsLoading = true;
+        try {
+            const page = await this.postHogService.getExperimentsPage(projectId, this.experimentsCursor);
+            this.experimentsCursor = page.next;
+            const resultsMap: Record<number, unknown> = {};
+            if (this.experimentCache) {
+                for (const exp of page.results) {
+                    const r = this.experimentCache.getResults(exp.id);
+                    if (r) { resultsMap[exp.id] = r; }
+                }
+            }
+            this.postMessage({ type: 'experimentsPage', data: page.results, results: resultsMap, hasMore: !!page.next, total: page.total });
+        } catch {
+            // Silently fail — user can scroll again to retry
+        } finally {
+            this.experimentsLoading = false;
         }
     }
 

@@ -249,6 +249,23 @@ html { height: 100vh; overflow: hidden; }
     opacity: 0.5;
 }
 
+.load-more-sentinel {
+    text-align: center;
+    padding: 16px;
+    font-size: 11px;
+    opacity: 0.5;
+}
+
+.load-more-label {
+    display: inline-block;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.8; }
+}
+
 /* ── Welcome ── */
 .welcome {
     display: flex;

@@ -124,6 +124,11 @@
       {
         "command": "posthog.generateType",
         "title": "PostHog: Generate Type"
+      },
+      {
+        "command": "posthog.findFlagReferences",
+        "title": "PostHog: Find Flag References",
+        "icon": "$(search)"
       }
     ],
     "menus": {
@@ -146,9 +151,26 @@
           "command": "posthog.cleanupStaleFlag",
           "when": "view == posthog-stale-flags && viewItem == staleFlag",
           "group": "inline"
+        },
+        {
+          "command": "posthog.openFlagInBrowser",
+          "when": "view == posthog-stale-flags && viewItem == staleFlagWithId",
+          "group": "1_actions"
+        },
+        {
+          "command": "posthog.findFlagReferences",
+          "when": "view == posthog-stale-flags && viewItem =~ /staleFlag/",
+          "group": "1_actions"
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "posthog-stale-flags",
+        "contents": "No stale flags found yet.\n[Scan for Stale Flags](command:posthog.scanStaleFlags)\nEvery feature flag evaluation counts toward your PostHog bill — even for flags that are disabled or fully rolled out. Cleaning up stale flags reduces unnecessary API calls and saves costs.",
+        "when": "posthog.isAuthenticated"
+      }
+    ],
     "configuration": {
       "title": "PostHog",
       "properties": {

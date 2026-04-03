@@ -74,6 +74,15 @@ export class DebugTreeProvider implements vscode.TreeDataProvider<DebugEntry> {
         entries.push({ label: 'Experiments', value: `${this.experimentCache.getExperiments().length} loaded` });
         entries.push({ label: 'Experiments Last Refresh', value: this.experimentCache.lastRefreshed?.toLocaleTimeString() ?? 'never' });
 
+        // Flag values
+        const allFlags = this.flagCache.getFlags().filter(f => !f.deleted);
+        if (allFlags.length > 0) {
+            entries.push({ label: '─── Flags', value: '───' });
+            for (const flag of allFlags) {
+                entries.push({ label: flag.key, value: flag.active ? 'ACTIVE' : 'inactive', copyable: true });
+            }
+        }
+
         // Config
         const config = vscode.workspace.getConfiguration('posthog');
         entries.push({ label: '─── Settings', value: '───' });

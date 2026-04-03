@@ -1190,6 +1190,7 @@ window.addEventListener('message', e => {
             document.getElementById('welcome-screen').style.display = showWelcome ? '' : 'none';
             document.getElementById('needs-project-screen').style.display = showNeedsProject ? '' : 'none';
             document.getElementById('main-app').style.display = showApp ? '' : 'none';
+            document.getElementById('wizard-screen').style.display = 'none';
             if (showApp) {
                 loadedTabs.clear();
                 loadedTabs.add('flags');
@@ -1199,6 +1200,12 @@ window.addEventListener('message', e => {
             // Show dev sign-in button in development mode
             var devBtn = document.getElementById('btn-sign-in-dev');
             if (devBtn) { devBtn.style.display = msg.isDev ? '' : 'none'; }
+            // Show wizard CTA behind feature flag (or in dev mode)
+            var wizardVisible = msg.wizardEnabled || msg.isDev;
+            var wizardDivider = document.getElementById('wizard-divider');
+            var wizardBtn = document.getElementById('btn-show-wizard');
+            if (wizardDivider) { wizardDivider.style.display = wizardVisible ? '' : 'none'; }
+            if (wizardBtn) { wizardBtn.style.display = wizardVisible ? '' : 'none'; }
             // Update project name + host in header
             var projNameEl = document.getElementById('project-name');
             if (projNameEl) {
@@ -1352,31 +1359,59 @@ document.querySelectorAll('.feedback-emoji').forEach(function(btn) {
     });
 });
 
-document.getElementById('feedback-send-btn').addEventListener('click', function() {
-    var message = document.getElementById('feedback-message').value.trim();
-    if (!feedbackRating && !message) { return; }
+var feedbackSendBtn = document.getElementById('feedback-send-btn');
+if (feedbackSendBtn) {
+    feedbackSendBtn.addEventListener('click', function() {
+        var message = document.getElementById('feedback-message').value.trim();
+        if (!feedbackRating && !message) { return; }
 
-    send({
-        type: 'sendFeedback',
-        message: message,
-        rating: feedbackRating || 'none'
+        send({
+            type: 'sendFeedback',
+            message: message,
+            rating: feedbackRating || 'none'
+        });
+
+        // Show success, reset form
+        document.getElementById('feedback-message').value = '';
+        document.querySelectorAll('.feedback-emoji').forEach(function(b) { b.classList.remove('selected'); });
+        feedbackRating = null;
+
+        var successEl = document.getElementById('feedback-success');
+        var sendBtn = document.getElementById('feedback-send-btn');
+        successEl.style.display = '';
+        sendBtn.style.display = 'none';
+
+        setTimeout(function() {
+            successEl.style.display = 'none';
+            sendBtn.style.display = '';
+        }, 3000);
     });
-
-    // Show success, reset form
-    document.getElementById('feedback-message').value = '';
-    document.querySelectorAll('.feedback-emoji').forEach(function(b) { b.classList.remove('selected'); });
-    feedbackRating = null;
-
-    var successEl = document.getElementById('feedback-success');
-    var sendBtn = document.getElementById('feedback-send-btn');
-    successEl.style.display = '';
-    sendBtn.style.display = 'none';
-
-    setTimeout(function() {
-        successEl.style.display = 'none';
-        sendBtn.style.display = '';
-    }, 3000);
-});
+}
 
 // ── Init ──
 send({ type: 'ready' });
+
+// ── Wizard (after init to avoid being blocked by missing feedback elements) ──
+
+var wizardShowBtn = document.getElementById('btn-show-wizard');
+if (wizardShowBtn) {
+    wizardShowBtn.addEventListener('click', function() {
+        document.getElementById('welcome-screen').style.display = 'none';
+        document.getElementById('wizard-screen').style.display = '';
+    });
+}
+
+var wizardBackBtn = document.getElementById('btn-wizard-back');
+if (wizardBackBtn) {
+    wizardBackBtn.addEventListener('click', function() {
+        document.getElementById('wizard-screen').style.display = 'none';
+        document.getElementById('welcome-screen').style.display = '';
+    });
+}
+
+var wizardRunBtn = document.getElementById('btn-run-wizard');
+if (wizardRunBtn) {
+    wizardRunBtn.addEventListener('click', function() {
+        send({ type: 'runWizard' });
+    });
+}

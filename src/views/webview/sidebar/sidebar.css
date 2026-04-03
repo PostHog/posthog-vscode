@@ -369,6 +369,156 @@ html { height: 100vh; overflow: hidden; }
     margin-top: 12px;
 }
 
+/* ── Wizard CTA button ── */
+.wizard-cta-btn {
+    width: 100%;
+    max-width: 260px;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+    letter-spacing: 0.2px;
+    background: linear-gradient(135deg, rgba(29, 74, 255, 0.12), rgba(245, 78, 0, 0.12), rgba(249, 189, 43, 0.12));
+    color: var(--vscode-foreground);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    white-space: nowrap;
+}
+.wizard-cta-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(29, 74, 255, 0.15), 0 2px 8px rgba(245, 78, 0, 0.1);
+    background: linear-gradient(135deg, rgba(29, 74, 255, 0.2), rgba(245, 78, 0, 0.18), rgba(249, 189, 43, 0.18));
+}
+.wizard-cta-sparkle {
+    font-size: 15px;
+}
+.wizard-cta-magic {
+    white-space: nowrap;
+}
+.wizard-cta-magic span {
+    display: inline-block;
+    font-weight: 700;
+    font-style: italic;
+    animation: wizardColorCycle 3s ease-in-out infinite;
+}
+.wizard-cta-magic span:nth-child(1)  { animation-delay: 0s; }
+.wizard-cta-magic span:nth-child(2)  { animation-delay: 0.15s; }
+.wizard-cta-magic span:nth-child(3)  { animation-delay: 0.3s; }
+.wizard-cta-magic span:nth-child(4)  { animation-delay: 0.45s; }
+.wizard-cta-magic span:nth-child(5)  { animation-delay: 0.6s; }
+.wizard-cta-magic span:nth-child(6)  { animation-delay: 0.75s; }
+.wizard-cta-magic span:nth-child(7)  { animation-delay: 0.9s; }
+.wizard-cta-magic span:nth-child(8)  { animation-delay: 1.05s; }
+.wizard-cta-magic span:nth-child(9)  { animation-delay: 1.2s; }
+.wizard-cta-magic span:nth-child(10) { animation-delay: 1.35s; }
+.wizard-cta-magic span:nth-child(11) { animation-delay: 1.5s; }
+.wizard-cta-magic span:nth-child(12) { animation-delay: 1.65s; }
+.wizard-cta-magic span:nth-child(13) { animation-delay: 1.8s; }
+@keyframes wizardColorCycle {
+    0%, 100% { color: #1D4AFF; }
+    33%      { color: #F54E00; }
+    66%      { color: #F9BD2B; }
+}
+.vscode-light .wizard-cta-btn {
+    border-color: rgba(0, 0, 0, 0.1);
+    background: linear-gradient(135deg, rgba(29, 74, 255, 0.08), rgba(245, 78, 0, 0.08), rgba(249, 189, 43, 0.08));
+}
+.vscode-light .wizard-cta-btn:hover {
+    background: linear-gradient(135deg, rgba(29, 74, 255, 0.14), rgba(245, 78, 0, 0.12), rgba(249, 189, 43, 0.12));
+}
+
+/* ── Welcome divider ── */
+.welcome-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    max-width: 260px;
+    margin: 12px 0;
+}
+.welcome-divider-line {
+    flex: 1;
+    height: 1px;
+    background: var(--vscode-panel-border);
+}
+.welcome-divider-text {
+    font-size: 11px;
+    opacity: 0.4;
+    text-transform: lowercase;
+}
+
+/* ── Wizard info screen ── */
+.wizard-features {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 100%;
+    max-width: 260px;
+    margin-bottom: 24px;
+    text-align: left;
+}
+.wizard-feature {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+.wizard-feature-icon {
+    font-size: 14px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: rgba(245, 78, 0, 0.1);
+    flex-shrink: 0;
+}
+.wizard-feature-text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding-top: 2px;
+}
+.wizard-feature-name {
+    font-size: 12px;
+    font-weight: 600;
+}
+.wizard-feature-desc {
+    font-size: 11px;
+    opacity: 0.5;
+    line-height: 1.4;
+}
+.wizard-note {
+    font-size: 11px;
+    opacity: 0.5;
+    line-height: 1.5;
+    max-width: 260px;
+    margin-bottom: 20px;
+}
+.wizard-note code {
+    font-family: var(--vscode-editor-font-family);
+    background: var(--vscode-textCodeBlock-background, rgba(255,255,255,0.06));
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11px;
+}
+.wizard-back-link {
+    background: none;
+    border: none;
+    color: var(--vscode-foreground);
+    opacity: 0.5;
+    font-size: 12px;
+    cursor: pointer;
+    margin-top: 10px;
+    padding: 4px 8px;
+}
+.wizard-back-link:hover { opacity: 1; }
+
 /* ── Detail panel ── */
 #detail-panel {
     display: none;

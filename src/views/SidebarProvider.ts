@@ -174,6 +174,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 if (section === 'analytics') { return this.loadInsights(); }
                 return;
             }
+            case 'runWizard':
+                this.telemetry?.capture('wizard_launched', { source: 'sidebar' });
+                return vscode.commands.executeCommand(Commands.RUN_WIZARD);
             case 'openExternal': {
                 this.telemetry?.capture('external_link_opened', { source: 'sidebar' });
                 const host = this.authService.getHost().replace(/\/+$/, '');
@@ -198,6 +201,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         }
 
         const hasProject = !!this.authService.getProjectId();
+        const wizardFlag = this.flagCache.getFlag('wizard-enabled');
         this.postMessage({
             type: 'authState',
             authenticated: authed,
@@ -206,6 +210,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             posthogHost: this.authService.getHost(),
             canWrite: this.authService.getCanWrite(),
             isDev: this.isDev,
+            wizardEnabled: !!(wizardFlag && wizardFlag.active),
         });
         if (authed && hasProject) {
             this.loadInsights().catch(() => {});

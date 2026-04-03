@@ -28,6 +28,48 @@
     </div>
     <button class="sign-in-btn sign-in-btn--primary" id="btn-sign-in">Sign In with PostHog</button>
     <button class="sign-in-btn sign-in-btn--dev" id="btn-sign-in-dev" style="display:none;">Sign In (localhost:8010)</button>
+    <div class="welcome-divider" id="wizard-divider" style="display:none;">
+        <span class="welcome-divider-line"></span>
+        <span class="welcome-divider-text">or</span>
+        <span class="welcome-divider-line"></span>
+    </div>
+    <button class="wizard-cta-btn" id="btn-show-wizard" style="display:none;">
+        <span class="wizard-cta-sparkle">&#x2728;</span>
+        Set up PostHog <span class="wizard-cta-magic"><span>a</span><span>u</span><span>t</span><span>o</span><span>m</span><span>a</span><span>g</span><span>i</span><span>c</span><span>a</span><span>l</span><span>l</span><span>y</span></span>
+    </button>
+</div>
+
+<!-- Wizard info screen -->
+<div id="wizard-screen" class="welcome" style="display:none;">
+    <img src="{{LOGO_URI}}" alt="PostHog" class="welcome-logo" />
+    <h2 class="welcome-title">PostHog Wizard</h2>
+    <p class="welcome-subtitle">Don't add PostHog to your codebase. Make AI do it for you — with one terminal command.</p>
+    <div class="wizard-features">
+        <div class="wizard-feature">
+            <span class="wizard-feature-icon">&#x1F9D9;</span>
+            <div class="wizard-feature-text">
+                <span class="wizard-feature-name">Analyzes your codebase</span>
+                <span class="wizard-feature-desc">Detects your framework, dependencies, and project structure</span>
+            </div>
+        </div>
+        <div class="wizard-feature">
+            <span class="wizard-feature-icon">&#x2728;</span>
+            <div class="wizard-feature-text">
+                <span class="wizard-feature-name">Automagically instruments</span>
+                <span class="wizard-feature-desc">Installs the SDK, sets up providers, env files, and event tracking</span>
+            </div>
+        </div>
+        <div class="wizard-feature">
+            <span class="wizard-feature-icon">&#x1F3AF;</span>
+            <div class="wizard-feature-text">
+                <span class="wizard-feature-name">Works like an expert would</span>
+                <span class="wizard-feature-desc">Next.js, React, Django, Flask, Swift, Android, and 15+ more</span>
+            </div>
+        </div>
+    </div>
+    <p class="wizard-note">Opens a terminal running <code>npx @posthog/wizard</code></p>
+    <button class="sign-in-btn sign-in-btn--primary" id="btn-run-wizard">Run the Wizard</button>
+    <button class="wizard-back-link" id="btn-wizard-back">&#x2190; Back</button>
 </div>
 
 <!-- Project selection (authenticated but no project) -->

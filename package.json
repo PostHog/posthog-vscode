@@ -2,7 +2,7 @@
   "name": "posthog-vscode",
   "displayName": "PostHog for VSCode",
   "description": "PostHog extension for VSCode",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "license": "MIT",
   "publisher": "PostHog",
   "icon": "resources/icons/ph-logo2.png",
@@ -129,6 +129,10 @@
         "command": "posthog.findFlagReferences",
         "title": "PostHog: Find Flag References",
         "icon": "$(search)"
+      },
+      {
+        "command": "posthog.runWizard",
+        "title": "PostHog: Run Setup Wizard"
       }
     ],
     "menus": {

@@ -75,7 +75,7 @@ export class FeedbackViewProvider implements vscode.WebviewViewProvider {
 </style></head><body>
     <h3>Send feedback</h3>
     <p class="subtitle">Help us make the extension better</p>
-    <textarea id="msg" placeholder="What's on your mind?"></textarea>
+    <textarea id="msg" placeholder="What's on your spiky hedgehog mind?"></textarea>
     <button class="btn" id="send" disabled>Send Feedback</button>
     <div class="links">
         <a href="#" onclick="post('open-url','https://github.com/PostHog/posthog-vscode/issues')">Report a bug</a>

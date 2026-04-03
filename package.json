@@ -232,8 +232,8 @@
   },
   "scripts": {
     "vscode:prepublish": "pnpm run fetch-grammars && pnpm run package",
-    "compile": "webpack",
-    "watch": "webpack --watch",
+    "compile": "pnpm run fetch-grammars && webpack",
+    "watch": "pnpm run fetch-grammars && webpack --watch",
     "package": "webpack --mode production --devtool hidden-source-map",
     "fetch-grammars": "node scripts/fetch-grammars.js",
     "compile-tests": "tsc -p . --outDir out",

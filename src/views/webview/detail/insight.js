@@ -6,11 +6,13 @@
     function renderPage(ins) {
         const refreshed = ins.last_refresh ? 'Last refreshed ' + new Date(ins.last_refresh).toLocaleDateString() : 'Not yet computed';
         const kind = ins.query?.source?.kind || 'Unknown';
+        const allowedKinds = ['TrendsQuery', 'FunnelsQuery', 'RetentionQuery', 'PathsQuery', 'StickinessQuery', 'LifecycleQuery'];
+        const safeKind = allowedKinds.indexOf(kind) !== -1 ? kind : 'Unknown';
 
         let html = '<div class="page">';
         html += '<div class="hero"><div class="hero-left">'
             + '<div class="hero-title">' + esc(ins.name || 'Untitled') + '</div>'
-            + '<div class="hero-badges"><span class="badge draft">' + kind + '</span><span class="badge draft">' + refreshed + '</span></div>'
+            + '<div class="hero-badges"><span class="badge draft">' + safeKind + '</span><span class="badge draft">' + refreshed + '</span></div>'
             + '</div><div class="hero-actions">'
             + '<button class="btn btn-secondary" id="refresh-btn">Refresh Data</button>'
             + '<button class="btn btn-ghost"' + act({type:'openExternal',url:host+'/project/'+projectId+'/insights/'+(ins.short_id||ins.id)}) + '>Open in PostHog &#x2197;</button>'
@@ -51,9 +53,11 @@
         var r = insight.result;
         if (!r || !Array.isArray(r) || r.length === 0) return '<div style="opacity:0.4;text-align:center;padding:20px">No data</div>';
         var k = insight.query?.source?.kind;
+        var allowedKinds = ['TrendsQuery', 'FunnelsQuery', 'RetentionQuery', 'PathsQuery', 'StickinessQuery', 'LifecycleQuery'];
+        var safeKind = allowedKinds.indexOf(k) !== -1 ? k : 'Unknown';
         if (k === 'TrendsQuery' && r[0] && r[0].data) return renderSparklines(r);
         if (k === 'FunnelsQuery' && r[0] && r[0].count != null) return renderFunnel(r);
-        return '<div style="opacity:0.4;text-align:center;padding:20px">' + (k || 'Unknown') + ' visualization</div>';
+        return '<div style="opacity:0.4;text-align:center;padding:20px">' + safeKind + ' visualization</div>';
     }
 
     function renderSparklines(results) {

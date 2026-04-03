@@ -7,9 +7,12 @@ import { Commands } from '../constants';
 import { getWebviewHtml } from './getWebviewHtml';
 import { DetailPanelProvider } from './DetailPanelProvider';
 import { TelemetryService } from '../services/telemetryService';
+import { PostHogAuthenticationProvider } from '../services/postHogAuthProvider';
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
     private view?: vscode.WebviewView;
+    private authProvider?: PostHogAuthenticationProvider;
+    private isDev = false;
 
     constructor(
         private readonly extensionUri: vscode.Uri,
@@ -20,6 +23,14 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         private readonly detailPanel?: DetailPanelProvider,
         private readonly telemetry?: TelemetryService,
     ) {}
+
+    setAuthProvider(authProvider: PostHogAuthenticationProvider): void {
+        this.authProvider = authProvider;
+    }
+
+    setDevMode(isDev: boolean): void {
+        this.isDev = isDev;
+    }
 
     resolveWebviewView(webviewView: vscode.WebviewView) {
         this.view = webviewView;
@@ -96,6 +107,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             case 'signIn':
                 await vscode.commands.executeCommand(Commands.SIGN_IN);
                 return this.sendAuthState();
+            case 'signInDev':
+                if (this.authProvider) {
+                    await this.authProvider.setOAuthAuthority(msg.host as string || 'http://localhost:8010');
+                }
+                await vscode.commands.executeCommand(Commands.SIGN_IN);
+                return this.sendAuthState();
             case 'signOut':
                 await vscode.commands.executeCommand(Commands.SIGN_OUT);
                 return this.sendAuthState();
@@ -168,7 +185,18 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     // ── Auth ──
 
     private async sendAuthState() {
-        const authed = this.authService.isAuthenticated();
+        let authed = this.authService.isAuthenticated();
+
+        // Verify against actual session — auto-restore if Memento is stale
+        if (!authed && this.authProvider) {
+            const sessions = await this.authProvider.getSessions();
+            if (sessions.length > 0) {
+                await this.authService.setAuthenticated(true);
+                vscode.commands.executeCommand('setContext', 'posthog.isAuthenticated', true);
+                authed = true;
+            }
+        }
+
         const hasProject = !!this.authService.getProjectId();
         this.postMessage({
             type: 'authState',
@@ -177,6 +205,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             projectName: this.authService.getProjectName() ?? null,
             posthogHost: this.authService.getHost(),
             canWrite: this.authService.getCanWrite(),
+            isDev: this.isDev,
         });
         if (authed && hasProject) {
             this.loadInsights().catch(() => {});

@@ -1,5 +1,3 @@
-export function getScript(): string {
-    return /*js*/ `
 const vscode = acquireVsCodeApi();
 function send(msg) { vscode.postMessage(msg); }
 
@@ -847,7 +845,7 @@ function showFlagDetail(key) {
         // Show inline confirmation bar
         var bar = document.createElement('div');
         bar.className = 'confirm-bar';
-        bar.innerHTML = '<span class="confirm-text">Apply changes to \\'<strong>' + esc(f.key) + '</strong>\\'? This affects production.</span>'
+        bar.innerHTML = '<span class="confirm-text">Apply changes to \'<strong>' + esc(f.key) + '</strong>\'? This affects production.</span>'
             + '<div class="confirm-actions">'
             + '<button class="btn-cancel">Cancel</button>'
             + '<button class="btn-confirm">Confirm</button>'
@@ -1145,6 +1143,7 @@ function showInsightDetail(id) {
 // ── Event listeners ──
 
 document.getElementById('btn-sign-in').addEventListener('click', () => send({ type: 'signIn' }));
+document.getElementById('btn-sign-in-dev').addEventListener('click', () => send({ type: 'signInDev', host: 'http://localhost:8010' }));
 document.getElementById('btn-select-project-welcome').addEventListener('click', () => send({ type: 'selectProject' }));
 document.getElementById('btn-select-project').addEventListener('click', () => send({ type: 'selectProject' }));
 document.getElementById('btn-sign-out').addEventListener('click', () => send({ type: 'signOut' }));
@@ -1197,6 +1196,9 @@ window.addEventListener('message', e => {
                 switchTab('flags');
                 send({ type: 'loadFlags' });
             }
+            // Show dev sign-in button in development mode
+            var devBtn = document.getElementById('btn-sign-in-dev');
+            if (devBtn) { devBtn.style.display = msg.isDev ? '' : 'none'; }
             // Update project name + host in header
             var projNameEl = document.getElementById('project-name');
             if (projNameEl) {
@@ -1377,5 +1379,4 @@ document.getElementById('feedback-send-btn').addEventListener('click', function(
 });
 
 // ── Init ──
-send({ type: 'ready' });`;
-}
+send({ type: 'ready' });

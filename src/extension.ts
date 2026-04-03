@@ -126,6 +126,7 @@ export function activate(context: vscode.ExtensionContext) {
         detailPanel,
         telemetry,
     );
+    sidebarProvider.setAuthProvider(authProvider);
 
     // Autocomplete, code actions & inline decorations — all powered by tree-sitter
     const completionProvider = new FlagCompletionProvider(flagCache, treeSitter, telemetry);
@@ -185,6 +186,7 @@ export function activate(context: vscode.ExtensionContext) {
     // Debug tree — only visible in development mode
     const isDev = context.extensionMode !== vscode.ExtensionMode.Production;
     vscode.commands.executeCommand('setContext', 'posthog.isDevelopment', isDev);
+    sidebarProvider.setDevMode(isDev);
     const debugTreeProvider = new DebugTreeProvider(authService, flagCache, eventCache, experimentCache, context.extensionMode);
 
     // ── Status bar ──

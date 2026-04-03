@@ -200,26 +200,45 @@ export function activate(context: vscode.ExtensionContext) {
         return `${minutes}m ago`;
     }
 
+    function getHostShort(): string {
+        const host = authService.getHost();
+        try {
+            const hostname = new URL(host).hostname;
+            return hostname === 'us.posthog.com' || hostname === 'us.i.posthog.com' ? 'US'
+                : hostname === 'eu.posthog.com' || hostname === 'eu.i.posthog.com' ? 'EU'
+                : hostname;
+        } catch { return host; }
+    }
+
+    function getStatusLabel(): string {
+        const projectName = authService.getProjectName();
+        const hostShort = getHostShort();
+        return projectName ? `PostHog: ${projectName} [${hostShort}]` : `PostHog [${hostShort}]`;
+    }
+
+    function formatCount(n: number): string {
+        return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+    }
+
+    function updateStatusBarSyncing(resource: string, loaded: number, total: number | null) {
+        const label = getStatusLabel();
+        const progress = total ? `${formatCount(loaded)}/${formatCount(total)}` : formatCount(loaded);
+        statusBar.text = `$(sync~spin) ${label} — syncing ${resource} ${progress}`;
+        statusBar.backgroundColor = undefined;
+        statusBar.show();
+    }
+
     function updateStatusBar(error?: boolean) {
         if (!authService.isAuthenticated()) {
             statusBar.hide();
             return;
         }
-        const projectName = authService.getProjectName();
         if (error) {
             statusBar.text = '$(warning) PostHog: sync failed';
             statusBar.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
         } else {
             const age = formatSyncAge(flagCache.lastRefreshed);
-            const host = authService.getHost();
-            let hostShort: string;
-            try {
-                const hostname = new URL(host).hostname;
-                hostShort = hostname === 'us.posthog.com' || hostname === 'us.i.posthog.com' ? 'US'
-                    : hostname === 'eu.posthog.com' || hostname === 'eu.i.posthog.com' ? 'EU'
-                    : hostname;
-            } catch { hostShort = host; }
-            const label = projectName ? `PostHog: ${projectName} [${hostShort}]` : `PostHog [${hostShort}]`;
+            const label = getStatusLabel();
             statusBar.text = age ? `$(cloud) ${label} (synced ${age})` : `$(cloud) ${label}`;
             statusBar.backgroundColor = undefined;
         }
@@ -228,13 +247,20 @@ export function activate(context: vscode.ExtensionContext) {
 
     // ── Cache loading helper ──
     async function loadFlags(projectId: number): Promise<void> {
-        const flags = await postHogService.getFeatureFlags(projectId);
+        const flags = await postHogService.getFeatureFlags(projectId, (partial, total) => {
+            flagCache.update([...partial]);
+            updateStatusBarSyncing('flags', partial.length, total);
+        });
         flagCache.update(flags);
     }
 
     async function loadEvents(projectId: number): Promise<void> {
-        const events = await postHogService.getEventDefinitions(projectId);
+        const events = await postHogService.getEventDefinitions(projectId, (partial, total) => {
+            eventCache.update([...partial]);
+            updateStatusBarSyncing('events', partial.length, total);
+        });
         eventCache.update(events);
+        updateStatusBarSyncing('event volumes', 0, null);
         const names = events.filter(e => !e.hidden && !e.name.startsWith('$')).map(e => e.name);
         const [volumes, sparklines] = await Promise.all([
             postHogService.getEventVolumes(projectId, names),
@@ -245,15 +271,21 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     async function loadExperiments(projectId: number): Promise<void> {
+        updateStatusBarSyncing('experiments', 0, null);
         const exps = await postHogService.getExperiments(projectId);
         experimentCache.update(exps);
         const active = exps.filter(e => e.start_date);
-        await Promise.allSettled(
-            active.map(async e => {
-                const results = await postHogService.getExperimentResults(projectId, e.id);
-                if (results) { experimentCache.updateResults(e.id, results); }
-            })
-        );
+        if (active.length > 0) {
+            let loaded = 0;
+            await Promise.allSettled(
+                active.map(async e => {
+                    const results = await postHogService.getExperimentResults(projectId, e.id);
+                    if (results) { experimentCache.updateResults(e.id, results); }
+                    loaded++;
+                    updateStatusBarSyncing('experiment results', loaded, active.length);
+                })
+            );
+        }
     }
 
     // ── Flag diff notifications ──
@@ -288,7 +320,10 @@ export function activate(context: vscode.ExtensionContext) {
                     loadFlags(projectId),
                     loadEvents(projectId),
                     loadExperiments(projectId),
-                ]).catch(err => {
+                ]).then(() => {
+                    // Auto-scan for stale flags after caches are loaded
+                    staleFlagService.scan().catch(() => {});
+                }).catch(err => {
                     const msg = err instanceof Error ? err.message : 'Connection failed';
                     vscode.window.showWarningMessage(`PostHog: ${msg}`);
                     updateStatusBar(true);
@@ -385,7 +420,11 @@ export function activate(context: vscode.ExtensionContext) {
                 sidebarProvider.navigateToExperiment(flagKey);
             }
         }),
-        vscode.window.registerTreeDataProvider(Views.STALE_FLAGS, staleFlagTreeProvider),
+        (() => {
+            const staleFlagView = vscode.window.createTreeView(Views.STALE_FLAGS, { treeDataProvider: staleFlagTreeProvider });
+            staleFlagTreeProvider.setView(staleFlagView);
+            return staleFlagView;
+        })(),
         vscode.window.registerTreeDataProvider('posthog-debug-v2', debugTreeProvider),
         vscode.commands.registerCommand('posthog.debugCopy', (value: string) => {
             vscode.env.clipboard.writeText(value);

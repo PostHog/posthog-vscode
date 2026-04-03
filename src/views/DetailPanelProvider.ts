@@ -367,7 +367,7 @@ ${isLoading ? `
 <body>
 <script nonce="${nonce}">
 const vscode = acquireVsCodeApi();
-const DATA = ${JSON.stringify(data)};
+const DATA = ${JSON.stringify(data).replace(/<\//g, '<\\/')};
 const LOGO_URI = "${logoUri}";
 ${getDetailScript(type)}
 </script>
@@ -400,12 +400,11 @@ body {
 
 .hero {
     display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
+    flex-direction: column;
     margin-bottom: 24px;
-    gap: 16px;
+    gap: 12px;
 }
-.hero-left { flex: 1; min-width: 0; }
+.hero-left { min-width: 0; }
 .hero-title {
     font-size: 20px;
     font-weight: 700;
@@ -415,6 +414,7 @@ body {
 .hero-subtitle {
     font-size: 12px;
     opacity: 0.5;
+    word-break: break-all;
 }
 .hero-badges { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .badge {
@@ -434,7 +434,7 @@ body {
 .badge.error { background: rgba(244, 68, 68, 0.15); color: #f66; }
 .badge.resolved { background: rgba(76, 187, 23, 0.15); color: #4CBB17; }
 
-.hero-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.hero-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .btn {
     padding: 7px 16px;
     border: none;
@@ -629,6 +629,111 @@ body {
 .ci-bar.neu { background: var(--vscode-foreground); opacity: 0.25; }
 .ci-range { font-family: var(--vscode-editor-font-family); opacity: 0.4; white-space: nowrap; flex-shrink: 0; }
 
+/* ── Stat values ── */
+.stat-value {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.4;
+    word-break: break-all;
+}
+.stat-value code {
+    font-family: var(--vscode-editor-font-family);
+    background: rgba(255,255,255,0.06);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+/* ── Exposure bar ── */
+.expose-bar {
+    display: flex;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    gap: 2px;
+    margin-bottom: 10px;
+}
+.expose-seg {
+    height: 100%;
+    border-radius: 3px;
+    min-width: 4px;
+    transition: width 0.3s;
+}
+.expose-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 11px;
+    opacity: 0.7;
+}
+.expose-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.expose-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+/* ── Release conditions ── */
+.condition-set {
+    padding: 12px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--vscode-panel-border, rgba(255,255,255,0.06));
+    border-radius: 6px;
+    margin-bottom: 8px;
+}
+.condition-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 8px;
+}
+.condition-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    background: var(--ph-blue);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+.condition-prop {
+    font-size: 12px;
+    font-family: var(--vscode-editor-font-family);
+    padding: 4px 8px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 4px;
+    margin-bottom: 4px;
+}
+.condition-rollout {
+    font-size: 12px;
+    margin-top: 8px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--ph-yellow);
+    color: var(--ph-yellow);
+    display: inline-block;
+}
+.condition-or {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0.35;
+    padding: 4px 0;
+    text-transform: uppercase;
+}
+
 /* ── Conclusion ── */
 .conclusion {
     padding: 12px 16px; border-radius: var(--radius); margin-bottom: 16px; font-size: 13px;
@@ -780,6 +885,13 @@ function getFlagScript(): string {
     const created = f.created_at ? new Date(f.created_at).toLocaleDateString() : 'Unknown';
     const createdBy = f.created_by ? (f.created_by.first_name || f.created_by.email) : 'Unknown';
 
+    // Flag type
+    var hasPayload = Object.values(payloads).some(function(v) { return v != null; });
+    var flagType = isMulti ? 'Multivariate' : hasPayload ? 'Remote config' : 'Boolean';
+    var flagTypeDesc = isMulti ? 'Multiple variants with rollout percentages'
+        : hasPayload ? 'Single payload without multivariate'
+        : 'Release toggle (boolean) with optional payload';
+
     let html = '<div class="page">';
 
     // Hero
@@ -793,12 +905,48 @@ function getFlagScript(): string {
         + '<button class="btn btn-ghost"' + act({type:'openExternal',url:host+'/project/'+projectId+'/feature_flags/'+f.id}) + '>Open in PostHog &#x2197;</button>'
         + '</div></div>';
 
+    // Metadata grid
+    html += '<div class="card-row">';
+    html += '<div class="card"><div class="card-title">Flag type</div><div class="stat-value">' + flagType + '</div><div style="font-size:11px;opacity:0.4;margin-top:2px">' + flagTypeDesc + '</div></div>';
+    html += '<div class="card"><div class="card-title">Created</div><div class="stat-value">' + created + '</div><div style="font-size:11px;opacity:0.4;margin-top:2px">by ' + esc(createdBy) + '</div></div>';
+    html += '</div>';
+
     // Status toggle
-    html += '<div class="card"><div class="card-title">Status</div>'
+    html += '<div class="card"><div class="card-title">Enable feature flag</div>'
         + '<div class="toggle-row">'
         + '<button class="toggle' + (f.active ? ' on' : '') + '" id="flag-toggle"><span class="toggle-knob"></span></button>'
-        + '<span class="toggle-label" id="toggle-label">' + (f.active ? 'Active' : 'Inactive') + '</span>'
+        + '<span class="toggle-label" id="toggle-label">' + (f.active ? 'Enabled' : 'Disabled') + '</span>'
         + '</div></div>';
+
+    // Release conditions
+    if (groups.length > 0) {
+        html += '<div class="card"><div class="card-title">Release conditions</div>';
+        html += '<div style="font-size:11px;opacity:0.4;margin-bottom:12px">Condition sets are evaluated top to bottom — the first match wins.</div>';
+        groups.forEach(function(g, gi) {
+            var props = g.properties || [];
+            var gRollout = g.rollout_percentage != null ? g.rollout_percentage : 100;
+            html += '<div class="condition-set">';
+            html += '<div class="condition-header"><span class="condition-num">' + (gi+1) + '</span>';
+            if (props.length > 0) {
+                html += '<span>Match users against ' + props.length + ' propert' + (props.length === 1 ? 'y' : 'ies') + '</span>';
+            } else {
+                html += '<span>All users</span>';
+            }
+            html += '</div>';
+            props.forEach(function(p) {
+                var propKey = p.key || '';
+                var op = p.operator || 'exact';
+                var val = p.value != null ? (Array.isArray(p.value) ? p.value.join(', ') : String(p.value)) : '';
+                html += '<div class="condition-prop">' + esc(propKey) + ' <span style="opacity:0.4">' + esc(op) + '</span> ' + esc(val) + '</div>';
+            });
+            html += '<div class="condition-rollout">Rolled out to <strong>' + gRollout + '%</strong> of users in this set.</div>';
+            html += '</div>';
+            if (gi < groups.length - 1) {
+                html += '<div class="condition-or">OR</div>';
+            }
+        });
+        html += '</div>';
+    }
 
     // Rollout / Variants
     if (isMulti) {
@@ -812,7 +960,8 @@ function getFlagScript(): string {
                 + '</div>';
         });
         html += '</div><button class="add-variant-btn" id="add-variant">+ Add variant</button></div>';
-    } else {
+    } else if (groups.length === 0) {
+        // Only show the bare rollout slider if there are no condition groups
         html += '<div class="card"><div class="card-title">Rollout</div>'
             + '<div class="slider-row">'
             + '<input type="range" class="slider" id="rollout-slider" min="0" max="100" value="' + rollout + '" />'
@@ -823,7 +972,11 @@ function getFlagScript(): string {
 
     // Payload
     const payloadKeys = isMulti ? variants.map(function(v) { return v.key; }) : ['true'];
+    var hasAnyPayload = payloadKeys.some(function(pk) { return payloads[pk] != null && payloads[pk] !== ''; });
     html += '<div class="card"><div class="card-title">Payload</div>';
+    if (!hasAnyPayload && !isMulti) {
+        html += '<div style="font-size:12px;opacity:0.4;margin-bottom:8px">No payload configured</div>';
+    }
     payloadKeys.forEach(function(pk) {
         const val = payloads[pk] != null ? (typeof payloads[pk] === 'string' ? payloads[pk] : JSON.stringify(payloads[pk], null, 2)) : '';
         if (payloadKeys.length > 1) html += '<div class="payload-label">' + esc(pk) + '</div>';
@@ -938,6 +1091,12 @@ function getExperimentScript(): string {
     const created = exp.created_at ? new Date(exp.created_at).toLocaleDateString() : 'Unknown';
     const createdBy = exp.created_by ? (exp.created_by.first_name || exp.created_by.email) : 'Unknown';
     const variants = exp.parameters && exp.parameters.feature_flag_variants;
+    var daysRunning = 0;
+    if (exp.start_date) {
+        var start = new Date(exp.start_date);
+        var end = exp.end_date ? new Date(exp.end_date) : new Date();
+        daysRunning = Math.ceil((end.getTime() - start.getTime()) / 86400000);
+    }
 
     let html = '<div class="page">';
 
@@ -946,11 +1105,8 @@ function getExperimentScript(): string {
         + '<div class="hero-title">' + esc(exp.name) + '</div>'
         + '<div class="hero-subtitle"><code>' + esc(exp.feature_flag_key) + '</code></div>'
         + '<div class="hero-badges"><span class="badge ' + badgeCls + '">' + status + '</span>';
-    if (exp.start_date) {
-        var start = new Date(exp.start_date);
-        var end = exp.end_date ? new Date(exp.end_date) : new Date();
-        var days = Math.ceil((end.getTime() - start.getTime()) / 86400000);
-        html += '<span class="badge draft">' + days + ' day' + (days !== 1 ? 's' : '') + '</span>';
+    if (daysRunning > 0) {
+        html += '<span class="badge draft">' + daysRunning + ' day' + (daysRunning !== 1 ? 's' : '') + '</span>';
     }
     html += '</div></div><div class="hero-actions">';
     // Launch / Stop buttons
@@ -964,25 +1120,15 @@ function getExperimentScript(): string {
         + '<button class="btn btn-ghost"' + act({type:'openExternal',url:host+'/project/'+projectId+'/experiments/'+exp.id}) + '>Open in PostHog &#x2197;</button>'
         + '</div></div>';
 
+    // Metadata grid — inspired by PostHog top bar
+    html += '<div class="card-row">';
+    html += '<div class="card"><div class="card-title">Feature flag</div><div class="stat-value"><code>' + esc(exp.feature_flag_key) + '</code></div></div>';
+    html += '<div class="card"><div class="card-title">Duration</div><div class="stat-value">' + (exp.start_date ? daysRunning + ' day' + (daysRunning !== 1 ? 's' : '') : 'Not started') + '</div></div>';
+    html += '<div class="card"><div class="card-title">Created</div><div class="stat-value">' + created + ' by ' + esc(createdBy) + '</div></div>';
+    html += '</div>';
+
     if (exp.description) {
         html += '<div class="field"><div class="field-value">' + esc(exp.description) + '</div></div>';
-    }
-
-    // Sample size progress
-    var recSample = exp.parameters && exp.parameters.recommended_sample_size;
-    if (exp.start_date && recSample && recSample > 0 && results) {
-        var sampleData = null;
-        if (results.primary && results.primary.results && results.primary.results[0]) sampleData = results.primary.results[0].data;
-        if (sampleData) {
-            var totalSamples = sampleData.baseline.number_of_samples;
-            (sampleData.variant_results || []).forEach(function(v) { totalSamples += v.number_of_samples; });
-            var samplePct = Math.min(Math.round((totalSamples / recSample) * 100), 100);
-            html += '<div class="card"><div class="card-title">Sample Progress</div>'
-                + '<div style="height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;">'
-                + '<div style="height:100%;width:' + samplePct + '%;background:var(--ph-blue);border-radius:3px;transition:width 0.3s;"></div></div>'
-                + '<div style="font-size:11px;opacity:0.5;margin-top:4px;">' + fmtNum(totalSamples) + ' / ' + fmtNum(recSample) + ' samples (' + samplePct + '%)</div>'
-                + '</div>';
-        }
     }
 
     // Conclusion
@@ -993,9 +1139,9 @@ function getExperimentScript(): string {
         html += '</div>';
     }
 
-    // Exposures
+    // Exposures — visual bar + table
+    var exposures = [];
     if (results) {
-        var exposures = [];
         if (results.variants && results.variants.length > 0) {
             exposures = results.variants;
         } else if (results.primary && results.primary.results && results.primary.results[0]) {
@@ -1007,19 +1153,46 @@ function getExperimentScript(): string {
                 });
             }
         }
-        if (exposures.length > 0) {
-            var total = exposures.reduce(function(s,e) { return s + (e.absolute_exposure||0); }, 0);
-            html += '<div class="card"><div class="card-title">Exposures</div>'
-                + '<table class="data-table"><thead><tr><th>Variant</th><th class="r">Exposures</th><th class="r">%</th></tr></thead><tbody>';
-            exposures.forEach(function(e) {
-                html += '<tr><td>' + esc(e.key) + '</td><td class="r">' + fmtNum(e.absolute_exposure||0) + '</td><td class="r">' + (total > 0 ? ((e.absolute_exposure||0)/total*100).toFixed(1)+'%' : '-') + '</td></tr>';
-            });
-            html += '<tr class="total"><td>Total</td><td class="r">' + fmtNum(total) + '</td><td class="r">100%</td></tr>';
-            html += '</tbody></table></div>';
-        }
+    }
+    if (exposures.length > 0) {
+        var expColors = ['#1D4AFF','#A855F7','#EC4899','#F97316','#4CBB17','#F9BD2B'];
+        var total = exposures.reduce(function(s,e) { return s + (e.absolute_exposure||0); }, 0);
+        html += '<div class="card"><div class="card-title">Exposures &nbsp;&nbsp;<span style="font-weight:700;font-size:13px;text-transform:none;letter-spacing:0;opacity:1">' + fmtNum(total) + '</span></div>';
+        // Distribution bar
+        html += '<div class="expose-bar">';
+        exposures.forEach(function(e, i) {
+            var pct = total > 0 ? (e.absolute_exposure||0)/total*100 : 0;
+            html += '<div class="expose-seg" style="width:'+pct+'%;background:'+expColors[i%expColors.length]+'"></div>';
+        });
+        html += '</div>';
+        // Legend
+        html += '<div class="expose-legend">';
+        exposures.forEach(function(e, i) {
+            var pct = total > 0 ? ((e.absolute_exposure||0)/total*100).toFixed(1)+'%' : '-';
+            html += '<span class="expose-item"><span class="expose-dot" style="background:'+expColors[i%expColors.length]+'"></span>' + esc(e.key) + ' ' + pct + '</span>';
+        });
+        html += '</div></div>';
     }
 
-    // Metric tables
+    // Sample size progress
+    var recSample = exp.parameters && exp.parameters.recommended_sample_size;
+    if (exp.start_date && recSample && recSample > 0) {
+        var sampleData = null;
+        if (results && results.primary && results.primary.results && results.primary.results[0]) sampleData = results.primary.results[0].data;
+        var totalSamples = 0;
+        if (sampleData) {
+            totalSamples = sampleData.baseline.number_of_samples;
+            (sampleData.variant_results || []).forEach(function(v) { totalSamples += v.number_of_samples; });
+        }
+        var samplePct = totalSamples > 0 ? Math.min(Math.round((totalSamples / recSample) * 100), 100) : 0;
+        html += '<div class="card"><div class="card-title">Sample Progress</div>'
+            + '<div style="height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;">'
+            + '<div style="height:100%;width:' + samplePct + '%;background:var(--ph-blue);border-radius:3px;transition:width 0.3s;"></div></div>'
+            + '<div style="font-size:11px;opacity:0.5;margin-top:4px;">' + fmtNum(totalSamples) + ' / ' + fmtNum(recSample) + ' samples (' + samplePct + '%)</div>'
+            + '</div>';
+    }
+
+    // Metric results tables
     function renderMetrics(label, metrics, metricResults) {
         if (!metrics || metrics.length === 0) return '';
         var h = '<div class="card"><div class="card-title">' + esc(label) + '</div>';
@@ -1036,14 +1209,14 @@ function getExperimentScript(): string {
                 var winner = vrs.length > 0 ? vrs.reduce(function(b,v) { return v.chance_to_win > b.chance_to_win ? v : b; }) : null;
 
                 h += '<table class="data-table"><thead><tr><th>Variant</th><th class="r">Value</th><th class="r">Delta</th><th class="r">Win %</th></tr></thead><tbody>';
-                h += '<tr class="baseline"><td>' + esc(bl.key) + '</td><td class="r">' + fmtVal(bl.mean, m.metric_type) + '<div class="sub">' + fmtNum(bl.number_of_samples) + '</div></td><td class="r">-</td><td class="r">-</td></tr>';
+                h += '<tr class="baseline"><td>' + esc(bl.key) + ' <span style="opacity:0.4;font-size:10px">baseline</span></td><td class="r">' + fmtVal(bl.mean, m.metric_type) + '<div class="sub">' + fmtNum(bl.number_of_samples) + ' users</div></td><td class="r">-</td><td class="r">-</td></tr>';
                 vrs.forEach(function(v) {
                     var wp = Math.round(v.chance_to_win*100);
                     var isW = v === winner && v.significant;
                     var dStr = v.delta != null ? '<span class="delta ' + (v.delta > 0 ? 'up' : v.delta < 0 ? 'down' : '') + '">' + (v.delta > 0 ? '+' : '') + (v.delta*100).toFixed(1) + '%</span>' : '-';
                     var wCls = v.significant ? (isW ? 'sig-win' : 'sig-lose') : '';
                     h += '<tr><td>' + esc(v.key) + (isW ? ' &#x2B50;' : '') + '</td>'
-                        + '<td class="r">' + fmtVal(v.mean, m.metric_type) + '<div class="sub">' + fmtNum(v.number_of_samples) + '</div></td>'
+                        + '<td class="r">' + fmtVal(v.mean, m.metric_type) + '<div class="sub">' + fmtNum(v.number_of_samples) + ' users</div></td>'
                         + '<td class="r">' + dStr + '</td>'
                         + '<td class="r"><span class="win-badge ' + wCls + '">' + wp + '%</span></td></tr>';
                 });
@@ -1051,7 +1224,6 @@ function getExperimentScript(): string {
 
                 // CI bars
                 if (vrs.some(function(v) { return v.credible_interval; })) {
-                    // Collect all CI bounds for dynamic normalization
                     var allBounds = [];
                     vrs.forEach(function(v) { if (v.credible_interval) { allBounds.push(v.credible_interval[0]*100, v.credible_interval[1]*100); } });
                     var dataMin = Math.min.apply(null, allBounds.concat([0]));
@@ -1085,7 +1257,10 @@ function getExperimentScript(): string {
     if (results) {
         html += renderMetrics('Primary metrics', exp.metrics, results.primary && results.primary.results);
         html += renderMetrics('Secondary metrics', exp.metrics_secondary, results.secondary && results.secondary.results);
-    } else if (variants && variants.length > 0) {
+    }
+
+    // Variant allocation — always show
+    if (variants && variants.length > 0) {
         html += '<div class="card"><div class="card-title">Variant allocation</div>'
             + '<table class="data-table"><thead><tr><th>Variant</th><th class="r">%</th></tr></thead><tbody>';
         variants.forEach(function(v) { html += '<tr><td>' + esc(v.key) + '</td><td class="r">' + v.rollout_percentage + '%</td></tr>'; });
@@ -1131,45 +1306,51 @@ function getExperimentScript(): string {
 function getInsightScript(): string {
     return /*js*/ `
 (function() {
-    const ins = DATA.insight;
+    var currentInsight = DATA.insight;
     const host = DATA.host;
     const projectId = DATA.projectId;
-    const refreshed = ins.last_refresh ? 'Last refreshed ' + new Date(ins.last_refresh).toLocaleDateString() : 'Not yet computed';
-    const kind = ins.query?.source?.kind || 'Unknown';
 
-    let html = '<div class="page">';
-    html += '<div class="hero"><div class="hero-left">'
-        + '<div class="hero-title">' + esc(ins.name || 'Untitled') + '</div>'
-        + '<div class="hero-badges"><span class="badge draft">' + kind + '</span><span class="badge draft">' + refreshed + '</span></div>'
-        + '</div><div class="hero-actions">'
-        + '<button class="btn btn-secondary" id="refresh-btn">Refresh Data</button>'
-        + '<button class="btn btn-ghost"' + act({type:'openExternal',url:host+'/project/'+projectId+'/insights/'+(ins.short_id||ins.id)}) + '>Open in PostHog &#x2197;</button>'
-        + '</div></div>';
+    function renderPage(ins) {
+        const refreshed = ins.last_refresh ? 'Last refreshed ' + new Date(ins.last_refresh).toLocaleDateString() : 'Not yet computed';
+        const kind = ins.query?.source?.kind || 'Unknown';
 
-    if (ins.description) html += '<div class="field"><div class="field-value">' + esc(ins.description) + '</div></div>';
+        let html = '<div class="page">';
+        html += '<div class="hero"><div class="hero-left">'
+            + '<div class="hero-title">' + esc(ins.name || 'Untitled') + '</div>'
+            + '<div class="hero-badges"><span class="badge draft">' + kind + '</span><span class="badge draft">' + refreshed + '</span></div>'
+            + '</div><div class="hero-actions">'
+            + '<button class="btn btn-secondary" id="refresh-btn">Refresh Data</button>'
+            + '<button class="btn btn-ghost"' + act({type:'openExternal',url:host+'/project/'+projectId+'/insights/'+(ins.short_id||ins.id)}) + '>Open in PostHog &#x2197;</button>'
+            + '</div></div>';
 
-    // Visualization
-    html += '<div class="viz-container" id="viz">' + renderViz(ins) + '</div>';
+        if (ins.description) html += '<div class="field"><div class="field-value">' + esc(ins.description) + '</div></div>';
 
-    // Data table
-    if (ins.result && Array.isArray(ins.result) && ins.result.length > 0) {
-        html += '<div class="card"><div class="card-title">Data</div>' + renderDataTable(ins) + '</div>';
+        // Visualization
+        html += '<div class="viz-container" id="viz">' + renderViz(ins) + '</div>';
+
+        // Data table
+        if (ins.result && Array.isArray(ins.result) && ins.result.length > 0) {
+            html += '<div class="card"><div class="card-title">Data</div>' + renderDataTable(ins) + '</div>';
+        }
+
+        html += '<div class="meta-row"><span>Created ' + (ins.created_at ? new Date(ins.created_at).toLocaleDateString() : 'Unknown') + '</span></div>';
+        html += '</div>';
+        document.body.innerHTML = html;
+        bindClicks();
+
+        document.getElementById('refresh-btn').addEventListener('click', function() {
+            this.textContent = 'Refreshing...';
+            this.disabled = true;
+            send({ type: 'refreshInsight', insightId: ins.id });
+        });
     }
 
-    html += '<div class="meta-row"><span>Created ' + (ins.created_at ? new Date(ins.created_at).toLocaleDateString() : 'Unknown') + '</span></div>';
-    html += '</div>';
-    document.body.innerHTML = html;
-    bindClicks();
-
-    document.getElementById('refresh-btn').addEventListener('click', function() {
-        this.textContent = 'Refreshing...';
-        this.disabled = true;
-        send({ type: 'refreshInsight', insightId: ins.id });
-    });
+    renderPage(currentInsight);
 
     window.addEventListener('message', function(ev) {
         if (ev.data.type === 'insightRefreshed') {
-            location.reload(); // simplest approach
+            currentInsight = ev.data.data;
+            renderPage(currentInsight);
         }
     });
 

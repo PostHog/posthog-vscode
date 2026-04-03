@@ -85,13 +85,16 @@ export class PostHogService {
         return this.request<Project>(`/api/projects/${projectId}/`);
     }
 
-    async getFeatureFlags(projectId: number): Promise<FeatureFlag[]> {
+    async getFeatureFlags(projectId: number, onProgress?: (loaded: FeatureFlag[], total: number | null) => void): Promise<FeatureFlag[]> {
         const flags: FeatureFlag[] = [];
         let nextPath: string | null = `/api/projects/${projectId}/feature_flags/?limit=100`;
+        let total: number | null = null;
 
         while (nextPath) {
             const data: PaginatedResponse<FeatureFlag> = await this.request<PaginatedResponse<FeatureFlag>>(nextPath);
             flags.push(...data.results);
+            if (total === null) { total = data.count; }
+            onProgress?.(flags, total);
 
             if (data.next) {
                 const parsed = new URL(data.next);
@@ -102,6 +105,28 @@ export class PostHogService {
         }
 
         return flags;
+    }
+
+    async getFeatureFlagsPage(projectId: number, cursor?: string): Promise<{ results: FeatureFlag[]; next: string | null; total: number }> {
+        const path = cursor ?? `/api/projects/${projectId}/feature_flags/?limit=100`;
+        const data = await this.request<PaginatedResponse<FeatureFlag>>(path);
+        let next: string | null = null;
+        if (data.next) {
+            const parsed = new URL(data.next);
+            next = parsed.pathname + parsed.search;
+        }
+        return { results: data.results, next, total: data.count };
+    }
+
+    async getExperimentsPage(projectId: number, cursor?: string): Promise<{ results: Experiment[]; next: string | null; total: number }> {
+        const path = cursor ?? `/api/projects/${projectId}/experiments/?limit=50`;
+        const data = await this.request<PaginatedResponse<Experiment>>(path);
+        let next: string | null = null;
+        if (data.next) {
+            const parsed = new URL(data.next);
+            next = parsed.pathname + parsed.search;
+        }
+        return { results: data.results, next, total: data.count };
     }
 
     async createFeatureFlag(projectId: number, key: string, name?: string, active?: boolean): Promise<FeatureFlag> {
@@ -123,13 +148,16 @@ export class PostHogService {
         });
     }
 
-    async getEventDefinitions(projectId: number): Promise<EventDefinition[]> {
+    async getEventDefinitions(projectId: number, onProgress?: (loaded: EventDefinition[], total: number | null) => void): Promise<EventDefinition[]> {
         const events: EventDefinition[] = [];
         let nextPath: string | null = `/api/projects/${projectId}/event_definitions/?limit=100`;
+        let total: number | null = null;
 
         while (nextPath) {
             const data: PaginatedResponse<EventDefinition> = await this.request<PaginatedResponse<EventDefinition>>(nextPath);
             events.push(...data.results);
+            if (total === null) { total = data.count; }
+            onProgress?.(events, total);
 
             if (data.next) {
                 const parsed = new URL(data.next);

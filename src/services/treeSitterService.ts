@@ -146,6 +146,26 @@ const JS_QUERIES: QueryStrings = {
                         object: (_) @client
                         property: (property_identifier) @method)
                     arguments: (arguments . (string (string_fragment) @flag_key))))) @assignment
+
+        (lexical_declaration
+            (variable_declarator
+                name: (identifier) @var_name
+                value: (await_expression
+                    (call_expression
+                        function: (member_expression
+                            object: (_) @client
+                            property: (property_identifier) @method)
+                        arguments: (arguments . (string (string_fragment) @flag_key)))))) @assignment
+
+        (variable_declaration
+            (variable_declarator
+                name: (identifier) @var_name
+                value: (await_expression
+                    (call_expression
+                        function: (member_expression
+                            object: (_) @client
+                            property: (property_identifier) @method)
+                        arguments: (arguments . (string (string_fragment) @flag_key)))))) @assignment
     `,
 
     functions: `
@@ -981,27 +1001,39 @@ export class TreeSitterService {
 
         if (!condition || !consequence) { return; }
 
-        const variant = this.extractComparison(condition, varName);
-        if (variant === null && !alternative) { return; }
+        // Only process if the condition actually references the tracked variable
+        if (!new RegExp('\\b' + varName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b').test(condition.text)) { return; }
 
-        if (variant !== null) {
-            branches.push({
-                flagKey,
-                variantKey: variant,
-                conditionLine: ifNode.startPosition.row,
-                startLine: ifNode.startPosition.row,
-                endLine: consequence.endPosition.row,
-            });
+        let variant = this.extractComparison(condition, varName);
+
+        // Truthiness check: if (varName) or if (!varName)
+        if (variant === null) {
+            const isTruthinessCheck = this.isTruthinessCheckForVar(condition, varName);
+            if (isTruthinessCheck) {
+                const negated = this.isNegated(condition);
+                variant = negated ? 'false' : 'true';
+            }
         }
+
+        if (variant === null) { return; }
+
+        branches.push({
+            flagKey,
+            variantKey: variant,
+            conditionLine: ifNode.startPosition.row,
+            startLine: ifNode.startPosition.row,
+            endLine: consequence.endPosition.row,
+        });
 
         if (alternative) {
             const altChild = alternative.namedChildren[0];
             if (altChild?.type === 'if_statement') {
                 this.extractIfChainBranches(altChild, varName, flagKey, branches);
             } else if (altChild) {
+                const elseVariant = variant === 'true' ? 'false' : variant === 'false' ? 'true' : 'else';
                 branches.push({
                     flagKey,
-                    variantKey: 'else',
+                    variantKey: elseVariant,
                     conditionLine: alternative.startPosition.row,
                     startLine: alternative.startPosition.row,
                     endLine: altChild.endPosition.row,
@@ -1294,6 +1326,25 @@ export class TreeSitterService {
         }
         return node.type === 'unary_expression' && node.text.startsWith('!')
             || node.type === 'not_operator';
+    }
+
+    /** Check if a condition is a simple truthiness check on a variable: `if (varName)` or `if (!varName)` */
+    private isTruthinessCheckForVar(conditionNode: Parser.SyntaxNode, varName: string): boolean {
+        let node = conditionNode;
+        while (node.type === 'parenthesized_expression' && node.namedChildren.length === 1) {
+            node = node.namedChildren[0];
+        }
+        // if (varName)
+        if (node.type === 'identifier' && node.text === varName) { return true; }
+        // if (!varName)
+        if ((node.type === 'unary_expression' || node.type === 'not_operator') && node.namedChildren.length > 0) {
+            let inner = node.namedChildren[node.namedChildren.length - 1];
+            while (inner.type === 'parenthesized_expression' && inner.namedChildren.length === 1) {
+                inner = inner.namedChildren[0];
+            }
+            if (inner.type === 'identifier' && inner.text === varName) { return true; }
+        }
+        return false;
     }
 
     private extractIdentifier(node: Parser.SyntaxNode): string | null {

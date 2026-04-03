@@ -11,6 +11,10 @@ let projectId = null;
 let userEmail = null;
 let myFlagsOnly = false;
 let canWrite = true;
+let hasMoreFlags = false;
+let hasMoreExperiments = false;
+let loadingMoreFlags = false;
+let loadingMoreExperiments = false;
 
 // ── Helpers ──
 
@@ -151,6 +155,28 @@ function renderSection(sectionId, items, renderFn) {
     }
 }
 
+function flagItemHtml(f) {
+    const dotClass = f.active ? 'active' : 'inactive';
+    return '<div class="item" data-key="' + esc(f.key) + '" style="cursor:pointer;">'
+        + '<div class="dot ' + dotClass + '"></div>'
+        + '<div class="info">'
+        + '<div class="primary">' + esc(f.key) + '</div>'
+        + (f.name ? '<div class="secondary">' + esc(f.name) + '</div>' : '')
+        + '</div>'
+        + '<div class="item-actions">'
+        + '<button class="act-copy" data-key="' + esc(f.key) + '" title="Copy key">&#x2398;</button>'
+        + '<button class="act-open" data-path="/project/' + projectId + '/feature_flags/' + f.id + '" title="Open in PostHog">&#x2197;</button>'
+        + '</div>'
+        + '</div>';
+}
+
+function loadMoreSentinelHtml(section, loaded, total) {
+    var label = total ? (loaded + ' / ' + total) : (loaded + ' loaded');
+    return '<div class="load-more-sentinel" id="' + section + '-sentinel">'
+        + '<span class="load-more-label">Loading more... ' + label + '</span>'
+        + '</div>';
+}
+
 function renderFlags(flags) {
     allData.flags = flags;
     var filtered = flags;
@@ -160,22 +186,62 @@ function renderFlags(flags) {
         });
     }
     renderSection('flags', filtered, (list, items) => {
-        list.innerHTML = items.map(f => {
-            const dotClass = f.active ? 'active' : 'inactive';
-            return '<div class="item" data-key="' + esc(f.key) + '" style="cursor:pointer;">'
-                + '<div class="dot ' + dotClass + '"></div>'
-                + '<div class="info">'
-                + '<div class="primary">' + esc(f.key) + '</div>'
-                + (f.name ? '<div class="secondary">' + esc(f.name) + '</div>' : '')
-                + '</div>'
-                + '<div class="item-actions">'
-                + '<button class="act-copy" data-key="' + esc(f.key) + '" title="Copy key">&#x2398;</button>'
-                + '<button class="act-open" data-path="/project/' + projectId + '/feature_flags/' + f.id + '" title="Open in PostHog">&#x2197;</button>'
-                + '</div>'
-                + '</div>';
-        }).join('');
+        list.innerHTML = items.map(flagItemHtml).join('');
+        if (hasMoreFlags) {
+            list.innerHTML += loadMoreSentinelHtml('flags', allData.flags.length, allData.flagsTotal || null);
+        }
         bindListClicks(list, 'key', (key) => send({ type: 'openFlagPanel', key }));
     });
+}
+
+function appendFlags(newFlags) {
+    allData.flags = allData.flags.concat(newFlags);
+    var list = document.getElementById('flags-list');
+    if (!list) return;
+    // Remove old sentinel
+    var oldSentinel = document.getElementById('flags-sentinel');
+    if (oldSentinel) oldSentinel.remove();
+    // Append new items
+    var fragment = document.createElement('div');
+    fragment.innerHTML = newFlags.map(flagItemHtml).join('');
+    // Bind actions on new items before appending
+    bindItemActions(fragment);
+    var newItems = Array.from(fragment.children);
+    newItems.forEach(function(child) {
+        child.style.cursor = 'pointer';
+        child.addEventListener('click', function(e) {
+            if (e.target.closest('.item-actions')) return;
+            send({ type: 'openFlagPanel', key: child.dataset.key });
+        });
+        list.appendChild(child);
+    });
+    // Add sentinel if more pages
+    if (hasMoreFlags) {
+        var sentinel = document.createElement('div');
+        sentinel.className = 'load-more-sentinel';
+        sentinel.id = 'flags-sentinel';
+        sentinel.innerHTML = '<span class="load-more-label">Loading more... ' + allData.flags.length + ' / ' + (allData.flagsTotal || '?') + '</span>';
+        list.appendChild(sentinel);
+    }
+    loadingMoreFlags = false;
+}
+
+function experimentItemHtml(exp) {
+    let status, dotClass;
+    if (exp.end_date) { status = 'Complete'; dotClass = 'complete'; }
+    else if (exp.start_date) { status = 'Running'; dotClass = 'running'; }
+    else { status = 'Draft'; dotClass = 'draft'; }
+    return '<div class="item" data-id="' + exp.id + '" style="cursor:pointer;">'
+        + '<div class="dot ' + dotClass + '"></div>'
+        + '<div class="info">'
+        + '<div class="primary">' + esc(exp.name) + '</div>'
+        + '<div class="secondary">' + esc(exp.feature_flag_key) + ' &middot; ' + status + '</div>'
+        + '</div>'
+        + '<div class="item-actions">'
+        + '<button class="act-copy" data-key="' + esc(exp.feature_flag_key) + '" title="Copy flag key">&#x2398;</button>'
+        + '<button class="act-open" data-path="/project/' + projectId + '/experiments/' + exp.id + '" title="Open in PostHog">&#x2197;</button>'
+        + '</div>'
+        + '</div>';
 }
 
 function renderExperiments(exps) {
@@ -196,25 +262,40 @@ function renderExperiments(exps) {
             ? '<div class="exp-summary">' + summaryParts.join(' &middot; ') + '</div>'
             : '';
 
-        list.innerHTML = summaryHtml + items.map(exp => {
-            let status, dotClass;
-            if (exp.end_date) { status = 'Complete'; dotClass = 'complete'; }
-            else if (exp.start_date) { status = 'Running'; dotClass = 'running'; }
-            else { status = 'Draft'; dotClass = 'draft'; }
-            return '<div class="item" data-id="' + exp.id + '" style="cursor:pointer;">'
-                + '<div class="dot ' + dotClass + '"></div>'
-                + '<div class="info">'
-                + '<div class="primary">' + esc(exp.name) + '</div>'
-                + '<div class="secondary">' + esc(exp.feature_flag_key) + ' &middot; ' + status + '</div>'
-                + '</div>'
-                + '<div class="item-actions">'
-                + '<button class="act-copy" data-key="' + esc(exp.feature_flag_key) + '" title="Copy flag key">&#x2398;</button>'
-                + '<button class="act-open" data-path="/project/' + projectId + '/experiments/' + exp.id + '" title="Open in PostHog">&#x2197;</button>'
-                + '</div>'
-                + '</div>';
-        }).join('');
+        list.innerHTML = summaryHtml + items.map(experimentItemHtml).join('');
+        if (hasMoreExperiments) {
+            list.innerHTML += loadMoreSentinelHtml('experiments', allData.experiments.length, allData.experimentsTotal || null);
+        }
         bindListClicks(list, 'id', (id) => send({ type: 'openExperimentPanel', id: Number(id) }));
     });
+}
+
+function appendExperiments(newExps) {
+    allData.experiments = allData.experiments.concat(newExps);
+    var list = document.getElementById('experiments-list');
+    if (!list) return;
+    var oldSentinel = document.getElementById('experiments-sentinel');
+    if (oldSentinel) oldSentinel.remove();
+    var fragment = document.createElement('div');
+    fragment.innerHTML = newExps.map(experimentItemHtml).join('');
+    bindItemActions(fragment);
+    var newItems = Array.from(fragment.children);
+    newItems.forEach(function(child) {
+        child.style.cursor = 'pointer';
+        child.addEventListener('click', function(e) {
+            if (e.target.closest('.item-actions')) return;
+            send({ type: 'openExperimentPanel', id: Number(child.dataset.id) });
+        });
+        list.appendChild(child);
+    });
+    if (hasMoreExperiments) {
+        var sentinel = document.createElement('div');
+        sentinel.className = 'load-more-sentinel';
+        sentinel.id = 'experiments-sentinel';
+        sentinel.innerHTML = '<span class="load-more-label">Loading more... ' + allData.experiments.length + ' / ' + (allData.experimentsTotal || '?') + '</span>';
+        list.appendChild(sentinel);
+    }
+    loadingMoreExperiments = false;
 }
 
 // ── Insight renderers ──
@@ -1081,6 +1162,23 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
     tab.addEventListener('click', () => { hideDetail(); switchTab(tab.dataset.tab); });
 });
 
+// ── Infinite scroll ──
+
+document.querySelector('.scroll-area').addEventListener('scroll', function() {
+    var el = this;
+    var nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 200;
+    if (!nearBottom) return;
+
+    if (currentTab === 'flags' && hasMoreFlags && !loadingMoreFlags) {
+        loadingMoreFlags = true;
+        send({ type: 'loadMoreFlags' });
+    }
+    if (currentTab === 'experiments' && hasMoreExperiments && !loadingMoreExperiments) {
+        loadingMoreExperiments = true;
+        send({ type: 'loadMoreExperiments' });
+    }
+});
+
 // ── Message handler ──
 
 window.addEventListener('message', e => {
@@ -1133,8 +1231,24 @@ window.addEventListener('message', e => {
             if (empty) empty.style.display = 'none';
             break;
         }
+        case 'loadingProgress': {
+            var progressLoader = document.getElementById(msg.section + '-loading');
+            if (progressLoader) {
+                var loaded = msg.loaded;
+                var total = msg.total;
+                var sectionName = msg.section === 'flags' ? 'flags' : msg.section === 'experiments' ? 'experiments' : 'events';
+                if (total && total > loaded) {
+                    progressLoader.textContent = 'Loading ' + sectionName + '... ' + loaded + ' / ' + total;
+                } else {
+                    progressLoader.textContent = 'Loading ' + sectionName + '... ' + loaded;
+                }
+            }
+            break;
+        }
         case 'flags':
             projectId = msg.projectId;
+            hasMoreFlags = !!msg.hasMore;
+            allData.flagsTotal = msg.total || null;
             if (msg.userEmail) {
                 userEmail = msg.userEmail;
                 var myBtn = document.getElementById('my-flags-toggle');
@@ -1142,10 +1256,23 @@ window.addEventListener('message', e => {
             }
             renderFlags(msg.data);
             break;
+        case 'flagsPage':
+            hasMoreFlags = !!msg.hasMore;
+            allData.flagsTotal = msg.total || allData.flagsTotal;
+            appendFlags(msg.data);
+            break;
         case 'experiments':
             projectId = msg.projectId;
+            hasMoreExperiments = !!msg.hasMore;
+            allData.experimentsTotal = msg.total || null;
             if (msg.results) experimentResults = msg.results;
             renderExperiments(msg.data);
+            break;
+        case 'experimentsPage':
+            hasMoreExperiments = !!msg.hasMore;
+            allData.experimentsTotal = msg.total || allData.experimentsTotal;
+            if (msg.results) Object.assign(experimentResults, msg.results);
+            appendExperiments(msg.data);
             break;
         case 'insights':
             projectId = msg.projectId;

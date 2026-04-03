@@ -48,22 +48,16 @@ export class FeedbackViewProvider implements vscode.WebviewViewProvider {
     private getFormHtml(): string {
         return `<!DOCTYPE html>
 <html><head><style>
-    body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); padding: 12px; margin: 0; }
-    h3 { font-size: 13px; margin: 0 0 4px; font-weight: 600; }
-    .subtitle { font-size: 11px; color: var(--vscode-descriptionForeground); margin: 0 0 12px; }
-    .rating { display: flex; gap: 6px; margin-bottom: 10px; }
-    .rating button {
-        flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
-        padding: 8px 4px; border: 1px solid var(--vscode-input-border); border-radius: 6px;
-        background: var(--vscode-input-background); cursor: pointer; transition: all 0.15s;
-        color: var(--vscode-foreground);
+    html, body { height: 100%; margin: 0; }
+    body {
+        font-family: var(--vscode-font-family); color: var(--vscode-foreground);
+        padding: 12px; box-sizing: border-box;
+        display: flex; flex-direction: column;
     }
-    .rating button:hover { border-color: var(--vscode-focusBorder); }
-    .rating button.selected { border-color: #1D4AFF; background: rgba(29, 74, 255, 0.1); }
-    .emoji { font-size: 20px; line-height: 1; }
-    .label { font-size: 10px; }
+    h3 { font-size: 13px; margin: 0 0 4px; font-weight: 600; }
+    .subtitle { font-size: 11px; color: var(--vscode-descriptionForeground); margin: 0 0 8px; }
     textarea {
-        width: 100%; box-sizing: border-box; resize: vertical; min-height: 60px;
+        width: 100%; box-sizing: border-box; resize: none; flex: 1; min-height: 60px;
         padding: 8px; border: 1px solid var(--vscode-input-border); border-radius: 4px;
         background: var(--vscode-input-background); color: var(--vscode-input-foreground);
         font-family: var(--vscode-font-family); font-size: 12px; margin-bottom: 8px;
@@ -71,44 +65,32 @@ export class FeedbackViewProvider implements vscode.WebviewViewProvider {
     textarea:focus { outline: none; border-color: #1D4AFF; }
     .btn {
         width: 100%; padding: 7px; border: none; border-radius: 4px; cursor: pointer;
-        background: #1D4AFF; color: white; font-size: 12px; font-weight: 500;
+        background: #1D4AFF; color: white; font-size: 12px; font-weight: 500; flex-shrink: 0;
     }
     .btn:hover { background: #1536cc; }
     .btn:disabled { opacity: 0.5; cursor: default; }
-    .links { margin-top: 10px; text-align: center; font-size: 11px; }
+    .links { margin-top: 8px; text-align: center; font-size: 11px; flex-shrink: 0; }
     .links a { color: var(--vscode-textLink-foreground); text-decoration: none; }
     .links a:hover { text-decoration: underline; }
 </style></head><body>
-    <h3>Having trouble? Send feedback!</h3>
+    <h3>Send feedback</h3>
     <p class="subtitle">Help us make the extension better</p>
-    <div class="rating" id="rating">
-        <button data-r="love"><span class="emoji">😍</span><span class="label">Love it</span></button>
-        <button data-r="okay"><span class="emoji">😐</span><span class="label">It's okay</span></button>
-        <button data-r="frustrated"><span class="emoji">😤</span><span class="label">Frustrated</span></button>
-    </div>
     <textarea id="msg" placeholder="What's on your mind?"></textarea>
     <button class="btn" id="send" disabled>Send Feedback</button>
     <div class="links">
         <a href="#" onclick="post('open-url','https://github.com/PostHog/posthog-vscode/issues')">Report a bug</a>
         &middot;
         <a href="#" onclick="post('open-url','https://github.com/PostHog/posthog-vscode/issues/new')">Request a feature</a>
+        &middot;
+        <a href="#" onclick="post('open-url','mailto:fernando.g@posthog.com')">Email us</a>
     </div>
     <script>
         const vscode = acquireVsCodeApi();
-        let rating = '';
         function post(type, url) { vscode.postMessage({ type, url }); }
-        function update() { document.getElementById('send').disabled = !rating && !document.getElementById('msg').value.trim(); }
-        document.querySelectorAll('[data-r]').forEach(b => {
-            b.addEventListener('click', () => {
-                document.querySelectorAll('[data-r]').forEach(x => x.classList.remove('selected'));
-                b.classList.add('selected');
-                rating = b.dataset.r;
-                update();
-            });
-        });
+        function update() { document.getElementById('send').disabled = !document.getElementById('msg').value.trim(); }
         document.getElementById('msg').addEventListener('input', update);
         document.getElementById('send').addEventListener('click', () => {
-            vscode.postMessage({ type: 'submit', rating, message: document.getElementById('msg').value.trim() });
+            vscode.postMessage({ type: 'submit', rating: '', message: document.getElementById('msg').value.trim() });
         });
     </script>
 </body></html>`;
@@ -131,6 +113,8 @@ export class FeedbackViewProvider implements vscode.WebviewViewProvider {
         <a href="#" onclick="acquireVsCodeApi().postMessage({type:'open-url',url:'https://github.com/PostHog/posthog-vscode/issues'})">Report a bug</a>
         &middot;
         <a href="#" onclick="acquireVsCodeApi().postMessage({type:'open-url',url:'https://github.com/PostHog/posthog-vscode/issues/new'})">Request a feature</a>
+        &middot;
+        <a href="#" onclick="acquireVsCodeApi().postMessage({type:'open-url',url:'mailto:fernando.g@posthog.com'})">Email us</a>
     </div>
 </body></html>`;
     }

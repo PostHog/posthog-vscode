@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.0
+
+### Minor Changes
+
+- 1bb6cb9: Improve empty state for stale feature flags
+- 8517b3c: Add new x-ray mode, also improve inline hints for events by letting them be configurable
+- ba8be9b: Detect incorrect `init` configuration
+
+### Patch Changes
+
+- d2d3b88: Cleanup README, CONTRIBUTING and ROADMAP
+
 ## 0.5.1
 
 ### Patch Changes

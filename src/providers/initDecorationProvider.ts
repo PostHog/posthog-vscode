@@ -127,7 +127,11 @@ export class InitDecorationProvider {
         const configNotes = this.getConfigNotes(init);
         if (configNotes.length > 0) { parts.push(configNotes.join(' · ')); }
 
-        return { label: parts.join(' · '), color: '#4CBB17', isValid: true };
+        // Use yellow for warnings (missing ui_host, invalid ui_host, or direct cloud without proxy)
+        const hasWarning = this.isMissingUiHost(init) || this.isInvalidUiHost(init) || this.isDirectCloudHost(init);
+        const color = hasWarning ? '#F9BD2B' : '#4CBB17';
+
+        return { label: parts.join(' · '), color, isValid: true };
     }
 
     private buildHover(init: PostHogInitCall): vscode.MarkdownString {
@@ -162,6 +166,25 @@ export class InitDecorationProvider {
             md.appendMarkdown(`**Host**: ${apiHost} (${hostLabel})\n\n`);
         } else {
             md.appendMarkdown(`**Host**: default (US Cloud)\n\n`);
+        }
+
+        // Warning for missing ui_host with custom api_host
+        if (this.isMissingUiHost(init)) {
+            md.appendMarkdown('---\n\n');
+            md.appendMarkdown('⚠️ **Missing `ui_host`**: You\'re using a custom `api_host` but haven\'t set `ui_host`.\n\n');
+            md.appendMarkdown('The PostHog toolbar won\'t work without it. Add `ui_host: "https://us.posthog.com"` (or `eu.posthog.com`) to your config.\n\n');
+            md.appendMarkdown('[Learn more about reverse proxy setup](https://posthog.com/docs/advanced/proxy)\n\n');
+        } else if (this.isInvalidUiHost(init)) {
+            const uiHost = init.configProperties.get('ui_host') || '';
+            md.appendMarkdown('---\n\n');
+            md.appendMarkdown(`⚠️ **Invalid \`ui_host\`**: \`${this.truncate(uiHost, 40)}\` is not a valid PostHog UI URL.\n\n`);
+            md.appendMarkdown('`ui_host` must be `https://us.posthog.com` or `https://eu.posthog.com` — the URL you use to access PostHog.\n\n');
+            md.appendMarkdown('[Learn more about reverse proxy setup](https://posthog.com/docs/advanced/proxy)\n\n');
+        } else if (this.isDirectCloudHost(init)) {
+            // Reverse proxy suggestion for direct cloud hosts
+            md.appendMarkdown('---\n\n');
+            md.appendMarkdown('💡 **Tip**: Sending events directly to PostHog can be blocked by ad blockers.\n\n');
+            md.appendMarkdown('Set up a [reverse proxy](https://posthog.com/docs/advanced/proxy) to route events through your own domain and improve data accuracy.\n\n');
         }
 
         // Config details
@@ -205,9 +228,46 @@ export class InitDecorationProvider {
         }
     }
 
+    private isDirectCloudHost(init: PostHogInitCall): boolean {
+        // No api_host means default (us.posthog.com) - also direct
+        if (!init.apiHost) { return true; }
+        try {
+            const hostname = new URL(init.apiHost).hostname;
+            return hostname === 'us.posthog.com' || hostname === 'eu.posthog.com'
+                || hostname === 'us.i.posthog.com' || hostname === 'eu.i.posthog.com';
+        } catch {
+            return false;
+        }
+    }
+
+    private isMissingUiHost(init: PostHogInitCall): boolean {
+        // If using a custom api_host (not cloud) but no ui_host, toolbar won't work
+        if (!init.apiHost) { return false; } // Using default, no issue
+        if (this.isDirectCloudHost(init)) { return false; } // Using cloud directly, no issue
+        return !init.configProperties.has('ui_host');
+    }
+
+    private isInvalidUiHost(init: PostHogInitCall): boolean {
+        const uiHost = init.configProperties.get('ui_host');
+        if (!uiHost) { return false; }
+        // Remove quotes if present
+        const cleaned = uiHost.replace(/^['"]|['"]$/g, '');
+        try {
+            const hostname = new URL(cleaned).hostname;
+            return hostname !== 'us.posthog.com' && hostname !== 'eu.posthog.com';
+        } catch {
+            return true; // Invalid URL
+        }
+    }
+
     private getConfigNotes(init: PostHogInitCall): string[] {
         const notes: string[] = [];
         const props = init.configProperties;
+
+        // Warnings (show first as they're important)
+        if (this.isMissingUiHost(init)) { notes.push('⚠ missing ui_host'); }
+        if (this.isInvalidUiHost(init)) { notes.push('⚠ invalid ui_host'); }
+        if (this.isDirectCloudHost(init)) { notes.push('⚠ no reverse proxy'); }
 
         if (props.get('autocapture') === 'false') { notes.push('autocapture off'); }
         if (props.get('disable_session_recording') === 'true') { notes.push('replay off'); }

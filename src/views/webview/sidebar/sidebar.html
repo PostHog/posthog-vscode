@@ -99,6 +99,7 @@
         <button class="nav-tab active" data-tab="flags">Flags</button>
         <button class="nav-tab" data-tab="experiments">Experiments</button>
         <button class="nav-tab" data-tab="analytics">Analytics</button>
+        <button class="nav-tab" data-tab="xray">X-ray</button>
     </div>
 
     <div class="search-bar" style="display:flex;gap:6px;align-items:center;">
@@ -168,6 +169,28 @@
             <div class="empty-state" id="analytics-empty" style="display:none;">
                 <div class="icon">&#x1F4CA;</div>
                 <p>No saved insights found</p>
+            </div>
+        </div>
+
+        <!-- X-ray (events in current file) -->
+        <div id="section-xray" class="section">
+            <div class="xray-header" id="xray-file-info">
+                <span class="xray-file-name" id="xray-file-name">No file open</span>
+            </div>
+            <div class="xray-description">
+                See how events in your code are performing. X-ray finds <code>capture()</code> calls in the current file and shows their 14-day trends from PostHog.
+            </div>
+            <div class="loading" id="xray-loading" style="display:none;">Analyzing file...</div>
+            <div class="xray-grid" id="xray-list" style="display:none;"></div>
+            <div class="empty-state" id="xray-empty" style="display:none;">
+                <div class="icon">&#x1F50D;</div>
+                <p>No events found in this file</p>
+                <p class="empty-hint">Open a file with posthog.capture() calls</p>
+            </div>
+            <div class="empty-state" id="xray-no-file" style="display:none;">
+                <div class="icon">&#x1F4C4;</div>
+                <p>Open a file to see events</p>
+                <p class="empty-hint">X-ray finds capture() calls and shows their analytics</p>
             </div>
         </div>
 

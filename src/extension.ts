@@ -118,6 +118,7 @@ export function activate(context: vscode.ExtensionContext) {
         authService,
         postHogService,
         flagCache,
+        experimentCache,
         telemetry,
     );
 
@@ -132,6 +133,7 @@ export function activate(context: vscode.ExtensionContext) {
         telemetry,
     );
     sidebarProvider.setAuthProvider(authProvider);
+    sidebarProvider.setTreeSitter(treeSitter);
 
     // Autocomplete, code actions & inline decorations — all powered by tree-sitter
     const completionProvider = new FlagCompletionProvider(flagCache, treeSitter, telemetry);

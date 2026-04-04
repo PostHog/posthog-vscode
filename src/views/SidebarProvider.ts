@@ -3,6 +3,7 @@ import { AuthService } from '../services/authService';
 import { PostHogService } from '../services/postHogService';
 import { FlagCacheService } from '../services/flagCacheService';
 import { ExperimentCacheService } from '../services/experimentCacheService';
+import { TreeSitterService } from '../services/treeSitterService';
 import { Commands } from '../constants';
 import { getWebviewHtml } from './getWebviewHtml';
 import { DetailPanelProvider } from './DetailPanelProvider';
@@ -13,6 +14,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     private view?: vscode.WebviewView;
     private authProvider?: PostHogAuthenticationProvider;
     private isDev = false;
+    private treeSitter?: TreeSitterService;
 
     constructor(
         private readonly extensionUri: vscode.Uri,
@@ -23,6 +25,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         private readonly detailPanel?: DetailPanelProvider,
         private readonly telemetry?: TelemetryService,
     ) {}
+
+    setTreeSitter(treeSitter: TreeSitterService): void {
+        this.treeSitter = treeSitter;
+    }
 
     setAuthProvider(authProvider: PostHogAuthenticationProvider): void {
         this.authProvider = authProvider;
@@ -182,6 +188,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
                 const host = this.authService.getHost().replace(/\/+$/, '');
                 return vscode.env.openExternal(vscode.Uri.parse(`${host}${msg.path}`));
             }
+            case 'loadXray':
+                this.telemetry?.capture('sidebar_tab_viewed', { tab: 'xray' });
+                return this.loadXray();
+            case 'openXrayInsight':
+                this.telemetry?.capture('xray_insight_opened', { event: msg.event });
+                return this.openXrayInsight(msg.event as string);
         }
     }
 
@@ -445,6 +457,82 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             this.insightsCache = await this.postHogService.getInsights(projectId);
             return this.insightsCache;
         } catch { return []; }
+    }
+
+    // ── X-ray ──
+
+    private async loadXray() {
+        const projectId = this.authService.getProjectId();
+        if (!projectId) {
+            this.postMessage({ type: 'xray', projectId, data: { fileName: null, events: [] } });
+            return;
+        }
+
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            this.postMessage({ type: 'xray', projectId, data: { fileName: null, events: [] } });
+            return;
+        }
+
+        const doc = editor.document;
+        const fileName = doc.fileName.split('/').pop() || doc.fileName;
+
+        // Show loading state
+        this.postMessage({ type: 'xrayLoading' });
+
+        // Find capture calls in the current file using tree-sitter
+        if (!this.treeSitter || !this.treeSitter.isSupported(doc.languageId)) {
+            this.postMessage({ type: 'xray', projectId, data: { fileName, events: [] } });
+            return;
+        }
+
+        try {
+            const calls = await this.treeSitter.findPostHogCalls(doc);
+            // Filter to only capture calls and extract unique event names
+            const captureMethodSet = new Set(['capture']);
+            const eventMap = new Map<string, number[]>(); // event name -> line numbers
+
+            for (const call of calls) {
+                if (captureMethodSet.has(call.method) && call.key) {
+                    const lines = eventMap.get(call.key) || [];
+                    lines.push(call.line + 1);
+                    eventMap.set(call.key, lines);
+                }
+            }
+
+            const eventNames = Array.from(eventMap.keys());
+            if (eventNames.length === 0) {
+                this.postMessage({ type: 'xray', projectId, data: { fileName, events: [] } });
+                return;
+            }
+
+            // Query PostHog for trends data for each event (last 14 days)
+            const trendsData = await this.postHogService.getEventTrends(projectId, eventNames, 14);
+
+            // Build the response data
+            const events = eventNames.map(eventName => ({
+                event: eventName,
+                lines: eventMap.get(eventName) || [],
+                data: trendsData[eventName] || [],
+            }));
+
+            this.postMessage({ type: 'xray', projectId, data: { fileName, events } });
+        } catch (err) {
+            console.warn('[PostHog] X-ray error:', err);
+            this.postMessage({ type: 'xray', projectId, data: { fileName, events: [] } });
+        }
+    }
+
+    private openXrayInsight(eventName: string) {
+        const projectId = this.authService.getProjectId();
+        if (!projectId) { return; }
+
+        // Open PostHog in browser with a new insight pre-filled
+        const host = this.authService.getHost().replace(/\/+$/, '');
+        const encodedEvent = encodeURIComponent(eventName);
+        // URL to create a new trends insight with this event
+        const url = `${host}/project/${projectId}/insights/new?insight=TRENDS&events=[{"id":"${encodedEvent}","type":"events"}]`;
+        vscode.env.openExternal(vscode.Uri.parse(url));
     }
 
     // ── Webview messaging ──

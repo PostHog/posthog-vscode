@@ -209,6 +209,19 @@
           "default": true,
           "markdownDescription": "Show inline flag status and event volume decorations in the editor."
         },
+        "posthog.inlineHintsMode": {
+          "type": "string",
+          "enum": [
+            "always",
+            "currentLine"
+          ],
+          "default": "always",
+          "enumDescriptions": [
+            "Show inline hints on all lines with PostHog calls",
+            "Show inline hints only on the line where the cursor is currently located"
+          ],
+          "markdownDescription": "When to display inline hints for feature flags and events."
+        },
         "posthog.useWorkspaceConfig": {
           "type": "boolean",
           "default": true,

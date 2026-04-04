@@ -43,6 +43,11 @@ PostHog for VS Code - and any other VSCode-based editor - brings your product an
 
 The core of the extension. Your PostHog data appears directly in your editor as you write code.
 
+- **SDK init detection** — detects `posthog.init()` calls and shows project name, host region, and configuration summary inline. Highlights potential issues:
+  - `⚠ no reverse proxy` — suggests setting up a reverse proxy when pointing directly to PostHog cloud (improves data accuracy by avoiding ad blockers)
+  - `⚠ missing ui_host` — warns when using a custom `api_host` without `ui_host` (the PostHog toolbar won't work)
+  - `⚠ invalid ui_host` — warns when `ui_host` is not `https://us.posthog.com` or `https://eu.posthog.com`
+  - `⚠ invalid token` — warns when the token doesn't start with `phc_`
 - **Flag status decorations** — see flag state inline after every flag call: `● enabled`, `○ inactive`, rollout %, variant count, or `⚠ not in PostHog`
 - **Event volume and sparklines** — 7-day event count and inline sparkline chart next to every `capture()` call
 - **Experiment results inline** — flags linked to experiments show live status like `⚗ test leading 72%`
@@ -64,6 +69,7 @@ A tabbed overview of your PostHog project, accessible from the activity bar.
 - **Flags tab** — all feature flags with search, filter by status, toggle, and rollout editing
 - **Experiments tab** — experiments with status indicators, results summary, and start/stop actions
 - **Analytics tab** — saved insights from your PostHog project with auto-refresh
+- **X-ray tab** — shows 14-day event trends for `capture()` calls found in the currently open file. Click any event to open a detailed insight in PostHog.
 - **"My Flags" filter** — quickly show only flags you created
 - **Stale Flags tree view** — dedicated tree view below the sidebar for codebase-wide flag hygiene
 
@@ -150,9 +156,10 @@ All settings live under `posthog.*` in VS Code settings (JSON or UI).
 
 **Display**
 
-| Setting                         | Type      | Default | Description                                                                                                        |
-| ------------------------------- | --------- | ------- | ------------------------------------------------------------------------------------------------------------------ |
-| `posthog.showInlineDecorations` | `boolean` | `true`  | Show inline flag status and event volume decorations in the editor. Set to `false` to hide all inline annotations. |
+| Setting                         | Type      | Default  | Description                                                                                                        |
+| ------------------------------- | --------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| `posthog.showInlineDecorations` | `boolean` | `true`   | Show inline flag status and event volume decorations in the editor. Set to `false` to hide all inline annotations. |
+| `posthog.inlineHintsMode`       | `string`  | `always` | When to show inline hints: `always` (all lines) or `currentLine` (only the line where the cursor is located, like git blame). |
 
 **Stale flag detection**
 

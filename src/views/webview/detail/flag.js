@@ -1,5 +1,6 @@
 (function() {
     const f = DATA.flag;
+    const experiment = DATA.experiment;
     const host = DATA.host;
     const projectId = DATA.projectId;
     const filters = f.filters || {};
@@ -39,6 +40,28 @@
     html += '<div class="card"><div class="card-title">Flag type</div><div class="stat-value">' + flagType + '</div><div style="font-size:11px;opacity:0.4;margin-top:2px">' + flagTypeDesc + '</div></div>';
     html += '<div class="card"><div class="card-title">Created</div><div class="stat-value">' + created + '</div><div style="font-size:11px;opacity:0.4;margin-top:2px">by ' + esc(createdBy) + '</div></div>';
     html += '</div>';
+
+    // Experiment card (if this flag is part of an experiment)
+    if (experiment) {
+        var expStatus = experiment.end_date ? 'Completed' : (experiment.start_date ? 'Running' : 'Draft');
+        var expStatusClass = experiment.end_date ? 'inactive' : (experiment.start_date ? 'active' : 'draft');
+        html += '<div class="card experiment-card">';
+        html += '<div class="card-title">Experiment</div>';
+        html += '<div class="experiment-info">';
+        html += '<div class="experiment-header">';
+        html += '<span class="experiment-name">' + esc(experiment.name) + '</span>';
+        html += '<span class="badge ' + expStatusClass + '">' + expStatus + '</span>';
+        html += '</div>';
+        if (experiment.description) {
+            html += '<div class="experiment-desc">' + esc(experiment.description) + '</div>';
+        }
+        html += '<div class="experiment-actions">';
+        html += '<button class="btn btn-secondary" id="view-experiment-btn" data-id="' + experiment.id + '">View Experiment</button>';
+        html += '<button class="btn btn-ghost"' + act({type:'openExternal',url:host+'/project/'+projectId+'/experiments/'+experiment.id}) + '>Open in PostHog &#x2197;</button>';
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+    }
 
     // Status toggle
     html += '<div class="card"><div class="card-title">Enable feature flag</div>'
@@ -159,6 +182,14 @@
         });
     }
     bindRemove();
+
+    // Experiment button
+    var expBtn = document.getElementById('view-experiment-btn');
+    if (expBtn) {
+        expBtn.addEventListener('click', function() {
+            send({ type: 'openExperimentPanel', id: Number(expBtn.dataset.id) });
+        });
+    }
 
     document.getElementById('save-btn').addEventListener('click', function() {
         var active = toggle.classList.contains('on');

@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { AuthService } from '../services/authService';
 import { PostHogService } from '../services/postHogService';
 import { FlagCacheService } from '../services/flagCacheService';
+import { ExperimentCacheService } from '../services/experimentCacheService';
 import { FeatureFlag, Experiment, ExperimentResults, Insight, SessionReplayEntry } from '../models/types';
 import { TelemetryService } from '../services/telemetryService';
 
@@ -36,13 +37,20 @@ export class DetailPanelProvider {
         private readonly authService: AuthService,
         private readonly postHogService: PostHogService,
         private readonly flagCache: FlagCacheService,
+        private readonly experimentCache: ExperimentCacheService,
         private readonly telemetry?: TelemetryService,
     ) {}
 
     showFlag(flag: FeatureFlag) {
         this.telemetry?.capture('flag_detail_opened', { flag_key: flag.key, source: 'detail_panel' });
         const panel = this.getOrCreatePanel('flag-' + flag.id, flag.key, 'Flag');
-        panel.webview.html = this.buildHtml(panel.webview, 'flag', { flag, host: this.getHost(), projectId: this.authService.getProjectId() });
+        const experiment = this.experimentCache.getByFlagKey(flag.key);
+        panel.webview.html = this.buildHtml(panel.webview, 'flag', {
+            flag,
+            experiment: experiment ?? null,
+            host: this.getHost(),
+            projectId: this.authService.getProjectId(),
+        });
         this.bindFlagMessages(panel);
     }
 
@@ -308,6 +316,15 @@ export class DetailPanelProvider {
                         filesToExclude: '**/node_modules/**',
                     });
                     break;
+                case 'openExperimentPanel': {
+                    const experimentId = msg.id as number;
+                    const exp = this.experimentCache.getExperiments().find(e => e.id === experimentId);
+                    if (exp) {
+                        const results = this.experimentCache.getResults(exp.id);
+                        this.showExperiment(exp, results);
+                    }
+                    break;
+                }
                 case 'saveFlag': {
                     const projectId = this.authService.getProjectId();
                     if (!projectId) { return; }

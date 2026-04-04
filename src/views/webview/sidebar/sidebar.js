@@ -70,15 +70,20 @@ function switchTab(tab) {
     var platformFilter = document.getElementById('platform-filter');
     if (platformFilter) { platformFilter.style.display = (tab === 'analytics') ? '' : 'none'; }
 
-    // Hide search bar on feedback tab
+    // Hide search bar on feedback and xray tabs
     var searchBar = document.querySelector('.search-bar');
-    if (searchBar) { searchBar.style.display = (tab === 'feedback') ? 'none' : ''; }
+    if (searchBar) { searchBar.style.display = (tab === 'feedback' || tab === 'xray') ? 'none' : ''; }
 
     if (!loadedTabs.has(tab)) {
         loadedTabs.add(tab);
         if (tab === 'flags') send({ type: 'loadFlags' });
         else if (tab === 'experiments') send({ type: 'loadExperiments' });
         else if (tab === 'analytics') send({ type: 'loadInsights' });
+    }
+
+    // X-ray always refreshes when tab is switched (file context may have changed)
+    if (tab === 'xray') {
+        send({ type: 'loadXray' });
     }
 }
 
@@ -159,7 +164,7 @@ function flagItemHtml(f) {
         + '<div class="dot ' + dotClass + '"></div>'
         + '<div class="info">'
         + '<div class="primary">' + esc(f.key) + '</div>'
-        + (f.name ? '<div class="secondary">' + esc(f.name) + '</div>' : '')
+        + '<div class="secondary">' + (f.name ? esc(f.name) : '&nbsp;') + '</div>'
         + '</div>'
         + '<div class="item-actions">'
         + '<button class="act-copy" data-key="' + esc(f.key) + '" title="Copy key">&#x2398;</button>'
@@ -400,6 +405,91 @@ function filterInsightsByPlatform(platform) {
         var matches = keywords.some(function(kw) { return searchText.includes(kw); });
         card.style.display = matches ? '' : 'none';
     });
+}
+
+// ── X-ray rendering ──
+
+function renderXray(data) {
+    var loading = document.getElementById('xray-loading');
+    var grid = document.getElementById('xray-list');
+    var empty = document.getElementById('xray-empty');
+    var noFile = document.getElementById('xray-no-file');
+    var fileNameEl = document.getElementById('xray-file-name');
+
+    loading.style.display = 'none';
+
+    if (!data.fileName) {
+        grid.style.display = 'none';
+        empty.style.display = 'none';
+        noFile.style.display = '';
+        fileNameEl.textContent = 'No file open';
+        return;
+    }
+
+    fileNameEl.textContent = data.fileName;
+    noFile.style.display = 'none';
+
+    if (!data.events || data.events.length === 0) {
+        grid.style.display = 'none';
+        empty.style.display = '';
+        return;
+    }
+
+    empty.style.display = 'none';
+    grid.style.display = '';
+
+    grid.innerHTML = data.events.map(function(ev) {
+        var totalCount = ev.data ? ev.data.reduce(function(a, b) { return a + b; }, 0) : 0;
+        var sparkHtml = renderXraySparkline(ev.data || []);
+        var encodedEvent = encodeURIComponent(ev.event);
+
+        return '<div class="xray-card" data-event="' + esc(ev.event) + '">'
+            + '<div class="xray-card-header">'
+            + '<div class="xray-card-title">' + esc(ev.event) + '</div>'
+            + '<div class="xray-card-count">' + formatNum(totalCount) + ' events</div>'
+            + '</div>'
+            + '<div class="xray-card-body">' + sparkHtml + '</div>'
+            + '<div class="xray-card-footer">'
+            + '<span class="xray-card-lines">' + (ev.lines ? ev.lines.length : 0) + ' occurrence' + ((ev.lines && ev.lines.length !== 1) ? 's' : '') + ' in file</span>'
+            + '<button class="xray-card-link act-xray-open" data-event="' + esc(encodedEvent) + '">Create Insight &#x2197;</button>'
+            + '</div>'
+            + '</div>';
+    }).join('');
+
+    // Bind click handlers
+    grid.querySelectorAll('.act-xray-open').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            send({ type: 'openXrayInsight', event: decodeURIComponent(btn.dataset.event) });
+        });
+    });
+}
+
+function renderXraySparkline(data) {
+    if (!data || data.length === 0) {
+        return '<div class="xray-card-empty">No data in last 14 days</div>';
+    }
+
+    var h = 36;
+    var max = Math.max.apply(null, data.concat([1]));
+    var min = Math.min.apply(null, data.concat([0]));
+    var range = max - min || 1;
+    var w = 200;
+    var step = w / Math.max(data.length - 1, 1);
+
+    var points = data.map(function(v, i) {
+        var x = (i * step).toFixed(1);
+        var y = (h - 2 - ((v - min) / range) * (h - 4)).toFixed(1);
+        return x + ',' + y;
+    }).join(' ');
+
+    var color = '#1D4AFF';
+    var fillPoints = points + ' ' + ((data.length - 1) * step).toFixed(1) + ',' + h + ' 0,' + h;
+
+    return '<div class="sparkline-container"><svg viewBox="0 0 200 ' + h + '" preserveAspectRatio="none">'
+        + '<polygon points="' + fillPoints + '" fill="' + color + '" opacity="0.08"/>'
+        + '<polyline points="' + points + '" fill="none" stroke="' + color + '" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'
+        + '</svg></div>';
 }
 
 function renderInsightViz(insight, large) {
@@ -1287,6 +1377,21 @@ window.addEventListener('message', e => {
             projectId = msg.projectId;
             renderInsights(msg.data);
             break;
+        case 'xray':
+            projectId = msg.projectId;
+            renderXray(msg.data);
+            break;
+        case 'xrayLoading': {
+            var xrayLoading = document.getElementById('xray-loading');
+            var xrayList = document.getElementById('xray-list');
+            var xrayEmpty = document.getElementById('xray-empty');
+            var xrayNoFile = document.getElementById('xray-no-file');
+            if (xrayLoading) xrayLoading.style.display = '';
+            if (xrayList) xrayList.style.display = 'none';
+            if (xrayEmpty) xrayEmpty.style.display = 'none';
+            if (xrayNoFile) xrayNoFile.style.display = 'none';
+            break;
+        }
         case 'insightRefreshed': {
             const idx = allData.analytics.findIndex(x => x.id === msg.data.id);
             if (idx >= 0) {

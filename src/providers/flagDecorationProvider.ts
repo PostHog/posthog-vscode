@@ -24,6 +24,9 @@ export class FlagDecorationProvider {
     private readonly decoration: vscode.TextEditorDecorationType;
     private readonly unknownFlagDecoration: vscode.TextEditorDecorationType;
     private debounceTimer: ReturnType<typeof setTimeout> | undefined;
+    private cachedDecorations: vscode.DecorationOptions[] = [];
+    private cachedUnknownDecorations: vscode.DecorationOptions[] = [];
+    private lastCursorLine: number = -1;
 
     constructor(
         private readonly flagCache: FlagCacheService,
@@ -41,10 +44,18 @@ export class FlagDecorationProvider {
         const disposables: vscode.Disposable[] = [this.decoration, this.unknownFlagDecoration];
 
         disposables.push(
-            vscode.window.onDidChangeActiveTextEditor(() => this.triggerUpdate()),
+            vscode.window.onDidChangeActiveTextEditor(() => {
+                this.lastCursorLine = -1;
+                this.triggerUpdate();
+            }),
             vscode.workspace.onDidChangeTextDocument(e => {
                 if (vscode.window.activeTextEditor?.document === e.document) {
                     this.triggerUpdate();
+                }
+            }),
+            vscode.window.onDidChangeTextEditorSelection(e => {
+                if (e.textEditor === vscode.window.activeTextEditor) {
+                    this.onCursorMove(e.textEditor);
                 }
             }),
         );
@@ -53,6 +64,29 @@ export class FlagDecorationProvider {
         this.triggerUpdate();
 
         return disposables;
+    }
+
+    private onCursorMove(editor: vscode.TextEditor) {
+        const config = vscode.workspace.getConfiguration('posthog');
+        const mode = config.get<string>('inlineHintsMode', 'always');
+
+        if (mode !== 'currentLine') { return; }
+
+        // Only update if cursor moved to a different line
+        const cursorLine = editor.selection.active.line;
+        if (cursorLine === this.lastCursorLine) { return; }
+        this.lastCursorLine = cursorLine;
+
+        // Filter decorations to only the cursor line
+        const filteredDecorations = this.cachedDecorations.filter(d =>
+            d.range.start.line === cursorLine
+        );
+        const filteredUnknown = this.cachedUnknownDecorations.filter(d =>
+            d.range.start.line === cursorLine
+        );
+
+        editor.setDecorations(this.decoration, filteredDecorations);
+        editor.setDecorations(this.unknownFlagDecoration, filteredUnknown);
     }
 
     refresh(): void {
@@ -74,6 +108,8 @@ export class FlagDecorationProvider {
         if (!config.get<boolean>('showInlineDecorations', true)) {
             editor.setDecorations(this.decoration, []);
             editor.setDecorations(this.unknownFlagDecoration, []);
+            this.cachedDecorations = [];
+            this.cachedUnknownDecorations = [];
             return;
         }
 
@@ -117,8 +153,19 @@ export class FlagDecorationProvider {
             }
         }
 
-        editor.setDecorations(this.decoration, decorations);
-        editor.setDecorations(this.unknownFlagDecoration, unknownDecorations);
+        // Cache decorations for currentLine mode
+        this.cachedDecorations = decorations;
+        this.cachedUnknownDecorations = unknownDecorations;
+
+        // Apply decorations based on mode
+        const mode = config.get<string>('inlineHintsMode', 'always');
+        if (mode === 'currentLine') {
+            this.lastCursorLine = -1; // Force refresh
+            this.onCursorMove(editor);
+        } else {
+            editor.setDecorations(this.decoration, decorations);
+            editor.setDecorations(this.unknownFlagDecoration, unknownDecorations);
+        }
     }
 
     // ── Inline label ──

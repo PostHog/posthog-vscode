@@ -1456,3 +1456,108 @@ html { height: 100vh; overflow: hidden; }
     font-size: 11px;
     opacity: 0.4;
 }
+
+/* ── X-ray tab ── */
+.xray-header {
+    padding: 8px 12px 0;
+}
+.xray-file-name {
+    font-size: 11px;
+    font-family: var(--vscode-editor-font-family);
+    opacity: 0.6;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+}
+.xray-description {
+    font-size: 11px;
+    line-height: 1.5;
+    opacity: 0.7;
+    padding: 8px 12px 12px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+.xray-description code {
+    font-family: var(--vscode-editor-font-family);
+    background: rgba(255,255,255,0.06);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 10px;
+}
+.xray-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+}
+.xray-card {
+    background: var(--vscode-textCodeBlock-background, rgba(255,255,255,0.04));
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    transition: border-color 0.15s, background 0.15s;
+}
+.xray-card:hover {
+    border-color: var(--ph-blue);
+    background: var(--vscode-list-hoverBackground);
+}
+.xray-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+.xray-card-title {
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--vscode-editor-font-family);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.xray-card-count {
+    font-size: 11px;
+    opacity: 0.6;
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+.xray-card-body {
+    min-height: 36px;
+}
+.xray-card-empty {
+    font-size: 10px;
+    opacity: 0.35;
+    text-align: center;
+    padding: 10px 0;
+}
+.xray-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--vscode-panel-border);
+}
+.xray-card-lines {
+    font-size: 10px;
+    opacity: 0.5;
+}
+.xray-card-link {
+    font-size: 10px;
+    color: var(--ph-blue);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    opacity: 0.8;
+}
+.xray-card-link:hover {
+    opacity: 1;
+    text-decoration: underline;
+}
+.empty-hint {
+    font-size: 11px;
+    opacity: 0.5;
+    margin-top: 4px;
+}

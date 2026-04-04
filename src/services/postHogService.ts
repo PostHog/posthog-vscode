@@ -314,6 +314,57 @@ export class PostHogService {
         return result;
     }
 
+    async getEventTrends(projectId: number, eventNames: string[], days: number = 14): Promise<Record<string, number[]>> {
+        const result: Record<string, number[]> = {};
+        if (eventNames.length === 0) { return result; }
+
+        const escaped = eventNames.map(n => `'${this.escapeHogQLString(n)}'`).join(', ');
+        const query = `SELECT event, toDate(timestamp) as day, count() as cnt FROM events WHERE event IN (${escaped}) AND timestamp >= toDate(now()) - INTERVAL ${days} DAY GROUP BY event, day ORDER BY event, day`;
+
+        try {
+            const data = await this.request<HogQLQueryResponse>(
+                `/api/environments/${projectId}/query/`,
+                { method: 'POST', body: { query: { kind: 'HogQLQuery', query } } },
+            );
+
+            // Build date index for the last N days
+            const today = new Date();
+            const dateKeys: string[] = [];
+            for (let i = days - 1; i >= 0; i--) {
+                const d = new Date(today);
+                d.setDate(d.getDate() - i);
+                dateKeys.push(d.toISOString().slice(0, 10));
+            }
+
+            const byEvent = new Map<string, Map<string, number>>();
+            for (const row of data.results) {
+                const name = row[0] as string;
+                const day = String(row[1]).slice(0, 10);
+                const count = row[2] as number;
+                if (!byEvent.has(name)) { byEvent.set(name, new Map()); }
+                byEvent.get(name)!.set(day, count);
+            }
+
+            for (const [name, dayCounts] of byEvent) {
+                result[name] = dateKeys.map(d => dayCounts.get(d) || 0);
+            }
+
+            // Ensure all requested events have entries (even if empty)
+            for (const eventName of eventNames) {
+                if (!result[eventName]) {
+                    result[eventName] = dateKeys.map(() => 0);
+                }
+            }
+        } catch {
+            // Return empty arrays for all events on error
+            for (const eventName of eventNames) {
+                result[eventName] = [];
+            }
+        }
+
+        return result;
+    }
+
     async getRecentSessions(projectId: number, eventName: string): Promise<SessionReplayEntry[]> {
         const safeEvent = this.escapeHogQLString(eventName);
         const query = `SELECT

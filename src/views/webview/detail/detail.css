@@ -453,3 +453,29 @@ body {
     margin: 0 auto;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Experiment card ── */
+.experiment-card {
+    border-color: var(--ph-blue);
+    background: rgba(29, 74, 255, 0.04);
+}
+.experiment-info { display: flex; flex-direction: column; gap: 8px; }
+.experiment-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.experiment-name {
+    font-size: 14px;
+    font-weight: 600;
+}
+.experiment-desc {
+    font-size: 12px;
+    opacity: 0.6;
+    line-height: 1.4;
+}
+.experiment-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}

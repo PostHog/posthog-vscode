@@ -21,6 +21,8 @@ const CAPTURE_METHODS = new Set(['capture', 'Capture']);
 export class EventDecorationProvider {
     private readonly decoration: vscode.TextEditorDecorationType;
     private debounceTimer: ReturnType<typeof setTimeout> | undefined;
+    private cachedDecorations: vscode.DecorationOptions[] = [];
+    private lastCursorLine: number = -1;
 
     constructor(
         private readonly eventCache: EventCacheService,
@@ -33,10 +35,18 @@ export class EventDecorationProvider {
         const disposables: vscode.Disposable[] = [this.decoration];
 
         disposables.push(
-            vscode.window.onDidChangeActiveTextEditor(() => this.triggerUpdate()),
+            vscode.window.onDidChangeActiveTextEditor(() => {
+                this.lastCursorLine = -1;
+                this.triggerUpdate();
+            }),
             vscode.workspace.onDidChangeTextDocument(e => {
                 if (vscode.window.activeTextEditor?.document === e.document) {
                     this.triggerUpdate();
+                }
+            }),
+            vscode.window.onDidChangeTextEditorSelection(e => {
+                if (e.textEditor === vscode.window.activeTextEditor) {
+                    this.onCursorMove(e.textEditor);
                 }
             }),
         );
@@ -45,6 +55,25 @@ export class EventDecorationProvider {
         this.triggerUpdate();
 
         return disposables;
+    }
+
+    private onCursorMove(editor: vscode.TextEditor) {
+        const config = vscode.workspace.getConfiguration('posthog');
+        const mode = config.get<string>('inlineHintsMode', 'always');
+
+        if (mode !== 'currentLine') { return; }
+
+        // Only update if cursor moved to a different line
+        const cursorLine = editor.selection.active.line;
+        if (cursorLine === this.lastCursorLine) { return; }
+        this.lastCursorLine = cursorLine;
+
+        // Filter decorations to only the cursor line
+        const filteredDecorations = this.cachedDecorations.filter(d =>
+            d.range.start.line === cursorLine
+        );
+
+        editor.setDecorations(this.decoration, filteredDecorations);
     }
 
     private triggerUpdate() {
@@ -61,6 +90,7 @@ export class EventDecorationProvider {
         const config = vscode.workspace.getConfiguration('posthog');
         if (!config.get<boolean>('showInlineDecorations', true)) {
             editor.setDecorations(this.decoration, []);
+            this.cachedDecorations = [];
             return;
         }
 
@@ -136,6 +166,16 @@ export class EventDecorationProvider {
             });
         }
 
-        editor.setDecorations(this.decoration, decorations);
+        // Cache decorations for currentLine mode
+        this.cachedDecorations = decorations;
+
+        // Apply decorations based on mode
+        const mode = config.get<string>('inlineHintsMode', 'always');
+        if (mode === 'currentLine') {
+            this.lastCursorLine = -1; // Force refresh
+            this.onCursorMove(editor);
+        } else {
+            editor.setDecorations(this.decoration, decorations);
+        }
     }
 }

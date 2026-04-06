@@ -80,6 +80,26 @@ const JS_FLAG_METHODS = new Set([
 ]);
 const JS_ALL_METHODS = new Set([...JS_CAPTURE_METHODS, ...JS_FLAG_METHODS]);
 
+const PY_CAPTURE_METHODS = new Set(['capture']);
+const PY_FLAG_METHODS = new Set([
+    'feature_enabled', 'is_feature_enabled', 'get_feature_flag',
+    'get_feature_flag_payload', 'get_remote_config',
+]);
+const PY_ALL_METHODS = new Set([...PY_CAPTURE_METHODS, ...PY_FLAG_METHODS]);
+
+const GO_CAPTURE_METHODS = new Set(['Enqueue']);
+const GO_FLAG_METHODS = new Set([
+    'GetFeatureFlag', 'IsFeatureEnabled', 'GetFeatureFlagPayload',
+]);
+const GO_ALL_METHODS = new Set([...GO_CAPTURE_METHODS, ...GO_FLAG_METHODS]);
+
+const RB_CAPTURE_METHODS = new Set(['capture']);
+const RB_FLAG_METHODS = new Set([
+    'is_feature_enabled', 'get_feature_flag',
+    'get_feature_flag_payload', 'get_remote_config_payload',
+]);
+const RB_ALL_METHODS = new Set([...RB_CAPTURE_METHODS, ...RB_FLAG_METHODS]);
+
 const CLIENT_NAMES = new Set(['posthog', 'client', 'ph']);
 
 interface LangFamily {
@@ -93,6 +113,9 @@ interface LangFamily {
 interface QueryStrings {
     postHogCalls: string;
     nodeCaptureCalls: string;
+    pythonCaptureCalls?: string;
+    goStructCalls?: string;
+    rubyCaptureCalls?: string;
     flagAssignments: string;
     functions: string;
     clientAliases: string;
@@ -243,6 +266,234 @@ const JS_QUERIES: QueryStrings = {
     `,
 };
 
+// ── Python tree-sitter queries ──
+
+const PY_QUERIES: QueryStrings = {
+    postHogCalls: `
+        (call
+            function: (attribute
+                object: (_) @client
+                attribute: (identifier) @method)
+            arguments: (argument_list . (string (string_content) @key))) @call
+    `,
+
+    nodeCaptureCalls: '',
+
+    pythonCaptureCalls: `
+        (call
+            function: (attribute
+                object: (_) @client
+                attribute: (identifier) @method)
+            arguments: (argument_list (string) . (string (string_content) @key))) @call
+
+        (call
+            function: (attribute
+                object: (_) @client
+                attribute: (identifier) @method)
+            arguments: (argument_list
+                (keyword_argument
+                    name: (identifier) @kwarg_name
+                    value: (string (string_content) @key)))) @call
+    `,
+
+    flagAssignments: `
+        (expression_statement
+            (assignment
+                left: (identifier) @var_name
+                right: (call
+                    function: (attribute
+                        object: (_) @client
+                        attribute: (identifier) @method)
+                    arguments: (argument_list . (string (string_content) @flag_key))))) @assignment
+    `,
+
+    functions: `
+        (function_definition
+            name: (identifier) @func_name
+            parameters: (parameters) @func_params
+            body: (block) @func_body)
+    `,
+
+    clientAliases: `
+        (expression_statement
+            (assignment
+                left: (identifier) @alias
+                right: (identifier) @source))
+    `,
+
+    constructorAliases: `
+        (expression_statement
+            (assignment
+                left: (identifier) @alias
+                right: (call
+                    function: (identifier) @class_name
+                    arguments: (argument_list))))
+    `,
+
+    destructuredMethods: '',
+
+    bareFunctionCalls: `
+        (call
+            function: (identifier) @func_name
+            arguments: (argument_list . (string (string_content) @key))) @call
+    `,
+};
+
+// ── Go tree-sitter queries ──
+
+const GO_QUERIES: QueryStrings = {
+    // Simple string first arg: client.GetFeatureFlag("my-flag")
+    postHogCalls: `
+        (call_expression
+            function: (selector_expression
+                operand: (_) @client
+                field: (field_identifier) @method)
+            arguments: (argument_list . (interpreted_string_literal) @key)) @call
+    `,
+
+    nodeCaptureCalls: '',
+
+    // Struct-based calls: client.Enqueue(posthog.Capture{Event: "purchase"})
+    // and client.GetFeatureFlag(posthog.FeatureFlagPayload{Key: "my-flag"})
+    goStructCalls: `
+        (call_expression
+            function: (selector_expression
+                operand: (_) @client
+                field: (field_identifier) @method)
+            arguments: (argument_list
+                (composite_literal
+                    body: (literal_value
+                        (keyed_element
+                            (literal_element (identifier) @field_name)
+                            (literal_element (interpreted_string_literal) @key)))))) @call
+    `,
+
+    flagAssignments: `
+        (short_var_declaration
+            left: (expression_list . (identifier) @var_name .)
+            right: (expression_list
+                (call_expression
+                    function: (selector_expression
+                        operand: (_) @client
+                        field: (field_identifier) @method)
+                    arguments: (argument_list . (interpreted_string_literal) @flag_key)))) @assignment
+
+        (short_var_declaration
+            left: (expression_list . (identifier) @var_name (_))
+            right: (expression_list
+                (call_expression
+                    function: (selector_expression
+                        operand: (_) @client
+                        field: (field_identifier) @method)
+                    arguments: (argument_list . (interpreted_string_literal) @flag_key)))) @assignment
+    `,
+
+    functions: `
+        (function_declaration
+            name: (identifier) @func_name
+            parameters: (parameter_list) @func_params
+            body: (block) @func_body)
+
+        (method_declaration
+            name: (field_identifier) @func_name
+            parameters: (parameter_list) @func_params
+            body: (block) @func_body)
+    `,
+
+    clientAliases: '',
+
+    constructorAliases: `
+        (short_var_declaration
+            left: (expression_list (identifier) @alias)
+            right: (expression_list
+                (call_expression
+                    function: (selector_expression
+                        operand: (identifier) @pkg_name
+                        field: (field_identifier) @func_name))))
+
+        (short_var_declaration
+            left: (expression_list (identifier) @alias (_))
+            right: (expression_list
+                (call_expression
+                    function: (selector_expression
+                        operand: (identifier) @pkg_name
+                        field: (field_identifier) @func_name))))
+    `,
+
+    destructuredMethods: '',
+
+    bareFunctionCalls: '',
+};
+
+// ── Ruby tree-sitter queries ──
+// Ruby `call` nodes have `receiver` and `method` as separate fields (no `function` field).
+// Strings are `string` > `string_content`. Constants are `constant` (PascalCase/UPPER_CASE).
+
+const RB_QUERIES: QueryStrings = {
+    // Flag method calls: client.get_feature_flag('key', 'user')
+    // Ruby call: receiver.method(arguments)
+    postHogCalls: `
+        (call
+            receiver: (_) @client
+            method: (identifier) @method
+            arguments: (argument_list . (string (string_content) @key))) @call
+    `,
+
+    nodeCaptureCalls: '',
+
+    // Ruby capture: client.capture(distinct_id: 'user', event: 'purchase')
+    // Event name is in the `event:` keyword argument (hash_key_symbol)
+    rubyCaptureCalls: `
+        (call
+            receiver: (_) @client
+            method: (identifier) @method
+            arguments: (argument_list
+                (pair
+                    (hash_key_symbol) @kwarg_name
+                    (string (string_content) @key)))) @call
+    `,
+
+    flagAssignments: `
+        (assignment
+            left: (identifier) @var_name
+            right: (call
+                receiver: (_) @client
+                method: (identifier) @method
+                arguments: (argument_list . (string (string_content) @flag_key)))) @assignment
+    `,
+
+    functions: `
+        (method
+            name: (identifier) @func_name
+            parameters: (method_parameters) @func_params
+            body: (_) @func_body)
+    `,
+
+    clientAliases: `
+        (assignment
+            left: (identifier) @alias
+            right: (identifier) @source)
+    `,
+
+    constructorAliases: `
+        (assignment
+            left: (identifier) @alias
+            right: (call
+                receiver: (scope_resolution
+                    scope: (constant) @scope_name
+                    name: (constant) @class_name)
+                method: (identifier) @method_name))
+    `,
+
+    destructuredMethods: '',
+
+    bareFunctionCalls: `
+        (call
+            method: (identifier) @func_name
+            arguments: (argument_list . (string (string_content) @key))) @call
+    `,
+};
+
 // ── Language → family mapping ──
 
 const LANG_FAMILIES: Record<string, LangFamily> = {
@@ -250,6 +501,9 @@ const LANG_FAMILIES: Record<string, LangFamily> = {
     javascriptreact: { wasm: 'tree-sitter-javascript.wasm', captureMethods: JS_CAPTURE_METHODS, flagMethods: JS_FLAG_METHODS, allMethods: JS_ALL_METHODS, queries: JS_QUERIES },
     typescript: { wasm: 'tree-sitter-typescript.wasm', captureMethods: JS_CAPTURE_METHODS, flagMethods: JS_FLAG_METHODS, allMethods: JS_ALL_METHODS, queries: JS_QUERIES },
     typescriptreact: { wasm: 'tree-sitter-tsx.wasm', captureMethods: JS_CAPTURE_METHODS, flagMethods: JS_FLAG_METHODS, allMethods: JS_ALL_METHODS, queries: JS_QUERIES },
+    python: { wasm: 'tree-sitter-python.wasm', captureMethods: PY_CAPTURE_METHODS, flagMethods: PY_FLAG_METHODS, allMethods: PY_ALL_METHODS, queries: PY_QUERIES },
+    go: { wasm: 'tree-sitter-go.wasm', captureMethods: GO_CAPTURE_METHODS, flagMethods: GO_FLAG_METHODS, allMethods: GO_ALL_METHODS, queries: GO_QUERIES },
+    ruby: { wasm: 'tree-sitter-ruby.wasm', captureMethods: RB_CAPTURE_METHODS, flagMethods: RB_FLAG_METHODS, allMethods: RB_ALL_METHODS, queries: RB_QUERIES },
 };
 
 // ── Service ──
@@ -284,6 +538,11 @@ export class TreeSitterService {
             if (node.type === 'member_expression' || node.type === 'attribute') {
                 const prop = node.childForFieldName('property') || node.childForFieldName('attribute');
                 if (prop) { return prop.text; }
+            }
+            // Go: selector_expression — e.g. pkg.Client
+            if (node.type === 'selector_expression') {
+                const field = node.childForFieldName('field');
+                if (field) { return field.text; }
             }
             // optional_chain_expression wrapping member_expression
             if (node.type === 'optional_chain_expression') {
@@ -404,13 +663,33 @@ export class TreeSitterService {
         }
 
         // Constructor aliases: const client = new PostHog('phc_...')
+        // Go: client := posthog.New("token") or client, _ := posthog.NewWithConfig("token", ...)
         const constructorQuery = this.getQuery(lang, family.queries.constructorAliases);
         if (constructorQuery) {
             const matches = constructorQuery.matches(tree.rootNode);
             for (const match of matches) {
                 const aliasNode = match.captures.find(c => c.name === 'alias');
                 const classNode = match.captures.find(c => c.name === 'class_name');
-                if (aliasNode && classNode && classNode.node.text === 'PostHog') {
+                const pkgNode = match.captures.find(c => c.name === 'pkg_name');
+                const funcNode = match.captures.find(c => c.name === 'func_name');
+
+                // JS/Python: new PostHog(...) or Posthog(...)
+                if (aliasNode && classNode && (classNode.node.text === 'PostHog' || classNode.node.text === 'Posthog')) {
+                    clientAliases.add(aliasNode.node.text);
+                }
+                // Go: posthog.New(...) or posthog.NewWithConfig(...)
+                if (aliasNode && pkgNode && funcNode &&
+                    pkgNode.node.text === 'posthog' &&
+                    (funcNode.node.text === 'New' || funcNode.node.text === 'NewWithConfig')) {
+                    clientAliases.add(aliasNode.node.text);
+                }
+                // Ruby: PostHog::Client.new(...)
+                const scopeNode = match.captures.find(c => c.name === 'scope_name');
+                const methodNameNode = match.captures.find(c => c.name === 'method_name');
+                if (aliasNode && scopeNode && classNode && methodNameNode &&
+                    (scopeNode.node.text === 'PostHog' || scopeNode.node.text === 'Posthog') &&
+                    classNode.node.text === 'Client' &&
+                    methodNameNode.node.text === 'new') {
                     clientAliases.add(aliasNode.node.text);
                 }
             }
@@ -474,6 +753,14 @@ export class TreeSitterService {
                 if (!clientName || !allClients.has(clientName)) { continue; }
                 if (!family.allMethods.has(method)) { continue; }
 
+                // For Python, skip capture in the generic query — the first arg is distinct_id, not the event.
+                // Python capture is handled separately by the pythonCaptureCalls query.
+                if (family.queries.pythonCaptureCalls && family.captureMethods.has(method)) { continue; }
+
+                // For Ruby, skip capture — event is in the `event:` keyword arg, not the first positional arg.
+                // Ruby capture is handled separately by the rubyCaptureCalls query.
+                if (family.queries.rubyCaptureCalls && family.captureMethods.has(method)) { continue; }
+
                 calls.push({
                     method,
                     key: this.cleanStringValue(keyNode.node.text),
@@ -481,6 +768,45 @@ export class TreeSitterService {
                     keyStartCol: keyNode.node.startPosition.column,
                     keyEndCol: keyNode.node.endPosition.column,
                 });
+            }
+        }
+
+        // Go struct-based calls: client.Enqueue(posthog.Capture{Event: "purchase"})
+        // and client.GetFeatureFlag(posthog.FeatureFlagPayload{Key: "my-flag"})
+        if (family.queries.goStructCalls) {
+            const structQuery = this.getQuery(lang, family.queries.goStructCalls);
+            if (structQuery) {
+                for (const match of structQuery.matches(tree.rootNode)) {
+                    const clientNode = match.captures.find(c => c.name === 'client');
+                    const methodNode = match.captures.find(c => c.name === 'method');
+                    const fieldNameNode = match.captures.find(c => c.name === 'field_name');
+                    const keyNode = match.captures.find(c => c.name === 'key');
+                    if (!clientNode || !methodNode || !fieldNameNode || !keyNode) { continue; }
+
+                    const clientName = this.extractClientName(clientNode.node);
+                    const method = methodNode.node.text;
+                    const fieldName = fieldNameNode.node.text;
+                    if (!clientName || !allClients.has(clientName)) { continue; }
+
+                    // For Enqueue(posthog.Capture{Event: "..."}), method is "Enqueue" and we want Event field
+                    // For GetFeatureFlag(posthog.FeatureFlagPayload{Key: "..."}), we want Key field
+                    const isCapture = method === 'Enqueue' && fieldName === 'Event';
+                    const isFlag = family.flagMethods.has(method) && fieldName === 'Key';
+                    if (!isCapture && !isFlag) { continue; }
+
+                    const effectiveMethod = isCapture ? 'capture' : method;
+                    const key = this.cleanStringValue(keyNode.node.text);
+                    const line = keyNode.node.startPosition.row;
+                    if (calls.some(c => c.line === line && c.key === key)) { continue; }
+
+                    calls.push({
+                        method: effectiveMethod,
+                        key,
+                        line,
+                        keyStartCol: keyNode.node.startPosition.column,
+                        keyEndCol: keyNode.node.endPosition.column,
+                    });
+                }
             }
         }
 
@@ -510,6 +836,83 @@ export class TreeSitterService {
                     keyStartCol: keyNode.node.startPosition.column,
                     keyEndCol: keyNode.node.endPosition.column,
                 });
+            }
+        }
+
+        // Python capture: posthog.capture(distinct_id, 'event_name', ...)
+        // Event is the 2nd positional arg, or the `event` keyword argument
+        if (family.queries.pythonCaptureCalls) {
+            const pyCaptureQuery = this.getQuery(lang, family.queries.pythonCaptureCalls);
+            if (pyCaptureQuery) {
+                const matches = pyCaptureQuery.matches(tree.rootNode);
+                for (const match of matches) {
+                    const clientNode = match.captures.find(c => c.name === 'client');
+                    const methodNode = match.captures.find(c => c.name === 'method');
+                    const keyNode = match.captures.find(c => c.name === 'key');
+                    const kwargNameNode = match.captures.find(c => c.name === 'kwarg_name');
+
+                    if (!clientNode || !methodNode || !keyNode) { continue; }
+
+                    const clientName = this.extractClientName(clientNode.node);
+                    const method = methodNode.node.text;
+
+                    if (!clientName || !allClients.has(clientName)) { continue; }
+                    if (method !== 'capture') { continue; }
+
+                    // For keyword argument form, only match event=
+                    if (kwargNameNode && kwargNameNode.node.text !== 'event') { continue; }
+
+                    const key = this.cleanStringValue(keyNode.node.text);
+                    const line = keyNode.node.startPosition.row;
+
+                    // Skip if already matched on this line (from postHogCalls query)
+                    if (calls.some(c => c.line === line && c.key === key)) { continue; }
+
+                    calls.push({
+                        method,
+                        key,
+                        line,
+                        keyStartCol: keyNode.node.startPosition.column,
+                        keyEndCol: keyNode.node.endPosition.column,
+                    });
+                }
+            }
+        }
+
+        // Ruby capture: client.capture(distinct_id: 'user', event: 'purchase')
+        // Event name is in the `event:` keyword argument (hash_key_symbol)
+        if (family.queries.rubyCaptureCalls) {
+            const rbCaptureQuery = this.getQuery(lang, family.queries.rubyCaptureCalls);
+            if (rbCaptureQuery) {
+                const matches = rbCaptureQuery.matches(tree.rootNode);
+                for (const match of matches) {
+                    const clientNode = match.captures.find(c => c.name === 'client');
+                    const methodNode = match.captures.find(c => c.name === 'method');
+                    const keyNode = match.captures.find(c => c.name === 'key');
+                    const kwargNameNode = match.captures.find(c => c.name === 'kwarg_name');
+
+                    if (!clientNode || !methodNode || !keyNode || !kwargNameNode) { continue; }
+
+                    const clientName = this.extractClientName(clientNode.node);
+                    const method = methodNode.node.text;
+
+                    if (!clientName || !allClients.has(clientName)) { continue; }
+                    if (method !== 'capture') { continue; }
+                    if (kwargNameNode.node.text !== 'event') { continue; }
+
+                    const key = this.cleanStringValue(keyNode.node.text);
+                    const line = keyNode.node.startPosition.row;
+
+                    if (calls.some(c => c.line === line && c.key === key)) { continue; }
+
+                    calls.push({
+                        method,
+                        key,
+                        line,
+                        keyStartCol: keyNode.node.startPosition.column,
+                        keyEndCol: keyNode.node.endPosition.column,
+                    });
+                }
             }
         }
 
@@ -564,13 +967,40 @@ export class TreeSitterService {
         // Resolve calls with identifier first argument: posthog.capture(MY_CONST) / posthog.getFeatureFlag(FLAG_KEY)
         const constantMap = this.buildConstantMap(lang, tree);
         if (constantMap.size > 0) {
-            const identArgQuery = this.getQuery(lang, `
-                (call_expression
+            let identArgQueryStr: string;
+            if (family.queries.rubyCaptureCalls) {
+                // Ruby: call with receiver + method, identifier or constant args
+                identArgQueryStr = `
+                    (call
+                        receiver: (_) @client
+                        method: (identifier) @method
+                        arguments: (argument_list . (identifier) @arg_id)) @call
+
+                    (call
+                        receiver: (_) @client
+                        method: (identifier) @method
+                        arguments: (argument_list . (constant) @arg_id)) @call`;
+            } else if (family.queries.goStructCalls) {
+                // Go: selector_expression + argument_list
+                identArgQueryStr = `(call_expression
+                    function: (selector_expression
+                        operand: (_) @client
+                        field: (field_identifier) @method)
+                    arguments: (argument_list . (identifier) @arg_id)) @call`;
+            } else if (family.queries.pythonCaptureCalls) {
+                identArgQueryStr = `(call
+                    function: (attribute
+                        object: (_) @client
+                        attribute: (identifier) @method)
+                    arguments: (argument_list . (identifier) @arg_id)) @call`;
+            } else {
+                identArgQueryStr = `(call_expression
                     function: (member_expression
                         object: (_) @client
                         property: (property_identifier) @method)
-                    arguments: (arguments . (identifier) @arg_id)) @call
-            `);
+                    arguments: (arguments . (identifier) @arg_id)) @call`;
+            }
+            const identArgQuery = this.getQuery(lang, identArgQueryStr);
             if (identArgQuery) {
                 const identMatches = identArgQuery.matches(tree.rootNode);
                 for (const match of identMatches) {
@@ -604,13 +1034,37 @@ export class TreeSitterService {
 
         // Detect dynamic capture calls (non-string first argument)
         const matchedLines = new Set(calls.map(c => c.line));
-        const dynamicQuery = this.getQuery(lang, `
-            (call_expression
+
+        let dynamicQueryStr: string;
+        if (family.queries.rubyCaptureCalls) {
+            // Ruby: call with receiver + method
+            dynamicQueryStr = `(call
+                receiver: (_) @client
+                method: (identifier) @method
+                arguments: (argument_list . (_) @first_arg)) @call`;
+        } else if (family.queries.goStructCalls) {
+            // Go: selector_expression + argument_list
+            dynamicQueryStr = `(call_expression
+                function: (selector_expression
+                    operand: (_) @client
+                    field: (field_identifier) @method)
+                arguments: (argument_list . (_) @first_arg)) @call`;
+        } else if (family.queries.pythonCaptureCalls) {
+            // Python: attribute + argument_list
+            dynamicQueryStr = `(call
+                function: (attribute
+                    object: (_) @client
+                    attribute: (identifier) @method)
+                arguments: (argument_list . (_) @first_arg)) @call`;
+        } else {
+            // JS/TS: member_expression + arguments
+            dynamicQueryStr = `(call_expression
                 function: (member_expression
                     object: (_) @client
                     property: (property_identifier) @method)
-                arguments: (arguments . (_) @first_arg)) @call
-        `);
+                arguments: (arguments . (_) @first_arg)) @call`;
+        }
+        const dynamicQuery = this.getQuery(lang, dynamicQueryStr);
         if (dynamicQuery) {
             const matches = dynamicQuery.matches(tree.rootNode);
             for (const match of matches) {
@@ -702,6 +1156,265 @@ export class TreeSitterService {
                 if (classNode.node.text !== 'PostHog') { continue; }
 
                 results.push(this.buildInitCall(tokenNode.node, configNode?.node));
+            }
+        }
+
+        // Pattern 3a: Posthog('phc_token', host='...') — positional token
+        const pyCtorQueryStr = `
+            (call
+                function: (identifier) @class_name
+                arguments: (argument_list
+                    (string (string_content) @token))) @call
+        `;
+
+        // Pattern 3b: Posthog(api_key='phc_token', host='...') — keyword token
+        const pyCtorKwQueryStr = `
+            (call
+                function: (identifier) @class_name
+                arguments: (argument_list
+                    (keyword_argument
+                        name: (identifier) @kw_name
+                        value: (string (string_content) @token)))) @call
+        `;
+
+        const pyCtorKwQuery = this.getQuery(lang, pyCtorKwQueryStr);
+        if (pyCtorKwQuery) {
+            for (const match of pyCtorKwQuery.matches(tree.rootNode)) {
+                const classNode = match.captures.find(c => c.name === 'class_name');
+                const kwNameNode = match.captures.find(c => c.name === 'kw_name');
+                const tokenNode = match.captures.find(c => c.name === 'token');
+
+                if (!classNode || !kwNameNode || !tokenNode) { continue; }
+                if (classNode.node.text !== 'PostHog' && classNode.node.text !== 'Posthog') { continue; }
+                if (kwNameNode.node.text !== 'api_key' && kwNameNode.node.text !== 'project_api_key') { continue; }
+
+                // Check we didn't already match this call via positional pattern
+                const line = tokenNode.node.startPosition.row;
+                if (results.some(r => r.tokenLine === line)) { continue; }
+
+                // Extract other keyword args for config
+                const callNode = match.captures.find(c => c.name === 'call');
+                const configProperties = new Map<string, string>();
+                let apiHost: string | null = null;
+
+                if (callNode) {
+                    const argsNode = callNode.node.childForFieldName('arguments');
+                    if (argsNode) {
+                        for (const child of argsNode.namedChildren) {
+                            if (child.type === 'keyword_argument') {
+                                const nameNode = child.childForFieldName('name');
+                                const valueNode = child.childForFieldName('value');
+                                if (nameNode && valueNode && nameNode.text !== 'api_key' && nameNode.text !== 'project_api_key') {
+                                    const key = nameNode.text;
+                                    let value = valueNode.text;
+                                    if (valueNode.type === 'string') {
+                                        const content = valueNode.namedChildren.find(c => c.type === 'string_content');
+                                        if (content) { value = content.text; }
+                                    }
+                                    configProperties.set(key, value);
+                                    if (key === 'host' || key === 'api_host') { apiHost = value; }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                results.push({
+                    token: this.cleanStringValue(tokenNode.node.text),
+                    tokenLine: tokenNode.node.startPosition.row,
+                    tokenStartCol: tokenNode.node.startPosition.column,
+                    tokenEndCol: tokenNode.node.endPosition.column,
+                    apiHost,
+                    configProperties,
+                });
+            }
+        }
+
+        const pyCtorQuery = this.getQuery(lang, pyCtorQueryStr);
+        if (pyCtorQuery) {
+            for (const match of pyCtorQuery.matches(tree.rootNode)) {
+                const classNode = match.captures.find(c => c.name === 'class_name');
+                const tokenNode = match.captures.find(c => c.name === 'token');
+
+                if (!classNode || !tokenNode) { continue; }
+                if (classNode.node.text !== 'PostHog' && classNode.node.text !== 'Posthog') { continue; }
+
+                // Extract keyword arguments for config
+                const callNode = match.captures.find(c => c.name === 'call');
+                const configProperties = new Map<string, string>();
+                let apiHost: string | null = null;
+
+                if (callNode) {
+                    const argsNode = callNode.node.childForFieldName('arguments');
+                    if (argsNode) {
+                        for (const child of argsNode.namedChildren) {
+                            if (child.type === 'keyword_argument') {
+                                const nameNode = child.childForFieldName('name');
+                                const valueNode = child.childForFieldName('value');
+                                if (nameNode && valueNode) {
+                                    const key = nameNode.text;
+                                    let value = valueNode.text;
+                                    if (valueNode.type === 'string') {
+                                        const content = valueNode.namedChildren.find(c => c.type === 'string_content');
+                                        if (content) { value = content.text; }
+                                    }
+                                    configProperties.set(key, value);
+                                    if (key === 'host' || key === 'api_host') { apiHost = value; }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                results.push({
+                    token: this.cleanStringValue(tokenNode.node.text),
+                    tokenLine: tokenNode.node.startPosition.row,
+                    tokenStartCol: tokenNode.node.startPosition.column,
+                    tokenEndCol: tokenNode.node.endPosition.column,
+                    apiHost,
+                    configProperties,
+                });
+            }
+        }
+
+        // Pattern 4: Go — posthog.New("phc_token") or posthog.NewWithConfig("phc_token", posthog.Config{Endpoint: "..."})
+        const goCtorQueryStr = `
+            (call_expression
+                function: (selector_expression
+                    operand: (identifier) @pkg_name
+                    field: (field_identifier) @func_name)
+                arguments: (argument_list
+                    (interpreted_string_literal) @token)) @call
+        `;
+
+        const goCtorQuery = this.getQuery(lang, goCtorQueryStr);
+        if (goCtorQuery) {
+            for (const match of goCtorQuery.matches(tree.rootNode)) {
+                const pkgNode = match.captures.find(c => c.name === 'pkg_name');
+                const funcNode = match.captures.find(c => c.name === 'func_name');
+                const tokenNode = match.captures.find(c => c.name === 'token');
+
+                if (!pkgNode || !funcNode || !tokenNode) { continue; }
+                if (pkgNode.node.text !== 'posthog') { continue; }
+                if (funcNode.node.text !== 'New' && funcNode.node.text !== 'NewWithConfig') { continue; }
+
+                const token = this.cleanStringValue(tokenNode.node.text);
+                const line = tokenNode.node.startPosition.row;
+                if (results.some(r => r.tokenLine === line)) { continue; }
+
+                // Try to extract Endpoint from Config struct literal
+                const configProperties = new Map<string, string>();
+                let apiHost: string | null = null;
+
+                const callNode = match.captures.find(c => c.name === 'call');
+                if (callNode) {
+                    const argsNode = callNode.node.childForFieldName('arguments');
+                    if (argsNode) {
+                        for (const arg of argsNode.namedChildren) {
+                            if (arg.type === 'composite_literal') {
+                                const body = arg.childForFieldName('body');
+                                if (body) {
+                                    for (const elem of body.namedChildren) {
+                                        if (elem.type === 'keyed_element') {
+                                            const children = elem.namedChildren;
+                                            if (children.length >= 2) {
+                                                const keyElem = children[0];
+                                                const valElem = children[1];
+                                                const keyId = keyElem.type === 'literal_element'
+                                                    ? keyElem.namedChildren[0]?.text || keyElem.text
+                                                    : keyElem.text;
+                                                const valText = this.cleanStringValue(valElem.text);
+                                                if (keyId) {
+                                                    configProperties.set(keyId, valText);
+                                                    if (keyId === 'Endpoint' || keyId === 'Host') {
+                                                        apiHost = valText;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                results.push({
+                    token,
+                    tokenLine: tokenNode.node.startPosition.row,
+                    tokenStartCol: tokenNode.node.startPosition.column,
+                    tokenEndCol: tokenNode.node.endPosition.column,
+                    apiHost,
+                    configProperties,
+                });
+            }
+        }
+
+        // Pattern 5: Ruby — PostHog::Client.new(api_key: 'phc_token', host: '...')
+        const rbCtorQueryStr = `
+            (call
+                receiver: (scope_resolution
+                    scope: (constant) @scope_name
+                    name: (constant) @class_name)
+                method: (identifier) @method_name
+                arguments: (argument_list
+                    (pair
+                        (hash_key_symbol) @kw_name
+                        (string (string_content) @token)))) @call
+        `;
+        const rbCtorQuery = this.getQuery(lang, rbCtorQueryStr);
+        if (rbCtorQuery) {
+            for (const match of rbCtorQuery.matches(tree.rootNode)) {
+                const scopeNode = match.captures.find(c => c.name === 'scope_name');
+                const classNode = match.captures.find(c => c.name === 'class_name');
+                const methodNode = match.captures.find(c => c.name === 'method_name');
+                const kwNameNode = match.captures.find(c => c.name === 'kw_name');
+                const tokenNode = match.captures.find(c => c.name === 'token');
+
+                if (!scopeNode || !classNode || !methodNode || !kwNameNode || !tokenNode) { continue; }
+                if (scopeNode.node.text !== 'PostHog' && scopeNode.node.text !== 'Posthog') { continue; }
+                if (classNode.node.text !== 'Client') { continue; }
+                if (methodNode.node.text !== 'new') { continue; }
+                if (kwNameNode.node.text !== 'api_key') { continue; }
+
+                const line = tokenNode.node.startPosition.row;
+                if (results.some(r => r.tokenLine === line)) { continue; }
+
+                // Extract other keyword args for config
+                const callNode = match.captures.find(c => c.name === 'call');
+                const configProperties = new Map<string, string>();
+                let apiHost: string | null = null;
+
+                if (callNode) {
+                    const argsNode = callNode.node.childForFieldName('arguments');
+                    if (argsNode) {
+                        for (const child of argsNode.namedChildren) {
+                            if (child.type === 'pair') {
+                                const keyN = child.namedChildren[0];
+                                const valueN = child.namedChildren[1];
+                                if (keyN?.type === 'hash_key_symbol' && valueN && keyN.text !== 'api_key') {
+                                    const key = keyN.text;
+                                    let value = valueN.text;
+                                    if (valueN.type === 'string') {
+                                        const content = valueN.namedChildren.find(c => c.type === 'string_content');
+                                        if (content) { value = content.text; }
+                                    }
+                                    configProperties.set(key, value);
+                                    if (key === 'host' || key === 'api_host') { apiHost = value; }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                results.push({
+                    token: this.cleanStringValue(tokenNode.node.text),
+                    tokenLine: tokenNode.node.startPosition.row,
+                    tokenStartCol: tokenNode.node.startPosition.column,
+                    tokenEndCol: tokenNode.node.endPosition.column,
+                    apiHost,
+                    configProperties,
+                });
             }
         }
 
@@ -836,8 +1549,36 @@ export class TreeSitterService {
         // 1a. Resolve flag assignments with identifier arguments: const v = posthog.getFeatureFlag(MY_FLAG)
         const constantMap = this.buildConstantMap(lang, tree);
         if (constantMap.size > 0) {
-            const identAssignQuery = this.getQuery(lang, `
-                (lexical_declaration
+            let identAssignQueryStr: string;
+            if (family.queries.rubyCaptureCalls !== undefined) {
+                // Ruby: assignment with identifier or constant argument
+                identAssignQueryStr = `
+                    (assignment
+                        left: (identifier) @var_name
+                        right: (call
+                            receiver: (_) @client
+                            method: (identifier) @method
+                            arguments: (argument_list . (identifier) @flag_id))) @assignment
+
+                    (assignment
+                        left: (identifier) @var_name
+                        right: (call
+                            receiver: (_) @client
+                            method: (identifier) @method
+                            arguments: (argument_list . (constant) @flag_id))) @assignment`;
+            } else if (family.queries.pythonCaptureCalls !== undefined) {
+                // Python: assignment with identifier argument
+                identAssignQueryStr = `(expression_statement
+                    (assignment
+                        left: (identifier) @var_name
+                        right: (call
+                            function: (attribute
+                                object: (_) @client
+                                attribute: (identifier) @method)
+                            arguments: (argument_list . (identifier) @flag_id)))) @assignment`;
+            } else {
+                // JS: const/let/var with identifier argument
+                identAssignQueryStr = `(lexical_declaration
                     (variable_declarator
                         name: (identifier) @var_name
                         value: (call_expression
@@ -873,8 +1614,9 @@ export class TreeSitterService {
                                 function: (member_expression
                                     object: (_) @client
                                     property: (property_identifier) @method)
-                                arguments: (arguments . (identifier) @flag_id))))) @assignment
-            `);
+                                arguments: (arguments . (identifier) @flag_id))))) @assignment`;
+            }
+            const identAssignQuery = this.getQuery(lang, identAssignQueryStr);
             if (identAssignQuery) {
                 const matches = identAssignQuery.matches(tree.rootNode);
                 for (const match of matches) {
@@ -906,8 +1648,16 @@ export class TreeSitterService {
             'useFeatureFlag', 'useFeatureFlagPayload', 'useFeatureFlagVariantKey',
         ]);
         if (bareFlagFunctions.size > 0 && family.queries.bareFunctionCalls) {
-            const bareAssignQuery = this.getQuery(lang, `
-                (lexical_declaration
+            const bareAssignQueryStr = family.queries.pythonCaptureCalls !== undefined
+                // Python: bare function assignment
+                ? `(expression_statement
+                    (assignment
+                        left: (identifier) @var_name
+                        right: (call
+                            function: (identifier) @func_name
+                            arguments: (argument_list . (string (string_content) @flag_key))))) @assignment`
+                // JS: const/let/var bare function assignment
+                : `(lexical_declaration
                     (variable_declarator
                         name: (identifier) @var_name
                         value: (call_expression
@@ -919,8 +1669,8 @@ export class TreeSitterService {
                         name: (identifier) @var_name
                         value: (call_expression
                             function: (identifier) @func_name
-                            arguments: (arguments . (string (string_fragment) @flag_key))))) @assignment
-            `);
+                            arguments: (arguments . (string (string_fragment) @flag_key))))) @assignment`;
+            const bareAssignQuery = this.getQuery(lang, bareAssignQueryStr);
             if (bareAssignQuery) {
                 const matches = bareAssignQuery.matches(tree.rootNode);
                 for (const match of matches) {
@@ -1026,18 +1776,26 @@ export class TreeSitterService {
                 const callNode = current.parent;
                 if (!callNode) { current = current.parent; continue; }
 
-                const func = callNode.childForFieldName('function');
-                if (!func) { current = current.parent; continue; }
-
                 let clientName: string | undefined;
                 let methodName: string | undefined;
 
-                // member_expression: posthog.capture
-                if (func.type === 'member_expression' || func.type === 'attribute' || func.type === 'selector_expression') {
-                    const obj = func.childForFieldName('object') || func.childForFieldName('operand');
-                    const prop = func.childForFieldName('property') || func.childForFieldName('attribute') || func.childForFieldName('field');
-                    clientName = obj ? (this.extractClientName(obj) ?? undefined) : undefined;
-                    methodName = prop?.text;
+                const func = callNode.childForFieldName('function');
+                if (func) {
+                    // JS/Python/Go: function field wraps object.method
+                    if (func.type === 'member_expression' || func.type === 'attribute' || func.type === 'selector_expression') {
+                        const obj = func.childForFieldName('object') || func.childForFieldName('operand');
+                        const prop = func.childForFieldName('property') || func.childForFieldName('attribute') || func.childForFieldName('field');
+                        clientName = obj ? (this.extractClientName(obj) ?? undefined) : undefined;
+                        methodName = prop?.text;
+                    }
+                } else {
+                    // Ruby: call has receiver + method as separate fields (no function field)
+                    const receiver = callNode.childForFieldName('receiver');
+                    const method = callNode.childForFieldName('method');
+                    if (receiver && method) {
+                        clientName = this.extractClientName(receiver) ?? undefined;
+                        methodName = method.text;
+                    }
                 }
 
                 if (!clientName || !methodName || !allClients.has(clientName)) {
@@ -1053,24 +1811,61 @@ export class TreeSitterService {
                     (position.line < a.endPosition.row || position.character <= a.endPosition.column)
                 );
 
-                // We're before/at the first argument
-                if (family.captureMethods.has(methodName) && argIndex <= 0) {
+                // Python capture: event is at argIndex 1 (distinct_id, event, ...)
+                // Also handle keyword argument: capture(distinct_id='x', event='y')
+                const isPythonCapture = family.queries.pythonCaptureCalls !== undefined && family.captureMethods.has(methodName);
+
+                if (isPythonCapture) {
+                    // Check if cursor is in a keyword_argument with name 'event'
+                    let kwNode: Parser.SyntaxNode | null = node;
+                    while (kwNode && kwNode !== current) {
+                        if (kwNode.type === 'keyword_argument') {
+                            const nameN = kwNode.childForFieldName('name');
+                            if (nameN?.text === 'event') {
+                                return { type: 'capture_event' };
+                            }
+                        }
+                        kwNode = kwNode.parent;
+                    }
+                    // Positional: event is 2nd arg (index 1)
+                    if (argIndex === 1) {
+                        return { type: 'capture_event' };
+                    }
+                } else if (family.queries.rubyCaptureCalls && family.captureMethods.has(methodName)) {
+                    // Ruby capture: event is in the `event:` keyword arg (pair with hash_key_symbol)
+                    let kwNode: Parser.SyntaxNode | null = node;
+                    while (kwNode && kwNode !== current) {
+                        if (kwNode.type === 'pair') {
+                            const keyN = kwNode.namedChildren[0];
+                            if (keyN?.type === 'hash_key_symbol' && keyN.text === 'event') {
+                                return { type: 'capture_event' };
+                            }
+                        }
+                        kwNode = kwNode.parent;
+                    }
+                } else if (family.captureMethods.has(methodName) && argIndex <= 0) {
+                    // JS/Node: event is the first argument
                     return { type: 'capture_event' };
                 }
+
                 if (family.flagMethods.has(methodName) && argIndex <= 0) {
                     return { type: 'flag_key' };
                 }
 
-                // We're in the second argument (properties object) of a capture call
-                if (family.captureMethods.has(methodName) && argIndex === 1 && args[0]) {
-                    const eventName = this.extractStringFromNode(args[0]);
-                    if (eventName) {
-                        // Determine key vs value position
-                        const propCtx = this.detectPropertyPosition(node, position);
-                        if (propCtx.mode === 'value' && propCtx.propertyName) {
-                            return { type: 'property_value', eventName, propertyName: propCtx.propertyName };
+                // We're in the properties argument of a capture call
+                if (family.captureMethods.has(methodName)) {
+                    const propsArgIndex = isPythonCapture ? 2 : 1;
+                    const eventArgIndex = isPythonCapture ? 1 : 0;
+                    if (argIndex === propsArgIndex && args[eventArgIndex]) {
+                        const eventName = this.extractStringFromNode(args[eventArgIndex]);
+                        if (eventName) {
+                            // Determine key vs value position
+                            const propCtx = this.detectPropertyPosition(node, position);
+                            if (propCtx.mode === 'value' && propCtx.propertyName) {
+                                return { type: 'property_value', eventName, propertyName: propCtx.propertyName };
+                            }
+                            return { type: 'property_key', eventName };
                         }
-                        return { type: 'property_key', eventName };
                     }
                 }
 
@@ -1130,7 +1925,8 @@ export class TreeSitterService {
             if (!foundAssignment) { continue; }
             if (child === afterNode) { continue; }
 
-            if (child.type === 'if_statement') {
+            // JS/Go: if_statement, Ruby: if
+            if (child.type === 'if_statement' || child.type === 'if') {
                 this.extractIfChainBranches(child, varName, flagKey, branches);
             }
         }
@@ -1173,18 +1969,61 @@ export class TreeSitterService {
         });
 
         if (alternative) {
-            const altChild = alternative.namedChildren[0];
-            if (altChild?.type === 'if_statement') {
-                this.extractIfChainBranches(altChild, varName, flagKey, branches);
-            } else if (altChild) {
+            // Python: elif_clause, Ruby: elsif — has condition, consequence, alternative
+            if (alternative.type === 'elif_clause' || alternative.type === 'elsif') {
+                this.extractIfChainBranches(alternative, varName, flagKey, branches);
+            } else if (alternative.type === 'else_clause') {
+                // Python else_clause: body is in 'body' field
+                const body = alternative.childForFieldName('body') || alternative.namedChildren[0];
+                if (body) {
+                    const elseVariant = variant === 'true' ? 'false' : variant === 'false' ? 'true' : 'else';
+                    branches.push({
+                        flagKey,
+                        variantKey: elseVariant,
+                        conditionLine: alternative.startPosition.row,
+                        startLine: alternative.startPosition.row,
+                        endLine: body.endPosition.row,
+                    });
+                }
+            } else if (alternative.type === 'if_statement') {
+                // Go: else if — alternative is directly an if_statement
+                this.extractIfChainBranches(alternative, varName, flagKey, branches);
+            } else if (alternative.type === 'block') {
+                // Go: else { ... } — alternative is directly a block
                 const elseVariant = variant === 'true' ? 'false' : variant === 'false' ? 'true' : 'else';
                 branches.push({
                     flagKey,
                     variantKey: elseVariant,
                     conditionLine: alternative.startPosition.row,
                     startLine: alternative.startPosition.row,
-                    endLine: altChild.endPosition.row,
+                    endLine: alternative.endPosition.row,
                 });
+            } else if (alternative.type === 'else') {
+                // Ruby: else — children are direct statements (no body field)
+                const lastChild = alternative.namedChildren[alternative.namedChildren.length - 1] || alternative;
+                const elseVariant = variant === 'true' ? 'false' : variant === 'false' ? 'true' : 'else';
+                branches.push({
+                    flagKey,
+                    variantKey: elseVariant,
+                    conditionLine: alternative.startPosition.row,
+                    startLine: alternative.startPosition.row,
+                    endLine: lastChild.endPosition.row,
+                });
+            } else {
+                // JS: else_clause wraps an if_statement or statement_block
+                const altChild = alternative.namedChildren[0];
+                if (altChild?.type === 'if_statement') {
+                    this.extractIfChainBranches(altChild, varName, flagKey, branches);
+                } else if (altChild) {
+                    const elseVariant = variant === 'true' ? 'false' : variant === 'false' ? 'true' : 'else';
+                    branches.push({
+                        flagKey,
+                        variantKey: elseVariant,
+                        conditionLine: alternative.startPosition.row,
+                        startLine: alternative.startPosition.row,
+                        endLine: altChild.endPosition.row,
+                    });
+                }
             }
         }
     }
@@ -1206,7 +2045,8 @@ export class TreeSitterService {
             }
             if (!foundAssignment || child === afterNode) { continue; }
 
-            if (child.type === 'switch_statement') {
+            // JS/TS: switch_statement, Go: expression_switch_statement
+            if (child.type === 'switch_statement' || child.type === 'expression_switch_statement') {
                 const value = child.childForFieldName('value');
                 if (!value) { continue; }
 
@@ -1214,19 +2054,21 @@ export class TreeSitterService {
                 const switchedVar = this.extractIdentifier(value);
                 if (switchedVar !== varName) { continue; }
 
-                const body = child.childForFieldName('body');
-                if (!body) { continue; }
+                // JS/TS: cases are inside a 'body' (switch_body) node
+                // Go: cases are direct children of the switch node
+                const caseContainer = child.childForFieldName('body') || child;
 
-                for (const caseNode of body.namedChildren) {
-                    if (caseNode.type === 'switch_case') {
+                for (const caseNode of caseContainer.namedChildren) {
+                    // JS/TS: switch_case, Go: expression_case
+                    if (caseNode.type === 'switch_case' || caseNode.type === 'expression_case') {
                         const caseValue = caseNode.childForFieldName('value');
-                        const variantKey = caseValue ? this.extractStringFromNode(caseValue) : null;
+                        const variantKey = caseValue ? this.extractStringFromCaseValue(caseValue) : null;
 
                         // Get the body range: from case line to before next case or end of switch
                         const nextSibling = caseNode.nextNamedSibling;
                         const endLine = nextSibling
                             ? nextSibling.startPosition.row - 1
-                            : body.endPosition.row - 1;
+                            : caseContainer.endPosition.row - 1;
 
                         branches.push({
                             flagKey,
@@ -1235,11 +2077,12 @@ export class TreeSitterService {
                             startLine: caseNode.startPosition.row,
                             endLine,
                         });
-                    } else if (caseNode.type === 'switch_default') {
+                    // JS/TS: switch_default, Go: default_case
+                    } else if (caseNode.type === 'switch_default' || caseNode.type === 'default_case') {
                         const nextSibling = caseNode.nextNamedSibling;
                         const endLine = nextSibling
                             ? nextSibling.startPosition.row - 1
-                            : body.endPosition.row - 1;
+                            : caseContainer.endPosition.row - 1;
 
                         branches.push({
                             flagKey,
@@ -1247,6 +2090,47 @@ export class TreeSitterService {
                             conditionLine: caseNode.startPosition.row,
                             startLine: caseNode.startPosition.row,
                             endLine,
+                        });
+                    }
+                }
+            }
+
+            // Ruby: case/when/else
+            if (child.type === 'case') {
+                const value = child.namedChildren[0]; // First named child is the matched expression
+                if (!value || value.type === 'when') { continue; } // case without value
+
+                const switchedVar = this.extractIdentifier(value);
+                if (switchedVar !== varName) { continue; }
+
+                for (const caseChild of child.namedChildren) {
+                    if (caseChild.type === 'when') {
+                        // when has pattern children and a body (then)
+                        const patterns = caseChild.namedChildren.filter(c => c.type === 'pattern');
+                        const body = caseChild.childForFieldName('body');
+                        const firstPattern = patterns[0];
+                        const patternStr = firstPattern?.namedChildren[0];
+                        const variantKey = patternStr ? this.extractStringFromNode(patternStr) : null;
+
+                        const endLine = body
+                            ? body.endPosition.row
+                            : caseChild.endPosition.row;
+
+                        branches.push({
+                            flagKey,
+                            variantKey: variantKey || 'default',
+                            conditionLine: caseChild.startPosition.row,
+                            startLine: caseChild.startPosition.row,
+                            endLine,
+                        });
+                    } else if (caseChild.type === 'else') {
+                        const lastChild = caseChild.namedChildren[caseChild.namedChildren.length - 1] || caseChild;
+                        branches.push({
+                            flagKey,
+                            variantKey: 'default',
+                            conditionLine: caseChild.startPosition.row,
+                            startLine: caseChild.startPosition.row,
+                            endLine: lastChild.endPosition.row,
                         });
                     }
                 }
@@ -1260,39 +2144,116 @@ export class TreeSitterService {
         family: LangFamily,
         branches: VariantBranch[],
     ): void {
-        // Walk all if_statements and check for inline flag comparisons
-        this.walkNodes(root, 'if_statement', (ifNode) => {
-            const condition = ifNode.childForFieldName('condition');
-            const consequence = ifNode.childForFieldName('consequence');
+        // Walk all if_statements (JS/Go) and if nodes (Ruby) for inline flag comparisons
+        const ifTypes = ['if_statement', 'if'];
+        for (const ifType of ifTypes) {
+            this.walkNodes(root, ifType, (ifNode) => {
+                const condition = ifNode.childForFieldName('condition');
+                const consequence = ifNode.childForFieldName('consequence');
+                if (!condition || !consequence) { return; }
+
+                // Look for: getFeatureFlag("key") === "variant"
+                const callInfo = this.extractFlagCallComparison(condition, clients, family);
+                if (!callInfo) { return; }
+
+                branches.push({
+                    flagKey: callInfo.flagKey,
+                    variantKey: callInfo.variant,
+                    conditionLine: ifNode.startPosition.row,
+                    startLine: ifNode.startPosition.row,
+                    endLine: consequence.endPosition.row,
+                });
+
+                // Process else chain
+                const alternative = ifNode.childForFieldName('alternative');
+                if (alternative) {
+                    // Python: elif_clause, Ruby: elsif
+                    if (alternative.type === 'elif_clause' || alternative.type === 'elsif') {
+                        // walkNodes will find it via recursive walking
+                    } else if (alternative.type === 'else_clause') {
+                        // Python else_clause
+                        const body = alternative.childForFieldName('body') || alternative.namedChildren[0];
+                        if (body) {
+                            branches.push({
+                                flagKey: callInfo.flagKey,
+                                variantKey: 'else',
+                                conditionLine: alternative.startPosition.row,
+                                startLine: alternative.startPosition.row,
+                                endLine: body.endPosition.row,
+                            });
+                        }
+                    } else if (alternative.type === 'if_statement') {
+                        // Go: else if — alternative is directly an if_statement (handled by walkNodes)
+                    } else if (alternative.type === 'block') {
+                        // Go: else { ... } — alternative is directly a block
+                        branches.push({
+                            flagKey: callInfo.flagKey,
+                            variantKey: 'else',
+                            conditionLine: alternative.startPosition.row,
+                            startLine: alternative.startPosition.row,
+                            endLine: alternative.endPosition.row,
+                        });
+                    } else if (alternative.type === 'else') {
+                        // Ruby: else — children are direct statements
+                        const lastChild = alternative.namedChildren[alternative.namedChildren.length - 1] || alternative;
+                        branches.push({
+                            flagKey: callInfo.flagKey,
+                            variantKey: 'else',
+                            conditionLine: alternative.startPosition.row,
+                            startLine: alternative.startPosition.row,
+                            endLine: lastChild.endPosition.row,
+                        });
+                    } else {
+                        // JS: else_clause wrapping if_statement or statement_block
+                        const altChild = alternative.namedChildren[0];
+                        if (altChild?.type === 'if_statement') {
+                            // Recurse — the recursive call to findInlineFlagIfs will handle it
+                        } else if (altChild) {
+                            branches.push({
+                                flagKey: callInfo.flagKey,
+                                variantKey: 'else',
+                                conditionLine: alternative.startPosition.row,
+                                startLine: alternative.startPosition.row,
+                                endLine: altChild.endPosition.row,
+                            });
+                        }
+                    }
+                }
+            });
+        }
+
+        // Python: also walk elif_clause nodes for inline flag comparisons
+        this.walkNodes(root, 'elif_clause', (elifNode) => {
+            const condition = elifNode.childForFieldName('condition');
+            const consequence = elifNode.childForFieldName('consequence');
             if (!condition || !consequence) { return; }
 
-            // Look for: getFeatureFlag("key") === "variant"
             const callInfo = this.extractFlagCallComparison(condition, clients, family);
             if (!callInfo) { return; }
 
             branches.push({
                 flagKey: callInfo.flagKey,
                 variantKey: callInfo.variant,
-                conditionLine: ifNode.startPosition.row,
-                startLine: ifNode.startPosition.row,
+                conditionLine: elifNode.startPosition.row,
+                startLine: elifNode.startPosition.row,
                 endLine: consequence.endPosition.row,
             });
 
-            // Process else chain
-            const alternative = ifNode.childForFieldName('alternative');
+            const alternative = elifNode.childForFieldName('alternative');
             if (alternative) {
-                const altChild = alternative.namedChildren[0];
-                if (altChild?.type === 'if_statement') {
-                    // Recurse — the recursive call to findInlineFlagIfs will handle it
-                } else if (altChild) {
-                    branches.push({
-                        flagKey: callInfo.flagKey,
-                        variantKey: 'else',
-                        conditionLine: alternative.startPosition.row,
-                        startLine: alternative.startPosition.row,
-                        endLine: altChild.endPosition.row,
-                    });
+                if (alternative.type === 'else_clause') {
+                    const body = alternative.childForFieldName('body') || alternative.namedChildren[0];
+                    if (body) {
+                        branches.push({
+                            flagKey: callInfo.flagKey,
+                            variantKey: 'else',
+                            conditionLine: alternative.startPosition.row,
+                            startLine: alternative.startPosition.row,
+                            endLine: body.endPosition.row,
+                        });
+                    }
                 }
+                // elif_clause chaining: will be handled by walking all elif_clause nodes
             }
         });
     }
@@ -1303,39 +2264,126 @@ export class TreeSitterService {
         family: LangFamily,
         branches: VariantBranch[],
     ): void {
-        this.walkNodes(root, 'if_statement', (ifNode) => {
-            const condition = ifNode.childForFieldName('condition');
-            const consequence = ifNode.childForFieldName('consequence');
+        const enabledIfTypes = ['if_statement', 'if'];
+        for (const ifType of enabledIfTypes) {
+            this.walkNodes(root, ifType, (ifNode) => {
+                const condition = ifNode.childForFieldName('condition');
+                const consequence = ifNode.childForFieldName('consequence');
+                if (!condition || !consequence) { return; }
+
+                const flagKey = this.extractEnabledCall(condition, clients, family);
+                if (!flagKey) { return; }
+
+                // Check for negation
+                const negated = this.isNegated(condition);
+
+                branches.push({
+                    flagKey,
+                    variantKey: negated ? 'false' : 'true',
+                    conditionLine: ifNode.startPosition.row,
+                    startLine: ifNode.startPosition.row,
+                    endLine: consequence.endPosition.row,
+                });
+
+                const alternative = ifNode.childForFieldName('alternative');
+                if (alternative) {
+                    // Python: elif_clause, Ruby: elsif
+                    if (alternative.type === 'elif_clause' || alternative.type === 'elsif') {
+                        // Handled by walk below
+                    } else if (alternative.type === 'else_clause') {
+                        // Python else_clause
+                        const body = alternative.childForFieldName('body') || alternative.namedChildren[0];
+                        if (body) {
+                            branches.push({
+                                flagKey,
+                                variantKey: negated ? 'true' : 'false',
+                                conditionLine: alternative.startPosition.row,
+                                startLine: alternative.startPosition.row,
+                                endLine: body.endPosition.row,
+                            });
+                        }
+                    } else if (alternative.type === 'block') {
+                        // Go: else { ... } — alternative is directly a block
+                        branches.push({
+                            flagKey,
+                            variantKey: negated ? 'true' : 'false',
+                            conditionLine: alternative.startPosition.row,
+                            startLine: alternative.startPosition.row,
+                            endLine: alternative.endPosition.row,
+                        });
+                    } else if (alternative.type === 'else') {
+                        // Ruby: else — children are direct statements
+                        const lastChild = alternative.namedChildren[alternative.namedChildren.length - 1] || alternative;
+                        branches.push({
+                            flagKey,
+                            variantKey: negated ? 'true' : 'false',
+                            conditionLine: alternative.startPosition.row,
+                            startLine: alternative.startPosition.row,
+                            endLine: lastChild.endPosition.row,
+                        });
+                    } else {
+                        // JS: else_clause
+                        const altChild = alternative.namedChildren[0];
+                        if (altChild && altChild.type !== 'if_statement') {
+                            branches.push({
+                                flagKey,
+                                variantKey: negated ? 'true' : 'false',
+                                conditionLine: alternative.startPosition.row,
+                                startLine: alternative.startPosition.row,
+                                endLine: altChild.endPosition.row,
+                            });
+                        }
+                    }
+                }
+            });
+        }
+
+        // Python/Ruby: also walk elif_clause/elsif nodes for enabled checks
+        const elifTypes = ['elif_clause', 'elsif'];
+        for (const elifType of elifTypes) { this.walkNodes(root, elifType, (elifNode) => {
+            const condition = elifNode.childForFieldName('condition');
+            const consequence = elifNode.childForFieldName('consequence');
             if (!condition || !consequence) { return; }
 
             const flagKey = this.extractEnabledCall(condition, clients, family);
             if (!flagKey) { return; }
 
-            // Check for negation
             const negated = this.isNegated(condition);
 
             branches.push({
                 flagKey,
                 variantKey: negated ? 'false' : 'true',
-                conditionLine: ifNode.startPosition.row,
-                startLine: ifNode.startPosition.row,
+                conditionLine: elifNode.startPosition.row,
+                startLine: elifNode.startPosition.row,
                 endLine: consequence.endPosition.row,
             });
 
-            const alternative = ifNode.childForFieldName('alternative');
+            const alternative = elifNode.childForFieldName('alternative');
             if (alternative) {
-                const altChild = alternative.namedChildren[0];
-                if (altChild && altChild.type !== 'if_statement') {
+                if (alternative.type === 'else_clause') {
+                    const body = alternative.childForFieldName('body') || alternative.namedChildren[0];
+                    if (body) {
+                        branches.push({
+                            flagKey,
+                            variantKey: negated ? 'true' : 'false',
+                            conditionLine: alternative.startPosition.row,
+                            startLine: alternative.startPosition.row,
+                            endLine: body.endPosition.row,
+                        });
+                    }
+                } else if (alternative.type === 'else') {
+                    // Ruby: else
+                    const lastChild = alternative.namedChildren[alternative.namedChildren.length - 1] || alternative;
                     branches.push({
                         flagKey,
                         variantKey: negated ? 'true' : 'false',
                         conditionLine: alternative.startPosition.row,
                         startLine: alternative.startPosition.row,
-                        endLine: altChild.endPosition.row,
+                        endLine: lastChild.endPosition.row,
                     });
                 }
             }
-        });
+        }); }
     }
 
     // ── Node extraction helpers ──
@@ -1347,7 +2395,8 @@ export class TreeSitterService {
             node = node.namedChildren[0];
         }
 
-        if (node.type === 'binary_expression') {
+        // JS/Go: binary_expression, Ruby: binary
+        if (node.type === 'binary_expression' || node.type === 'binary') {
             const left = node.childForFieldName('left');
             const right = node.childForFieldName('right');
             const op = node.childForFieldName('operator');
@@ -1365,6 +2414,27 @@ export class TreeSitterService {
             }
         }
 
+        // Python: comparison_operator (e.g. `flag == "variant"`)
+        if (node.type === 'comparison_operator') {
+            const children = node.namedChildren;
+            // comparison_operator has: left_operand, operator(s), right_operand(s)
+            // For simple `a == b`, children are [a, b] with operator tokens between
+            if (children.length >= 2) {
+                const left = children[0];
+                const right = children[children.length - 1];
+                // Check the operator text between operands
+                const fullText = node.text;
+                if (fullText.includes('==') || fullText.includes('!=')) {
+                    if (left.text === varName) {
+                        return this.extractStringFromNode(right);
+                    }
+                    if (right.text === varName) {
+                        return this.extractStringFromNode(left);
+                    }
+                }
+            }
+        }
+
         return null;
     }
 
@@ -1378,24 +2448,42 @@ export class TreeSitterService {
             node = node.namedChildren[0];
         }
 
-        if (node.type !== 'binary_expression') { return null; }
+        let left: Parser.SyntaxNode | null = null;
+        let right: Parser.SyntaxNode | null = null;
 
-        const left = node.childForFieldName('left');
-        const right = node.childForFieldName('right');
+        // JS/Go: binary_expression, Ruby: binary, Python: comparison_operator
+        if (node.type === 'binary_expression' || node.type === 'binary') {
+            left = node.childForFieldName('left');
+            right = node.childForFieldName('right');
+        } else if (node.type === 'comparison_operator') {
+            // Python: comparison_operator children are [left_operand, right_operand]
+            const children = node.namedChildren;
+            if (children.length >= 2) {
+                left = children[0];
+                right = children[children.length - 1];
+            }
+        }
+
         if (!left || !right) { return null; }
 
         // Check if left is a posthog.getFeatureFlag("key") call
-        const callNode = left.type === 'call_expression' ? left : (right.type === 'call_expression' ? right : null);
+        const callTypes = new Set(['call_expression', 'call']);
+        const callNode = callTypes.has(left.type) ? left : (callTypes.has(right.type) ? right : null);
         const valueNode = callNode === left ? right : left;
         if (!callNode || !valueNode) { return null; }
 
-        const func = callNode.childForFieldName('function');
-        if (!func || (func.type !== 'member_expression' && func.type !== 'attribute' && func.type !== 'selector_expression')) {
-            return null;
-        }
+        let obj: Parser.SyntaxNode | null = null;
+        let prop: Parser.SyntaxNode | null = null;
 
-        const obj = func.childForFieldName('object') || func.childForFieldName('operand');
-        const prop = func.childForFieldName('property') || func.childForFieldName('attribute') || func.childForFieldName('field');
+        const func = callNode.childForFieldName('function');
+        if (func && (func.type === 'member_expression' || func.type === 'attribute' || func.type === 'selector_expression')) {
+            obj = func.childForFieldName('object') || func.childForFieldName('operand');
+            prop = func.childForFieldName('property') || func.childForFieldName('attribute') || func.childForFieldName('field');
+        } else {
+            // Ruby: call has receiver + method as separate fields
+            obj = callNode.childForFieldName('receiver');
+            prop = callNode.childForFieldName('method');
+        }
         if (!obj || !prop) { return null; }
         const extractedClient = this.extractClientName(obj);
         if (!extractedClient || !clients.has(extractedClient)) { return null; }
@@ -1429,8 +2517,9 @@ export class TreeSitterService {
         while (node.type === 'parenthesized_expression' && node.namedChildren.length === 1) {
             node = node.namedChildren[0];
         }
-        if (node.type === 'unary_expression' || node.type === 'not_operator') {
-            const operand = node.namedChildren[node.namedChildren.length - 1];
+        // JS: unary_expression, Python: not_operator, Ruby: unary
+        if (node.type === 'unary_expression' || node.type === 'not_operator' || node.type === 'unary') {
+            const operand = node.childForFieldName('operand') || node.namedChildren[node.namedChildren.length - 1];
             if (operand) { node = operand; }
         }
         while (node.type === 'parenthesized_expression' && node.namedChildren.length === 1) {
@@ -1439,17 +2528,25 @@ export class TreeSitterService {
 
         if (node.type !== 'call_expression' && node.type !== 'call') { return null; }
 
-        const func = node.childForFieldName('function');
-        if (!func) { return null; }
-
         let clientName: string | undefined;
         let methodName: string | undefined;
 
-        if (func.type === 'member_expression' || func.type === 'attribute' || func.type === 'selector_expression') {
-            const obj = func.childForFieldName('object') || func.childForFieldName('operand');
-            const prop = func.childForFieldName('property') || func.childForFieldName('attribute') || func.childForFieldName('field');
-            clientName = obj ? (this.extractClientName(obj) ?? undefined) : undefined;
-            methodName = prop?.text;
+        const func = node.childForFieldName('function');
+        if (func) {
+            if (func.type === 'member_expression' || func.type === 'attribute' || func.type === 'selector_expression') {
+                const obj = func.childForFieldName('object') || func.childForFieldName('operand');
+                const prop = func.childForFieldName('property') || func.childForFieldName('attribute') || func.childForFieldName('field');
+                clientName = obj ? (this.extractClientName(obj) ?? undefined) : undefined;
+                methodName = prop?.text;
+            }
+        } else {
+            // Ruby: call has receiver + method as separate fields
+            const receiver = node.childForFieldName('receiver');
+            const method = node.childForFieldName('method');
+            if (receiver && method) {
+                clientName = this.extractClientName(receiver) ?? undefined;
+                methodName = method.text;
+            }
         }
 
         if (!clientName || !methodName || !clients.has(clientName)) { return null; }
@@ -1471,8 +2568,10 @@ export class TreeSitterService {
         while (node.type === 'parenthesized_expression' && node.namedChildren.length === 1) {
             node = node.namedChildren[0];
         }
-        return node.type === 'unary_expression' && node.text.startsWith('!')
-            || node.type === 'not_operator';
+        // JS: unary_expression, Python: not_operator, Ruby: unary
+        return (node.type === 'unary_expression' && node.text.startsWith('!'))
+            || node.type === 'not_operator'
+            || (node.type === 'unary' && node.text.startsWith('!'));
     }
 
     /** Check if a condition is a simple truthiness check on a variable: `if (varName)` or `if (!varName)` */
@@ -1483,8 +2582,8 @@ export class TreeSitterService {
         }
         // if (varName)
         if (node.type === 'identifier' && node.text === varName) { return true; }
-        // if (!varName)
-        if ((node.type === 'unary_expression' || node.type === 'not_operator') && node.namedChildren.length > 0) {
+        // if (!varName) — JS: unary_expression, Python: not_operator, Ruby: unary
+        if ((node.type === 'unary_expression' || node.type === 'not_operator' || node.type === 'unary') && node.namedChildren.length > 0) {
             let inner = node.namedChildren[node.namedChildren.length - 1];
             while (inner.type === 'parenthesized_expression' && inner.namedChildren.length === 1) {
                 inner = inner.namedChildren[0];
@@ -1497,7 +2596,9 @@ export class TreeSitterService {
     /** Build a map of const/let/var identifier → string value from the file */
     private buildConstantMap(lang: Parser.Language, tree: Parser.Tree): Map<string, string> {
         const constants = new Map<string, string>();
-        const query = this.getQuery(lang, `
+
+        // JS: const/let/var declarations
+        const jsQuery = this.getQuery(lang, `
             (lexical_declaration
                 (variable_declarator
                     name: (identifier) @name
@@ -1508,15 +2609,90 @@ export class TreeSitterService {
                     name: (identifier) @name
                     value: (string (string_fragment) @value)))
         `);
-        if (!query) { return constants; }
-        const matches = query.matches(tree.rootNode);
-        for (const match of matches) {
-            const nameNode = match.captures.find(c => c.name === 'name');
-            const valueNode = match.captures.find(c => c.name === 'value');
-            if (nameNode && valueNode) {
-                constants.set(nameNode.node.text, valueNode.node.text);
+        if (jsQuery) {
+            const matches = jsQuery.matches(tree.rootNode);
+            for (const match of matches) {
+                const nameNode = match.captures.find(c => c.name === 'name');
+                const valueNode = match.captures.find(c => c.name === 'value');
+                if (nameNode && valueNode) {
+                    constants.set(nameNode.node.text, valueNode.node.text);
+                }
             }
         }
+
+        // Python: simple assignment — NAME = "value"
+        const pyQuery = this.getQuery(lang, `
+            (expression_statement
+                (assignment
+                    left: (identifier) @name
+                    right: (string (string_content) @value)))
+        `);
+        if (pyQuery) {
+            const matches = pyQuery.matches(tree.rootNode);
+            for (const match of matches) {
+                const nameNode = match.captures.find(c => c.name === 'name');
+                const valueNode = match.captures.find(c => c.name === 'value');
+                if (nameNode && valueNode) {
+                    constants.set(nameNode.node.text, valueNode.node.text);
+                }
+            }
+        }
+
+        // Go: short var declarations and const declarations
+        const goVarQuery = this.getQuery(lang, `
+            (short_var_declaration
+                left: (expression_list (identifier) @name)
+                right: (expression_list (interpreted_string_literal) @value))
+        `);
+        if (goVarQuery) {
+            const matches = goVarQuery.matches(tree.rootNode);
+            for (const match of matches) {
+                const nameNode = match.captures.find(c => c.name === 'name');
+                const valueNode = match.captures.find(c => c.name === 'value');
+                if (nameNode && valueNode) {
+                    constants.set(nameNode.node.text, this.cleanStringValue(valueNode.node.text));
+                }
+            }
+        }
+
+        const goConstQuery = this.getQuery(lang, `
+            (const_declaration
+                (const_spec
+                    name: (identifier) @name
+                    value: (expression_list (interpreted_string_literal) @value)))
+        `);
+        if (goConstQuery) {
+            const matches = goConstQuery.matches(tree.rootNode);
+            for (const match of matches) {
+                const nameNode = match.captures.find(c => c.name === 'name');
+                const valueNode = match.captures.find(c => c.name === 'value');
+                if (nameNode && valueNode) {
+                    constants.set(nameNode.node.text, this.cleanStringValue(valueNode.node.text));
+                }
+            }
+        }
+
+        // Ruby: assignment — local var: name = "value", constant: NAME = "value"
+        const rbQuery = this.getQuery(lang, `
+            (assignment
+                left: (identifier) @name
+                right: (string (string_content) @value))
+
+            (assignment
+                left: (constant) @name
+                right: (string (string_content) @value))
+        `);
+        if (rbQuery) {
+            const matches = rbQuery.matches(tree.rootNode);
+            for (const match of matches) {
+                const nameNode = match.captures.find(c => c.name === 'name');
+                const valueNode = match.captures.find(c => c.name === 'value');
+                if (nameNode && valueNode) {
+                    constants.set(nameNode.node.text, valueNode.node.text);
+                }
+            }
+        }
+
         return constants;
     }
 
@@ -1527,6 +2703,15 @@ export class TreeSitterService {
             return this.extractIdentifier(node.namedChildren[0]);
         }
         return null;
+    }
+
+    // Extract string from a switch case value node (handles Go's expression_list wrapper)
+    private extractStringFromCaseValue(node: Parser.SyntaxNode): string | null {
+        // Go: case value is an expression_list containing the actual string literal
+        if (node.type === 'expression_list' && node.namedChildCount > 0) {
+            return this.extractStringFromNode(node.namedChildren[0]);
+        }
+        return this.extractStringFromNode(node);
     }
 
     private extractStringFromNode(node: Parser.SyntaxNode): string | null {

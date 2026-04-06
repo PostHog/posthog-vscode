@@ -200,8 +200,11 @@ Code intelligence (autocomplete, decorations, diagnostics, code actions) works i
 | JavaScript   | `.js`, `.jsx`  | posthog-js, posthog-node |
 | TypeScript   | `.ts`, `.tsx`  | posthog-js, posthog-node |
 | React Native | `.jsx`, `.tsx` | posthog-react-native     |
+| Python       | `.py`          | posthog-python           |
+| Go           | `.go`          | posthog-go               |
+| Ruby         | `.rb`          | posthog-ruby             |
 
-Powered by [tree-sitter](https://tree-sitter.github.io/tree-sitter/) for accurate AST-based detection. Both client-side (`posthog.capture('event')`) and server-side (`client.capture({ event: 'event' })`) patterns are recognized.
+Powered by [tree-sitter](https://tree-sitter.github.io/tree-sitter/) for accurate AST-based detection. Each language's SDK calling conventions are fully supported — client-side (`posthog.capture('event')`), server-side (`client.capture({ event: 'event' })`), Python positional args (`posthog.capture(distinct_id, event)`), Go struct args (`client.Enqueue(posthog.Capture{Event: "event"})`), and Ruby keyword args (`client.capture(event: 'event')`).
 
 ---
 

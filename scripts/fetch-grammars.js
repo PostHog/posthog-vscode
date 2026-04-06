@@ -107,14 +107,14 @@ function main() {
     if (buildGrammar('tree-sitter-typescript', 'tree-sitter-typescript.wasm', 'typescript')) built++;
     if (buildGrammar('tree-sitter-typescript', 'tree-sitter-tsx.wasm', 'tsx')) built++;
 
-    // Python
-    if (buildGrammar('tree-sitter-python', 'tree-sitter-python.wasm')) built++;
+    // Python — pinned to 0.23.5 for ABI v14 compatibility with web-tree-sitter@0.24.x
+    if (buildGrammar('tree-sitter-python@0.23.5', 'tree-sitter-python.wasm')) built++;
 
-    // Go
-    if (buildGrammar('tree-sitter-go', 'tree-sitter-go.wasm')) built++;
+    // Go — pinned to 0.23.4 for ABI v14 compatibility with web-tree-sitter@0.24.x
+    if (buildGrammar('tree-sitter-go@0.23.4', 'tree-sitter-go.wasm')) built++;
 
-    // Ruby
-    if (buildGrammar('tree-sitter-ruby', 'tree-sitter-ruby.wasm')) built++;
+    // Ruby — pinned to 0.23.1 for ABI v14 compatibility with web-tree-sitter@0.24.x
+    if (buildGrammar('tree-sitter-ruby@0.23.1', 'tree-sitter-ruby.wasm')) built++;
 
     // Cleanup temp dir
     const tempDir = path.join(__dirname, '..', '.grammar-build');

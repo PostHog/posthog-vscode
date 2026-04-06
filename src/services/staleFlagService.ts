@@ -25,6 +25,9 @@ export interface StaleFlag {
 const FLAG_METHODS = new Set([
     'getFeatureFlag', 'isFeatureEnabled', 'getFeatureFlagPayload',
     'getFeatureFlagResult', 'isFeatureFlagEnabled', 'getRemoteConfig',
+    'feature_enabled', 'is_feature_enabled', 'get_feature_flag',
+    'get_feature_flag_payload', 'get_remote_config', 'get_remote_config_payload',
+    'GetFeatureFlag', 'IsFeatureEnabled', 'GetFeatureFlagPayload',
 ]);
 
 export class StaleFlagService {
@@ -49,8 +52,7 @@ export class StaleFlagService {
         const excludePattern = `{${excludeParts.join(',')}}`;
 
         const files = await vscode.workspace.findFiles(
-            // Only JS/TS supported — add more extensions when WASM grammars are shipped
-            '**/*.{ts,tsx,js,jsx}',
+            '**/*.{ts,tsx,js,jsx,py,go,rb}',
             excludePattern,
         );
 
@@ -172,6 +174,9 @@ export class StaleFlagService {
 const POSTHOG_FLAG_METHODS = [
     'getFeatureFlag', 'isFeatureEnabled', 'getFeatureFlagPayload',
     'getFeatureFlagResult', 'isFeatureFlagEnabled', 'getRemoteConfig',
+    'feature_enabled', 'is_feature_enabled', 'get_feature_flag',
+    'get_feature_flag_payload', 'get_remote_config', 'get_remote_config_payload',
+    'GetFeatureFlag', 'IsFeatureEnabled', 'GetFeatureFlagPayload',
 ];
 
 /**

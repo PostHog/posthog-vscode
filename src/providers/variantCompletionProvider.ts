@@ -4,7 +4,10 @@ import { TreeSitterService } from '../services/treeSitterService';
 import { TelemetryService } from '../services/telemetryService';
 
 const FLAG_METHODS = new Set([
-    'getFeatureFlag', 'isFeatureEnabled', 'feature_enabled', 'get_feature_flag',
+    'getFeatureFlag', 'isFeatureEnabled', 'getFeatureFlagPayload',
+    'getFeatureFlagResult', 'isFeatureFlagEnabled', 'getRemoteConfig',
+    'feature_enabled', 'is_feature_enabled', 'get_feature_flag',
+    'get_feature_flag_payload', 'get_remote_config', 'get_remote_config_payload',
     'useFeatureFlag', 'useFeatureFlagVariantKey', 'useFeatureFlagPayload',
 ]);
 
@@ -69,7 +72,7 @@ export class VariantCompletionProvider implements vscode.CompletionItemProvider 
         if (!quoteMatch) { return undefined; }
 
         // Check inline: posthog.getFeatureFlag('key') === '|cursor|'
-        const inlinePattern = /(?:getFeatureFlag|isFeatureEnabled|feature_enabled|get_feature_flag|useFeatureFlag|useFeatureFlagVariantKey)\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/;
+        const inlinePattern = /(?:getFeatureFlag|isFeatureEnabled|feature_enabled|get_feature_flag|get_feature_flag_payload|get_remote_config_payload|GetFeatureFlag|IsFeatureEnabled|GetFeatureFlagPayload|useFeatureFlag|useFeatureFlagVariantKey)\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/;
         const inlineMatch = lineText.match(inlinePattern);
         if (inlineMatch) { return inlineMatch[1]; }
 
@@ -101,11 +104,13 @@ export class VariantCompletionProvider implements vscode.CompletionItemProvider 
             }
         }
 
-        // Also check switch statement: switch (posthog.getFeatureFlag('key')) { case '|' }
+        // Also check switch/case statement:
+        //   JS/Go: switch (posthog.getFeatureFlag('key')) { case '|' }
+        //   Ruby:  case posthog.get_feature_flag('key') / when '|'
         for (let i = scanEnd; i >= scanStart; i--) {
             const text = document.lineAt(i).text;
             const switchMatch = text.match(
-                /switch\s*\(.*?(?:getFeatureFlag|isFeatureEnabled|feature_enabled|get_feature_flag)\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/
+                /(?:switch|case)\s*(?:\(.*?)?(?:getFeatureFlag|isFeatureEnabled|feature_enabled|get_feature_flag|get_feature_flag_payload|GetFeatureFlag|IsFeatureEnabled|GetFeatureFlagPayload)\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/
             );
             if (switchMatch) { return switchMatch[1]; }
         }
@@ -114,11 +119,16 @@ export class VariantCompletionProvider implements vscode.CompletionItemProvider 
     }
 
     private findFlagKeyForVar(document: vscode.TextDocument, varName: string, scanStart: number, scanEnd: number): string | undefined {
+        const escaped = this.escapeRegex(varName);
+        const methodNames = 'getFeatureFlag|isFeatureEnabled|feature_enabled|get_feature_flag|get_feature_flag_payload|get_remote_config_payload|GetFeatureFlag|IsFeatureEnabled|GetFeatureFlagPayload|useFeatureFlag|useFeatureFlagVariantKey';
         for (let i = scanEnd; i >= scanStart; i--) {
             const text = document.lineAt(i).text;
+            // JS/TS: const/let/var varName = ...getFeatureFlag('key')
+            // Python/Ruby: varName = ...get_feature_flag('key')
+            // Go: varName, _ := ...GetFeatureFlag("key")
             const assignPattern = new RegExp(
-                `(?:const|let|var|val)\\s+${this.escapeRegex(varName)}\\s*(?::[^=]*)?=.*?` +
-                `(?:getFeatureFlag|isFeatureEnabled|feature_enabled|get_feature_flag|useFeatureFlag|useFeatureFlagVariantKey)\\s*\\(\\s*['"\`]([^'"\`]+)['"\`]`
+                `(?:(?:const|let|var|val)\\s+)?${escaped}\\s*(?:,[^=]*)?(?::[^=]*)?(?::=|=).*?` +
+                `(?:${methodNames})\\s*\\(\\s*['"\`]([^'"\`]+)['"\`]`
             );
             const assignMatch = text.match(assignPattern);
             if (assignMatch) { return assignMatch[1]; }

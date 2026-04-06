@@ -6,7 +6,7 @@ import { Commands } from '../constants';
 const FLAG_METHODS = new Set([
     'getFeatureFlag', 'isFeatureEnabled', 'getFeatureFlagPayload',
     'getFeatureFlagResult', 'isFeatureFlagEnabled', 'getRemoteConfig',
-    'get_feature_flag', 'is_feature_enabled', 'get_feature_flag_payload', 'get_remote_config',
+    'feature_enabled', 'get_feature_flag', 'is_feature_enabled', 'get_feature_flag_payload', 'get_remote_config', 'get_remote_config_payload',
     'GetFeatureFlag', 'IsFeatureEnabled', 'GetFeatureFlagPayload',
     'useFeatureFlag', 'useFeatureFlagPayload', 'useFeatureFlagVariantKey', 'useActiveFeatureFlags',
 ]);

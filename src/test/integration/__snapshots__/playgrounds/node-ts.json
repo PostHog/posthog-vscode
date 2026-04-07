@@ -1,0 +1,113 @@
+{
+  "calls": [
+    {
+      "method": "isFeatureEnabled",
+      "key": "new-dashboard",
+      "line": 29,
+      "dynamic": false
+    },
+    {
+      "method": "getFeatureFlag",
+      "key": "onboarding-flow",
+      "line": 30,
+      "dynamic": false
+    },
+    {
+      "method": "getFeatureFlagPayload",
+      "key": "feature-limits",
+      "line": 31,
+      "dynamic": false
+    },
+    {
+      "method": "getFeatureFlag",
+      "key": "pricing-test",
+      "line": 38,
+      "dynamic": false
+    },
+    {
+      "method": "capture",
+      "key": "",
+      "line": 55,
+      "dynamic": true
+    },
+    {
+      "method": "capture",
+      "key": "dashboard_viewed",
+      "line": 57,
+      "dynamic": false
+    },
+    {
+      "method": "capture",
+      "key": "",
+      "line": 64,
+      "dynamic": true
+    },
+    {
+      "method": "capture",
+      "key": "feature_used",
+      "line": 66,
+      "dynamic": false
+    },
+    {
+      "method": "capture",
+      "key": "",
+      "line": 73,
+      "dynamic": true
+    },
+    {
+      "method": "capture",
+      "key": "api_request",
+      "line": 75,
+      "dynamic": false
+    }
+  ],
+  "branches": [
+    {
+      "flagKey": "pricing-test",
+      "variantKey": "control",
+      "conditionLine": 41
+    },
+    {
+      "flagKey": "pricing-test",
+      "variantKey": "else",
+      "conditionLine": 43
+    }
+  ],
+  "inits": [
+    {
+      "token": "phc_test_token",
+      "tokenLine": 7,
+      "apiHost": "https://eu.i.posthog.com"
+    }
+  ],
+  "assignments": [
+    {
+      "varName": "showDashboard",
+      "method": "isFeatureEnabled",
+      "flagKey": "new-dashboard",
+      "line": 29,
+      "hasTypeAnnotation": false
+    },
+    {
+      "varName": "experiment",
+      "method": "getFeatureFlag",
+      "flagKey": "onboarding-flow",
+      "line": 30,
+      "hasTypeAnnotation": false
+    },
+    {
+      "varName": "config",
+      "method": "getFeatureFlagPayload",
+      "flagKey": "feature-limits",
+      "line": 31,
+      "hasTypeAnnotation": false
+    },
+    {
+      "varName": "variant",
+      "method": "getFeatureFlag",
+      "flagKey": "pricing-test",
+      "line": 38,
+      "hasTypeAnnotation": false
+    }
+  ]
+}

@@ -1,0 +1,274 @@
+{
+  "calls": [
+    {
+      "method": "get_feature_flag",
+      "key": "onboarding-wizard-prominence",
+      "line": 29,
+      "dynamic": false
+    },
+    {
+      "method": "is_feature_enabled",
+      "key": "beta-feature",
+      "line": 30,
+      "dynamic": false
+    },
+    {
+      "method": "get_feature_flag_payload",
+      "key": "config-flag",
+      "line": 31,
+      "dynamic": false
+    },
+    {
+      "method": "get_feature_flag",
+      "key": "this-flag-does-not-exist",
+      "line": 50,
+      "dynamic": false
+    },
+    {
+      "method": "is_feature_enabled",
+      "key": "another-flag",
+      "line": 87,
+      "dynamic": false
+    },
+    {
+      "method": "get_feature_flag",
+      "key": "file-engagement-v2",
+      "line": 100,
+      "dynamic": false
+    },
+    {
+      "method": "get_feature_flag",
+      "key": "file-engagement-v2",
+      "line": 102,
+      "dynamic": false
+    },
+    {
+      "method": "capture",
+      "key": "purchase_completed",
+      "line": 115,
+      "dynamic": false
+    },
+    {
+      "method": "capture",
+      "key": "page_viewed",
+      "line": 116,
+      "dynamic": false
+    },
+    {
+      "method": "capture",
+      "key": "this_event_does_not_exist",
+      "line": 117,
+      "dynamic": false
+    },
+    {
+      "method": "capture",
+      "key": "",
+      "line": 126,
+      "dynamic": true
+    },
+    {
+      "method": "get_feature_flag",
+      "key": "class-flag",
+      "line": 136,
+      "dynamic": false
+    },
+    {
+      "method": "is_feature_enabled",
+      "key": "beta-feature",
+      "line": 139,
+      "dynamic": false
+    },
+    {
+      "method": "capture",
+      "key": "aliased_event",
+      "line": 149,
+      "dynamic": false
+    },
+    {
+      "method": "get_feature_flag",
+      "key": "file-engagement-v2",
+      "line": 150,
+      "dynamic": false
+    },
+    {
+      "method": "capture",
+      "key": "constructor_event",
+      "line": 159,
+      "dynamic": false
+    },
+    {
+      "method": "get_feature_flag",
+      "key": "file-engagement-v2",
+      "line": 160,
+      "dynamic": false
+    },
+    {
+      "method": "get_feature_flag",
+      "key": "file-engagement-v2",
+      "line": 169,
+      "dynamic": false
+    },
+    {
+      "method": "is_feature_enabled",
+      "key": "stale-flag-to-test",
+      "line": 188,
+      "dynamic": false
+    },
+    {
+      "method": "get_feature_flag",
+      "key": "file-engagement-v2",
+      "line": 197,
+      "dynamic": false
+    },
+    {
+      "method": "get_feature_flag",
+      "key": "onboarding-wizard-prominence",
+      "line": 213,
+      "dynamic": false
+    },
+    {
+      "method": "get_feature_flag",
+      "key": "file-engagement-v2",
+      "line": 232,
+      "dynamic": false
+    },
+    {
+      "method": "get_feature_flag",
+      "key": "flag-a",
+      "line": 242,
+      "dynamic": false
+    },
+    {
+      "method": "get_feature_flag",
+      "key": "flag-b",
+      "line": 243,
+      "dynamic": false
+    },
+    {
+      "method": "get_feature_flag",
+      "key": "checkout_",
+      "line": 257,
+      "dynamic": false
+    }
+  ],
+  "branches": [
+    {
+      "flagKey": "onboarding-wizard-prominence",
+      "variantKey": "control",
+      "conditionLine": 60
+    },
+    {
+      "flagKey": "onboarding-wizard-prominence",
+      "variantKey": "wizard-hero",
+      "conditionLine": 62
+    },
+    {
+      "flagKey": "onboarding-wizard-prominence",
+      "variantKey": "else",
+      "conditionLine": 64
+    },
+    {
+      "flagKey": "beta-feature",
+      "variantKey": "true",
+      "conditionLine": 75
+    },
+    {
+      "flagKey": "beta-feature",
+      "variantKey": "false",
+      "conditionLine": 77
+    },
+    {
+      "flagKey": "another-flag",
+      "variantKey": "false",
+      "conditionLine": 87
+    },
+    {
+      "flagKey": "another-flag",
+      "variantKey": "true",
+      "conditionLine": 89
+    },
+    {
+      "flagKey": "file-engagement-v2",
+      "variantKey": "control",
+      "conditionLine": 100
+    },
+    {
+      "flagKey": "onboarding-wizard-prominence",
+      "variantKey": "control",
+      "conditionLine": 215
+    },
+    {
+      "flagKey": "onboarding-wizard-prominence",
+      "variantKey": "wizard-hero",
+      "conditionLine": 217
+    },
+    {
+      "flagKey": "onboarding-wizard-prominence",
+      "variantKey": "default",
+      "conditionLine": 219
+    }
+  ],
+  "inits": [
+    {
+      "token": "phc_test_token",
+      "tokenLine": 15,
+      "apiHost": "https://us.posthog.com"
+    },
+    {
+      "token": "phc_other_token",
+      "tokenLine": 20,
+      "apiHost": "https://eu.posthog.com"
+    }
+  ],
+  "assignments": [
+    {
+      "varName": "flag",
+      "method": "get_feature_flag",
+      "flagKey": "onboarding-wizard-prominence",
+      "line": 29,
+      "hasTypeAnnotation": false
+    },
+    {
+      "varName": "enabled",
+      "method": "is_feature_enabled",
+      "flagKey": "beta-feature",
+      "line": 30,
+      "hasTypeAnnotation": false
+    },
+    {
+      "varName": "payload",
+      "method": "get_feature_flag_payload",
+      "flagKey": "config-flag",
+      "line": 31,
+      "hasTypeAnnotation": false
+    },
+    {
+      "varName": "ph_flag",
+      "method": "get_feature_flag",
+      "flagKey": "file-engagement-v2",
+      "line": 150,
+      "hasTypeAnnotation": false
+    },
+    {
+      "varName": "client_flag",
+      "method": "get_feature_flag",
+      "flagKey": "file-engagement-v2",
+      "line": 160,
+      "hasTypeAnnotation": false
+    },
+    {
+      "varName": "test_flag",
+      "method": "get_feature_flag",
+      "flagKey": "file-engagement-v2",
+      "line": 197,
+      "hasTypeAnnotation": false
+    },
+    {
+      "varName": "case_flag",
+      "method": "get_feature_flag",
+      "flagKey": "onboarding-wizard-prominence",
+      "line": 213,
+      "hasTypeAnnotation": false
+    }
+  ]
+}

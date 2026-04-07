@@ -5,6 +5,9 @@ on:
     branches: [main]
   push:
     branches: [main, "feat/**"]
+  # Allow other workflows (release.yml, publish-*.yml) to call this workflow
+  # as a reusable test gate before publishing.
+  workflow_call:
 
 permissions:
   contents: read
@@ -30,5 +33,37 @@ jobs:
       - name: Compile tests
         run: pnpm compile-tests
 
-      - name: Run tests
-        run: xvfb-run -a pnpm test
+      - name: Run tests with coverage
+        run: xvfb-run -a pnpm test:coverage
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage-report
+          path: coverage/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Enforce coverage thresholds
+        if: success()
+        env:
+          MIN_LINES: "30"
+          MIN_FUNCTIONS: "30"
+        run: |
+          node -e '
+            const fs = require("fs");
+            const summary = JSON.parse(fs.readFileSync("coverage/coverage-summary.json", "utf8"));
+            const total = summary.total || {};
+            const lines = total.lines ? total.lines.pct : 0;
+            const functions = total.functions ? total.functions.pct : 0;
+            const minLines = Number(process.env.MIN_LINES);
+            const minFunctions = Number(process.env.MIN_FUNCTIONS);
+            console.log(`Coverage: lines=${lines}% functions=${functions}%`);
+            console.log(`Thresholds: lines>=${minLines}% functions>=${minFunctions}%`);
+            if (lines < minLines || functions < minFunctions) {
+              console.error("Coverage below threshold.");
+              process.exit(1);
+            }
+            console.log("Coverage thresholds met.");
+          '

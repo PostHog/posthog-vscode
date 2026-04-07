@@ -32,9 +32,15 @@ jobs:
                     echo "has-changesets=true" >> "$GITHUB_OUTPUT"
                   fi
 
+    test:
+        name: Tests (release gate)
+        needs: check-changesets
+        if: needs.check-changesets.outputs.has-changesets == 'true'
+        uses: ./.github/workflows/test.yml
+
     version-and-release:
         name: Version bump and release
-        needs: check-changesets
+        needs: [check-changesets, test]
         if: needs.check-changesets.outputs.has-changesets == 'true'
         runs-on: ubuntu-latest
         permissions:
@@ -159,6 +165,8 @@ jobs:
         uses: ./.github/workflows/publish-vscode.yml
         with:
             version: ${{ needs.version-and-release.outputs.new-version }}
+            # Tests already ran in the `test` job above; skip duplicate run.
+            skip_tests: true
         secrets:
             VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
@@ -169,5 +177,7 @@ jobs:
         uses: ./.github/workflows/publish-ovsx.yml
         with:
             version: ${{ needs.version-and-release.outputs.new-version }}
+            # Tests already ran in the `test` job above; skip duplicate run.
+            skip_tests: true
         secrets:
             OPEN_VSX_TOKEN: ${{ secrets.OPEN_VSX_TOKEN }}

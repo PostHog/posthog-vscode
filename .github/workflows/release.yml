@@ -146,7 +146,7 @@ jobs:
                   cache: pnpm
 
             - name: Setup Emscripten
-              uses: mymindstorm/setup-emsdk@v14
+              uses: mymindstorm/setup-emsdk@6ab9eb1bda2574c4ddb79809fc9247783eaf9021 # v14
 
             - name: Install dependencies
               run: pnpm install --frozen-lockfile

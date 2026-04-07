@@ -69,8 +69,13 @@
     },
     {
       "flagKey": "pricing-test",
-      "variantKey": "else",
+      "variantKey": "discount",
       "conditionLine": 43
+    },
+    {
+      "flagKey": "pricing-test",
+      "variantKey": "premium",
+      "conditionLine": 45
     }
   ],
   "inits": [

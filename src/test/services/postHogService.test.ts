@@ -101,6 +101,26 @@ function assertEscaped(query: string, doubledFragment: string): void {
     );
 }
 
+/**
+ * Extract every hostname appearing in any URL inside `text`. Used by network-error
+ * tests to verify a host is mentioned in an error message WITHOUT relying on
+ * `text.includes('https://...')`, which CodeQL flags as incomplete URL substring
+ * sanitization (a substring like `us.posthog.example.com` could appear inside a
+ * larger malicious host).
+ */
+function extractHostnames(text: string): string[] {
+    const urls = text.match(/https?:\/\/[^\s/'"`)>]+/g) ?? [];
+    const hostnames: string[] = [];
+    for (const url of urls) {
+        try {
+            hostnames.push(new URL(url).hostname);
+        } catch {
+            // ignore malformed URLs
+        }
+    }
+    return hostnames;
+}
+
 // ===========================================================================
 // Test suite
 // ===========================================================================
@@ -310,9 +330,13 @@ suite('PostHogService', () => {
                 (err: unknown) => {
                     assert.ok(err instanceof PostHogApiError, `expected PostHogApiError, got: ${err}`);
                     assert.strictEqual(err.statusCode, 0, 'statusCode should be 0 for network errors');
+                    // Extract hostname from the error message and compare structurally,
+                    // not via substring match (CodeQL: incomplete URL substring sanitization).
+                    const expectedHostname = new URL(TEST_HOST).hostname;
+                    const messageHosts = extractHostnames(err.message);
                     assert.ok(
-                        err.message.includes(TEST_HOST),
-                        `error message should include host. Got: ${err.message}`,
+                        messageHosts.includes(expectedHostname),
+                        `error message should include host '${expectedHostname}'. Got: ${err.message}`,
                     );
                     assert.ok(
                         err.message.includes('Unable to reach PostHog'),
@@ -329,19 +353,28 @@ suite('PostHogService', () => {
 
         test('network error includes host with trailing slashes stripped', async () => {
             fetchMock.queue(new Error('boom'));
-            const service = new PostHogService(makeAuthStub({ host: 'https://eu.posthog.example.com///' }));
+            const hostWithSlashes = 'https://eu.posthog.example.com///';
+            const expectedHostname = new URL(hostWithSlashes).hostname;
+            const service = new PostHogService(makeAuthStub({ host: hostWithSlashes }));
 
             await assert.rejects(
                 () => service.getProjects(),
                 (err: unknown) => {
                     assert.ok(err instanceof PostHogApiError);
                     assert.strictEqual(err.statusCode, 0);
+                    // Compare hostnames structurally rather than substring match.
+                    const messageHosts = extractHostnames(err.message);
                     assert.ok(
-                        err.message.includes('https://eu.posthog.example.com'),
-                        `expected normalized host. Got: ${err.message}`,
+                        messageHosts.includes(expectedHostname),
+                        `expected normalized hostname '${expectedHostname}'. Got: ${err.message}`,
+                    );
+                    // Verify trailing slashes were stripped — the message should NOT contain
+                    // '//' immediately after the hostname.
+                    const trailingSlashPattern = new RegExp(
+                        `${expectedHostname.replace(/\./g, '\\.')}/{2,}`,
                     );
                     assert.ok(
-                        !err.message.includes('example.com//'),
+                        !trailingSlashPattern.test(err.message),
                         `trailing slashes should be stripped. Got: ${err.message}`,
                     );
                     return true;

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0
+
+### Minor Changes
+
+- 65da142: Added robust testing
+
 ## 0.6.0
 
 ### Minor Changes

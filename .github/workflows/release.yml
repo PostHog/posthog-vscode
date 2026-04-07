@@ -63,7 +63,7 @@ jobs:
                   token: ${{ steps.releaser.outputs.token }}
 
             - name: Setup pnpm
-              uses: pnpm/action-setup@v4
+              uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
 
             - name: Setup Node.js
               uses: actions/setup-node@v4
@@ -100,9 +100,11 @@ jobs:
 
             - name: Commit version bump
               if: steps.version.outputs.was-released == 'true'
+              env:
+                  VERSION: ${{ steps.version.outputs.new-version }}
               run: |
                   git add -A
-                  git commit -m "chore: release v${{ steps.version.outputs.new-version }}"
+                  git commit -m "chore: release v$VERSION"
                   git push
 
             - name: Create Git tag
@@ -135,7 +137,7 @@ jobs:
                   ref: v${{ needs.version-and-release.outputs.new-version }}
 
             - name: Setup pnpm
-              uses: pnpm/action-setup@v4
+              uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
 
             - name: Setup Node.js
               uses: actions/setup-node@v4

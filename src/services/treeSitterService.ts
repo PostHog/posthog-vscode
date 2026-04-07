@@ -1973,17 +1973,23 @@ export class TreeSitterService {
             if (alternative.type === 'elif_clause' || alternative.type === 'elsif') {
                 this.extractIfChainBranches(alternative, varName, flagKey, branches);
             } else if (alternative.type === 'else_clause') {
-                // Python else_clause: body is in 'body' field
-                const body = alternative.childForFieldName('body') || alternative.namedChildren[0];
-                if (body) {
-                    const elseVariant = variant === 'true' ? 'false' : variant === 'false' ? 'true' : 'else';
-                    branches.push({
-                        flagKey,
-                        variantKey: elseVariant,
-                        conditionLine: alternative.startPosition.row,
-                        startLine: alternative.startPosition.row,
-                        endLine: body.endPosition.row,
-                    });
+                // JS else_clause may wrap an if_statement (else if). Recurse if so.
+                // Otherwise treat as terminal else (Python: body field; JS: statement_block).
+                const innerIf = alternative.namedChildren.find(c => c.type === 'if_statement');
+                if (innerIf) {
+                    this.extractIfChainBranches(innerIf, varName, flagKey, branches);
+                } else {
+                    const body = alternative.childForFieldName('body') || alternative.namedChildren[0];
+                    if (body) {
+                        const elseVariant = variant === 'true' ? 'false' : variant === 'false' ? 'true' : 'else';
+                        branches.push({
+                            flagKey,
+                            variantKey: elseVariant,
+                            conditionLine: alternative.startPosition.row,
+                            startLine: alternative.startPosition.row,
+                            endLine: body.endPosition.row,
+                        });
+                    }
                 }
             } else if (alternative.type === 'if_statement') {
                 // Go: else if — alternative is directly an if_statement
@@ -2009,21 +2015,6 @@ export class TreeSitterService {
                     startLine: alternative.startPosition.row,
                     endLine: lastChild.endPosition.row,
                 });
-            } else {
-                // JS: else_clause wraps an if_statement or statement_block
-                const altChild = alternative.namedChildren[0];
-                if (altChild?.type === 'if_statement') {
-                    this.extractIfChainBranches(altChild, varName, flagKey, branches);
-                } else if (altChild) {
-                    const elseVariant = variant === 'true' ? 'false' : variant === 'false' ? 'true' : 'else';
-                    branches.push({
-                        flagKey,
-                        variantKey: elseVariant,
-                        conditionLine: alternative.startPosition.row,
-                        startLine: alternative.startPosition.row,
-                        endLine: altChild.endPosition.row,
-                    });
-                }
             }
         }
     }
@@ -2171,16 +2162,20 @@ export class TreeSitterService {
                     if (alternative.type === 'elif_clause' || alternative.type === 'elsif') {
                         // walkNodes will find it via recursive walking
                     } else if (alternative.type === 'else_clause') {
-                        // Python else_clause
-                        const body = alternative.childForFieldName('body') || alternative.namedChildren[0];
-                        if (body) {
-                            branches.push({
-                                flagKey: callInfo.flagKey,
-                                variantKey: 'else',
-                                conditionLine: alternative.startPosition.row,
-                                startLine: alternative.startPosition.row,
-                                endLine: body.endPosition.row,
-                            });
+                        // JS else_clause may wrap another if_statement (else if).
+                        // Skip the else label in that case — walkNodes will visit the inner if.
+                        const innerIf = alternative.namedChildren.find(c => c.type === 'if_statement');
+                        if (!innerIf) {
+                            const body = alternative.childForFieldName('body') || alternative.namedChildren[0];
+                            if (body) {
+                                branches.push({
+                                    flagKey: callInfo.flagKey,
+                                    variantKey: 'else',
+                                    conditionLine: alternative.startPosition.row,
+                                    startLine: alternative.startPosition.row,
+                                    endLine: body.endPosition.row,
+                                });
+                            }
                         }
                     } else if (alternative.type === 'if_statement') {
                         // Go: else if — alternative is directly an if_statement (handled by walkNodes)
@@ -2203,20 +2198,6 @@ export class TreeSitterService {
                             startLine: alternative.startPosition.row,
                             endLine: lastChild.endPosition.row,
                         });
-                    } else {
-                        // JS: else_clause wrapping if_statement or statement_block
-                        const altChild = alternative.namedChildren[0];
-                        if (altChild?.type === 'if_statement') {
-                            // Recurse — the recursive call to findInlineFlagIfs will handle it
-                        } else if (altChild) {
-                            branches.push({
-                                flagKey: callInfo.flagKey,
-                                variantKey: 'else',
-                                conditionLine: alternative.startPosition.row,
-                                startLine: alternative.startPosition.row,
-                                endLine: altChild.endPosition.row,
-                            });
-                        }
                     }
                 }
             });
@@ -2291,16 +2272,20 @@ export class TreeSitterService {
                     if (alternative.type === 'elif_clause' || alternative.type === 'elsif') {
                         // Handled by walk below
                     } else if (alternative.type === 'else_clause') {
-                        // Python else_clause
-                        const body = alternative.childForFieldName('body') || alternative.namedChildren[0];
-                        if (body) {
-                            branches.push({
-                                flagKey,
-                                variantKey: negated ? 'true' : 'false',
-                                conditionLine: alternative.startPosition.row,
-                                startLine: alternative.startPosition.row,
-                                endLine: body.endPosition.row,
-                            });
+                        // JS else_clause may wrap another if_statement (else if).
+                        // Skip the else label in that case — walkNodes will visit the inner if.
+                        const innerIf = alternative.namedChildren.find(c => c.type === 'if_statement');
+                        if (!innerIf) {
+                            const body = alternative.childForFieldName('body') || alternative.namedChildren[0];
+                            if (body) {
+                                branches.push({
+                                    flagKey,
+                                    variantKey: negated ? 'true' : 'false',
+                                    conditionLine: alternative.startPosition.row,
+                                    startLine: alternative.startPosition.row,
+                                    endLine: body.endPosition.row,
+                                });
+                            }
                         }
                     } else if (alternative.type === 'block') {
                         // Go: else { ... } — alternative is directly a block
@@ -2321,18 +2306,6 @@ export class TreeSitterService {
                             startLine: alternative.startPosition.row,
                             endLine: lastChild.endPosition.row,
                         });
-                    } else {
-                        // JS: else_clause
-                        const altChild = alternative.namedChildren[0];
-                        if (altChild && altChild.type !== 'if_statement') {
-                            branches.push({
-                                flagKey,
-                                variantKey: negated ? 'true' : 'false',
-                                conditionLine: alternative.startPosition.row,
-                                startLine: alternative.startPosition.row,
-                                endLine: altChild.endPosition.row,
-                            });
-                        }
                     }
                 }
             });

@@ -32,9 +32,15 @@ jobs:
                     echo "has-changesets=true" >> "$GITHUB_OUTPUT"
                   fi
 
+    test:
+        name: Tests (release gate)
+        needs: check-changesets
+        if: needs.check-changesets.outputs.has-changesets == 'true'
+        uses: ./.github/workflows/test.yml
+
     version-and-release:
         name: Version bump and release
-        needs: check-changesets
+        needs: [check-changesets, test]
         if: needs.check-changesets.outputs.has-changesets == 'true'
         runs-on: ubuntu-latest
         permissions:
@@ -57,7 +63,7 @@ jobs:
                   token: ${{ steps.releaser.outputs.token }}
 
             - name: Setup pnpm
-              uses: pnpm/action-setup@v4
+              uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
 
             - name: Setup Node.js
               uses: actions/setup-node@v4
@@ -94,9 +100,11 @@ jobs:
 
             - name: Commit version bump
               if: steps.version.outputs.was-released == 'true'
+              env:
+                  VERSION: ${{ steps.version.outputs.new-version }}
               run: |
                   git add -A
-                  git commit -m "chore: release v${{ steps.version.outputs.new-version }}"
+                  git commit -m "chore: release v$VERSION"
                   git push
 
             - name: Create Git tag
@@ -129,7 +137,7 @@ jobs:
                   ref: v${{ needs.version-and-release.outputs.new-version }}
 
             - name: Setup pnpm
-              uses: pnpm/action-setup@v4
+              uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
 
             - name: Setup Node.js
               uses: actions/setup-node@v4
@@ -138,7 +146,7 @@ jobs:
                   cache: pnpm
 
             - name: Setup Emscripten
-              uses: mymindstorm/setup-emsdk@v14
+              uses: mymindstorm/setup-emsdk@6ab9eb1bda2574c4ddb79809fc9247783eaf9021 # v14
 
             - name: Install dependencies
               run: pnpm install --frozen-lockfile
@@ -159,6 +167,8 @@ jobs:
         uses: ./.github/workflows/publish-vscode.yml
         with:
             version: ${{ needs.version-and-release.outputs.new-version }}
+            # Tests already ran in the `test` job above; skip duplicate run.
+            skip_tests: true
         secrets:
             VSCE_PAT: ${{ secrets.VSCE_PAT }}
 
@@ -169,5 +179,7 @@ jobs:
         uses: ./.github/workflows/publish-ovsx.yml
         with:
             version: ${{ needs.version-and-release.outputs.new-version }}
+            # Tests already ran in the `test` job above; skip duplicate run.
+            skip_tests: true
         secrets:
             OPEN_VSX_TOKEN: ${{ secrets.OPEN_VSX_TOKEN }}

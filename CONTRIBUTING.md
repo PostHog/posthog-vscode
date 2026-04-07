@@ -126,6 +126,19 @@ Tests run in the VS Code Extension Host via `@vscode/test-electron`.
 pnpm test
 ```
 
+### Coverage
+
+Code coverage is measured with [c8](https://github.com/bcoe/c8). To run the test suite with coverage locally:
+
+```bash
+pnpm test:coverage      # runs tests with coverage report
+open coverage/index.html # view the HTML report in your browser
+```
+
+The HTML, lcov, and text reports are written to `coverage/`. Coverage is measured for `src/services`, `src/providers`, and `src/utils`. Tests, webview UI, and command/view glue are excluded.
+
+The same script runs in CI on every PR and the `coverage/` directory is uploaded as a build artifact for inspection.
+
 ### Test Structure
 
 - `src/test/extension.test.ts` -- basic extension activation test
@@ -219,16 +232,38 @@ This prompts you to select the change type (patch/minor/major) and write a summa
 
 When PRs with changesets are merged to `main`, the release workflow automatically:
 
-1. Consumes all pending changesets
-2. Bumps the version in `package.json`
-3. Updates `CHANGELOG.md` with the changeset summaries
-4. Commits the version bump to `main`
-5. Creates a git tag (`v{version}`)
-6. Creates a GitHub Release with the changelog
-7. Builds and packages the extension
-8. Publishes to both VS Code Marketplace and Open VSX Registry
+1. Checks if any changesets are pending
+2. **Runs the full test suite** (release gate — see below)
+3. Consumes all pending changesets
+4. Bumps the version in `package.json`
+5. Updates `CHANGELOG.md` with the changeset summaries
+6. Commits the version bump to `main`
+7. Creates a git tag (`v{version}`)
+8. Creates a GitHub Release with the changelog
+9. Builds and packages the extension
+10. Publishes to both VS Code Marketplace and Open VSX Registry
 
 Do not manually bump the version in `package.json`. The CI pipeline handles it.
+
+### Release gate: tests must pass before publishing
+
+**Publishing is gated by the test suite.** No extension is ever published — to either marketplace, automatically or manually — unless the full test suite passes and coverage thresholds are met.
+
+The gate is implemented as a reusable workflow (`.github/workflows/test.yml`) that other workflows call:
+
+| Trigger                                       | Test gate                                                                          |
+| --------------------------------------------- | ---------------------------------------------------------------------------------- |
+| PR to `main` or push to `feat/**`             | `test.yml` runs directly                                                           |
+| Push to `main` with changesets (auto release) | `release.yml` runs `test.yml` first; version bump, build, and publish only run if tests pass |
+| Manual `publish-vscode.yml` workflow_dispatch | `test.yml` runs first; publish only runs if tests pass                             |
+| Manual `publish-ovsx.yml` workflow_dispatch   | `test.yml` runs first; publish only runs if tests pass                             |
+| Internal call from `release.yml` to publish-* | Tests skipped (`skip_tests: true`) — already gated by `release.yml`                |
+
+In short: there is no path to a published version of the extension that bypasses the test suite. If a test fails, every downstream job (version bump, build, package, publish) is blocked automatically.
+
+### Coverage thresholds in CI
+
+The release/publish gate also enforces minimum code coverage. The current thresholds are intentionally low (lines ≥ 30%, functions ≥ 30%) and are configured in `.github/workflows/test.yml` under `MIN_LINES`/`MIN_FUNCTIONS`. Ratchet them upward as test coverage improves.
 
 ## PR Guidelines
 

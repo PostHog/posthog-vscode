@@ -1,0 +1,188 @@
+{
+  "calls": [
+    {
+      "method": "GetFeatureFlag",
+      "key": "my-flag",
+      "line": 24,
+      "dynamic": false
+    },
+    {
+      "method": "IsFeatureEnabled",
+      "key": "beta-feature",
+      "line": 25,
+      "dynamic": false
+    },
+    {
+      "method": "GetFeatureFlagPayload",
+      "key": "config-flag",
+      "line": 26,
+      "dynamic": false
+    },
+    {
+      "method": "GetFeatureFlag",
+      "key": "struct-flag",
+      "line": 31,
+      "dynamic": false
+    },
+    {
+      "method": "IsFeatureEnabled",
+      "key": "struct-enabled",
+      "line": 36,
+      "dynamic": false
+    },
+    {
+      "method": "Enqueue",
+      "key": "",
+      "line": 42,
+      "dynamic": true
+    },
+    {
+      "method": "capture",
+      "key": "purchase_completed",
+      "line": 44,
+      "dynamic": false
+    },
+    {
+      "method": "Enqueue",
+      "key": "",
+      "line": 48,
+      "dynamic": true
+    },
+    {
+      "method": "capture",
+      "key": "signup",
+      "line": 50,
+      "dynamic": false
+    },
+    {
+      "method": "GetFeatureFlag",
+      "key": "experiment",
+      "line": 55,
+      "dynamic": false
+    },
+    {
+      "method": "IsFeatureEnabled",
+      "key": "dark-mode",
+      "line": 66,
+      "dynamic": false
+    },
+    {
+      "method": "GetFeatureFlag",
+      "key": "switch-exp",
+      "line": 75,
+      "dynamic": false
+    },
+    {
+      "method": "GetFeatureFlag",
+      "key": "constant-flag",
+      "line": 86,
+      "dynamic": false
+    },
+    {
+      "method": "Enqueue",
+      "key": "",
+      "line": 98,
+      "dynamic": true
+    },
+    {
+      "method": "capture",
+      "key": "method_event",
+      "line": 100,
+      "dynamic": false
+    },
+    {
+      "method": "GetFeatureFlag",
+      "key": "method-flag",
+      "line": 102,
+      "dynamic": false
+    }
+  ],
+  "branches": [
+    {
+      "flagKey": "experiment",
+      "variantKey": "control",
+      "conditionLine": 56
+    },
+    {
+      "flagKey": "experiment",
+      "variantKey": "test",
+      "conditionLine": 58
+    },
+    {
+      "flagKey": "experiment",
+      "variantKey": "else",
+      "conditionLine": 60
+    },
+    {
+      "flagKey": "switch-exp",
+      "variantKey": "a",
+      "conditionLine": 77
+    },
+    {
+      "flagKey": "switch-exp",
+      "variantKey": "b",
+      "conditionLine": 79
+    },
+    {
+      "flagKey": "switch-exp",
+      "variantKey": "default",
+      "conditionLine": 81
+    }
+  ],
+  "inits": [
+    {
+      "token": "phc_test_token",
+      "tokenLine": 13,
+      "apiHost": "https://us.posthog.com"
+    },
+    {
+      "token": "phc_simple",
+      "tokenLine": 19,
+      "apiHost": null
+    }
+  ],
+  "assignments": [
+    {
+      "varName": "flag",
+      "method": "GetFeatureFlag",
+      "flagKey": "my-flag",
+      "line": 24,
+      "hasTypeAnnotation": false
+    },
+    {
+      "varName": "enabled",
+      "method": "IsFeatureEnabled",
+      "flagKey": "beta-feature",
+      "line": 25,
+      "hasTypeAnnotation": false
+    },
+    {
+      "varName": "payload",
+      "method": "GetFeatureFlagPayload",
+      "flagKey": "config-flag",
+      "line": 26,
+      "hasTypeAnnotation": false
+    },
+    {
+      "varName": "variant",
+      "method": "GetFeatureFlag",
+      "flagKey": "experiment",
+      "line": 55,
+      "hasTypeAnnotation": false
+    },
+    {
+      "varName": "on",
+      "method": "IsFeatureEnabled",
+      "flagKey": "dark-mode",
+      "line": 66,
+      "hasTypeAnnotation": false
+    },
+    {
+      "varName": "sv",
+      "method": "GetFeatureFlag",
+      "flagKey": "switch-exp",
+      "line": 75,
+      "hasTypeAnnotation": false
+    }
+  ]
+}

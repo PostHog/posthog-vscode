@@ -1,0 +1,19 @@
+{
+  "calls": [
+    {
+      "method": "capture",
+      "key": "",
+      "line": 14,
+      "dynamic": true
+    }
+  ],
+  "branches": [],
+  "inits": [
+    {
+      "token": "phc_test",
+      "tokenLine": 2,
+      "apiHost": "https://us.posthog.com"
+    }
+  ],
+  "assignments": []
+}

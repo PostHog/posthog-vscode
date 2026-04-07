@@ -6,6 +6,11 @@ on:
             version:
                 required: true
                 type: string
+            skip_tests:
+                description: "Skip the test gate (only set true when called from release.yml after it already ran tests)"
+                required: false
+                type: boolean
+                default: false
         secrets:
             VSCE_PAT:
                 required: true
@@ -17,15 +22,26 @@ on:
                 type: string
 
 jobs:
+    test:
+        name: Tests (publish gate)
+        # Run tests unless explicitly skipped (workflow_call from release.yml).
+        # Manual workflow_dispatch always runs tests.
+        if: github.event_name == 'workflow_dispatch' || inputs.skip_tests != true
+        uses: ./.github/workflows/test.yml
+
     publish:
         name: Publish to VS Code Marketplace
+        needs: test
+        # Run publish if tests passed OR were skipped (release.yml gated).
+        # `always()` is required so that a `skipped` test job doesn't block this job.
+        if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped')
         runs-on: ubuntu-latest
         steps:
             - name: Checkout repository
               uses: actions/checkout@v4
 
             - name: Setup pnpm
-              uses: pnpm/action-setup@v4
+              uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
 
             - name: Setup Node.js
               uses: actions/setup-node@v4

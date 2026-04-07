@@ -370,8 +370,12 @@ suite('PostHogService', () => {
                     );
                     // Verify trailing slashes were stripped — the message should NOT contain
                     // '//' immediately after the hostname.
+                    const escapedHostname = expectedHostname.replace(
+                        /[.*+?^${}()|[\]\\]/g,
+                        '\\$&',
+                    );
                     const trailingSlashPattern = new RegExp(
-                        `${expectedHostname.replace(/\./g, '\\.')}/{2,}`,
+                        `${escapedHostname}/{2,}`,
                     );
                     assert.ok(
                         !trailingSlashPattern.test(err.message),

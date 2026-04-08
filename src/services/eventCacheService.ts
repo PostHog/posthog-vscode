@@ -31,9 +31,10 @@ export class EventCacheService {
         return this.sparklines.get(name);
     }
 
-    updateSparklines(sparklines: Map<string, number[]>): void {
-        this.sparklines = sparklines;
-        this.notify();
+    extend(events: EventDefinition[]): void {
+        const existingNames = new Set(this.events.map(e => e.name));
+        const newEvents = events.filter(e => !existingNames.has(e.name));
+        this.update([...this.events, ...newEvents]);
     }
 
     update(events: EventDefinition[]): void {
@@ -43,7 +44,12 @@ export class EventCacheService {
     }
 
     updateVolumes(volumes: Map<string, { count: number; days: number }>): void {
-        this.volumes = volumes;
+        volumes.forEach((value, key) => this.volumes.set(key, value));
+        this.notify();
+    }
+
+    updateSparklines(sparklines: Map<string, number[]>): void {
+        sparklines.forEach((value, key) => this.sparklines.set(key, value));
         this.notify();
     }
 

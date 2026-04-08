@@ -264,19 +264,24 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     async function loadEvents(projectId: number): Promise<void> {
-        const events = await postHogService.getEventDefinitions(projectId, (partial, total) => {
-            eventCache.update([...partial]);
-            updateStatusBarSyncing('events', partial.length, total);
+        const allEvents = await postHogService.getEventDefinitions(projectId, (newEvents, currentLength, totalLength) => {
+            eventCache.extend(newEvents);
+            updateStatusBarSyncing('events', currentLength, totalLength);
+
+            const partialNames = newEvents.filter(e => !e.hidden).map(e => e.name);
+            
+            Promise.all([
+                postHogService.getEventVolumes(projectId, partialNames),
+                postHogService.getEventSparklines(projectId, partialNames),
+            ]).then(([volumes, sparklines]) => {
+
+                eventCache.updateVolumes(volumes);
+                eventCache.updateSparklines(sparklines);
+            });
         });
-        eventCache.update(events);
-        updateStatusBarSyncing('event volumes', 0, null);
-        const names = events.filter(e => !e.hidden && !e.name.startsWith('$')).map(e => e.name);
-        const [volumes, sparklines] = await Promise.all([
-            postHogService.getEventVolumes(projectId, names),
-            postHogService.getEventSparklines(projectId, names),
-        ]);
-        eventCache.updateVolumes(volumes);
-        eventCache.updateSparklines(sparklines);
+
+        // Make sure we get all events in the end
+        eventCache.update(allEvents);
     }
 
     async function loadExperiments(projectId: number): Promise<void> {
@@ -562,12 +567,10 @@ export function activate(context: vscode.ExtensionContext) {
                 e.affectsConfiguration('posthog.detectNestedClients')) {
                 treeSitter.updateConfig(loadDetectionConfig());
             }
-            if (e.affectsConfiguration('posthog.showInlineDecorations')) {
-                // Re-trigger decoration providers by firing a fake editor change
-                const editor = vscode.window.activeTextEditor;
-                if (editor) {
-                    vscode.window.showTextDocument(editor.document, editor.viewColumn);
-                }
+            if (e.affectsConfiguration('posthog.showInlineDecorations') ||
+                e.affectsConfiguration('posthog.inlineHintsMode')) {
+                flagDecorationProvider.refresh();
+                eventDecorationProvider.refresh();
             }
         }),
         // Multi-project awareness: detect when a file from a different workspace folder is opened

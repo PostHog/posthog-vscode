@@ -76,6 +76,10 @@ export class EventDecorationProvider {
         editor.setDecorations(this.decoration, filteredDecorations);
     }
 
+    refresh(): void {
+        this.triggerUpdate();
+    }
+
     private triggerUpdate() {
         if (this.debounceTimer) {
             clearTimeout(this.debounceTimer);
@@ -131,6 +135,7 @@ export class EventDecorationProvider {
                 const spark = sparkline ? `${buildSparkline(sparkline)} ` : '';
                 text = `${spark}${formatCount(volume.count)} in ${volume.days}d`;
                 color = '#4CBB17';
+                console.log(eventName, spark, sparkline, text, color);
             } else if (sparkline) {
                 // Has sparkline data but volume query returned 0 (possible timing mismatch)
                 text = `${buildSparkline(sparkline)} 0 in 7d`;

@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { FlagCacheService } from '../services/flagCacheService';
 import { TreeSitterService } from '../services/treeSitterService';
 import { TelemetryService } from '../services/telemetryService';
+import { extractRollout } from '../utils/flagClassification';
 
 export class FlagCompletionProvider implements vscode.CompletionItemProvider {
     constructor(
@@ -23,11 +24,12 @@ export class FlagCompletionProvider implements vscode.CompletionItemProvider {
         const items = flags.map(flag => {
             const item = new vscode.CompletionItem(flag.key, vscode.CompletionItemKind.Value);
             item.detail = flag.active ? 'Active' : 'Inactive';
+            const rollout = extractRollout(flag);
             item.documentation = new vscode.MarkdownString(
                 `**${flag.key}**\n\n` +
                 (flag.name ? `${flag.name}\n\n` : '') +
                 `Status: ${flag.active ? 'Active' : 'Inactive'}\n\n` +
-                `Rollout: ${flag.rollout_percentage !== null ? `${flag.rollout_percentage}%` : 'N/A'}`
+                `Rollout: ${rollout !== null ? `${rollout}%` : 'N/A'}`
             );
             item.sortText = flag.active ? `0-${flag.key}` : `1-${flag.key}`;
             return item;

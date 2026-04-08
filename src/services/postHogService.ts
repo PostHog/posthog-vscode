@@ -148,7 +148,7 @@ export class PostHogService {
         });
     }
 
-    async getEventDefinitions(projectId: number, onProgress?: (loaded: EventDefinition[], total: number | null) => void): Promise<EventDefinition[]> {
+    async getEventDefinitions(projectId: number, onProgress?: (events: EventDefinition[], currentLength: number, totalLength: number) => void): Promise<EventDefinition[]> {
         const events: EventDefinition[] = [];
         let nextPath: string | null = `/api/projects/${projectId}/event_definitions/?limit=100`;
         let total: number | null = null;
@@ -157,11 +157,13 @@ export class PostHogService {
             const data: PaginatedResponse<EventDefinition> = await this.request<PaginatedResponse<EventDefinition>>(nextPath);
             events.push(...data.results);
             if (total === null) { total = data.count; }
-            onProgress?.(events, total);
+            
+            // Call the progress callback with the latest events, the total length up to this point, and the total count
+            onProgress?.(data.results, events.length, total);
 
             if (data.next) {
                 const parsed = new URL(data.next);
-                nextPath = parsed.pathname + parsed.search;
+                nextPath = `${parsed.pathname}${parsed.search}`;
             } else {
                 nextPath = null;
             }

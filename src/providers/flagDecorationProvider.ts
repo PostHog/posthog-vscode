@@ -211,7 +211,7 @@ export class FlagDecorationProvider {
 
         if (variants.length > 0) {
             parts.push(`${variants.length} variants`);
-        } else if (rollout !== null && rollout < 100) {
+        } else if (rollout !== null) {
             parts.push(`${rollout}%`);
         } else {
             parts.push('enabled');

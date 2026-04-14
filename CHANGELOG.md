@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.1
+
+### Patch Changes
+
+- 2d8e6eb: Lower VS Code engine minimum to 1.93.0 for Cursor compatibility
+- 400ef9e: Lower VS Code engine minimum to 1.93.0 for Cursor compatibility
+
 ## 0.7.0
 
 ### Minor Changes

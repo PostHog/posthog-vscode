@@ -180,7 +180,7 @@ suite('FlagDecorationProvider', function () {
         await vscode.commands.executeCommand('workbench.action.closeAllEditors');
     });
 
-    test('renders "enabled" label for fully active flag with 100% rollout', async () => {
+    test('renders "100%" label for fully active flag with 100% rollout', async () => {
         const cache = fakeFlagCache([makeFlag({ key: 'on', active: true, rollout_percentage: 100 })]);
         const expCache = fakeExperimentCache([]);
         const ts = fakeTreeSitter({ calls: [postHogCall('getFeatureFlag', 'on', 0)] });
@@ -190,7 +190,7 @@ suite('FlagDecorationProvider', function () {
 
         assert.strictEqual(captured.after.length, 1, 'should produce one inline decoration');
         const text = captured.after[0].contentText ?? '';
-        assert.ok(text.includes('enabled'), `expected "enabled" in label, got "${text}"`);
+        assert.ok(text.includes('100%'), `expected "100%" in label, got "${text}"`);
         assert.ok(text.includes('●'), `expected status dot in label, got "${text}"`);
         assert.strictEqual(captured.after[0].color, '#4CBB17', 'green for active');
     });
@@ -318,7 +318,7 @@ suite('FlagDecorationProvider', function () {
         const captured = await runProvider(provider, code, 'typescript');
 
         assert.strictEqual(captured.after.length, 2, 'should produce 2 decorations');
-        assert.ok(captured.after[0].contentText?.includes('enabled'), 'first should be enabled');
+        assert.ok(captured.after[0].contentText?.includes('100%'), 'first should be 100%');
         assert.ok(captured.after[1].contentText?.includes('50%'), 'second should be 50%');
     });
 });

@@ -9,9 +9,6 @@
 </p>
 
 <p align="center">
-  <a href="https://marketplace.visualstudio.com/items?itemName=PostHog.posthog-vscode"><img src="https://img.shields.io/visual-studio-marketplace/v/PostHog.posthog-vscode?label=VSCode" alt="VSCode Marketplace" /></a>
-  <a href="https://marketplace.visualstudio.com/items?itemName=PostHog.posthog-vscode"><img src="https://img.shields.io/visual-studio-marketplace/i/PostHog.posthog-vscode?label=Downloads" alt="VSCode Installs" /></a>
-  <br/>
   <a href="https://open-vsx.org/extension/posthog/posthog-vscode"><img src="https://img.shields.io/open-vsx/v/posthog/posthog-vscode?label=VSX
   " alt="VSX Marketplace" /></a>
   <a href="https://open-vsx.org/extension/posthog/posthog-vscode"><img src="https://img.shields.io/open-vsx/dt/posthog/posthog-vscode?label=Downloads
@@ -156,9 +153,9 @@ All settings live under `posthog.*` in VS Code settings (JSON or UI).
 
 **Display**
 
-| Setting                         | Type      | Default  | Description                                                                                                        |
-| ------------------------------- | --------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
-| `posthog.showInlineDecorations` | `boolean` | `true`   | Show inline flag status and event volume decorations in the editor. Set to `false` to hide all inline annotations. |
+| Setting                         | Type      | Default  | Description                                                                                                                   |
+| ------------------------------- | --------- | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `posthog.showInlineDecorations` | `boolean` | `true`   | Show inline flag status and event volume decorations in the editor. Set to `false` to hide all inline annotations.            |
 | `posthog.inlineHintsMode`       | `string`  | `always` | When to show inline hints: `always` (all lines) or `currentLine` (only the line where the cursor is located, like git blame). |
 
 **Stale flag detection**

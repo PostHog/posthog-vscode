@@ -9,10 +9,8 @@
 </p>
 
 <p align="center">
-  <a href="https://open-vsx.org/extension/posthog/posthog-vscode"><img src="https://img.shields.io/open-vsx/v/posthog/posthog-vscode?label=VSX
-  " alt="VSX Marketplace" /></a>
-  <a href="https://open-vsx.org/extension/posthog/posthog-vscode"><img src="https://img.shields.io/open-vsx/dt/posthog/posthog-vscode?label=Downloads
-  " alt="VSCode Installs" /></a>
+  <a href="https://open-vsx.org/extension/posthog/posthog-vscode"><img src="https://img.shields.io/open-vsx/v/posthog/posthog-vscode?label=VSX" alt="VSX Marketplace" /></a>
+  <a href="https://open-vsx.org/extension/posthog/posthog-vscode"><img src="https://img.shields.io/open-vsx/dt/posthog/posthog-vscode?label=Downloads" alt="VSX Installs" /></a>
   <br/>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/PostHog/posthog-vscode" alt="License" /></a>
 </p>

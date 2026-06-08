@@ -114,9 +114,9 @@ export class PostHogAuthenticationProvider implements vscode.AuthenticationProvi
                         'Copy and paste the PostHog authentication URL into your browser to sign in',
                         'Copy URL',
                         'Cancel',
-                    ).then(choice => {
+                    ).then(async (choice) => {
                         if (choice === 'Copy URL') {
-                            vscode.env.clipboard.writeText(authUrlString);
+                            await vscode.env.clipboard.writeText(authUrlString);
                         } else if (choice === 'Cancel') {
                             clearTimeout(timeout);
                             this.pendingAuths.delete(state);

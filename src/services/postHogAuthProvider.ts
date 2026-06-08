@@ -97,7 +97,8 @@ export class PostHogAuthenticationProvider implements vscode.AuthenticationProvi
             scope: scopes.join(' '),
         });
 
-        const authUrl = vscode.Uri.parse(`${this.oauthAuthority}/authorize?${params.toString()}`);
+        const authUrlString = `${this.oauthAuthority}/authorize?${params.toString()}`;
+        const authUrl = vscode.Uri.parse(authUrlString);
 
         return new Promise<vscode.AuthenticationSession>((resolve, reject) => {
             const timeout = setTimeout(() => {
@@ -109,9 +110,19 @@ export class PostHogAuthenticationProvider implements vscode.AuthenticationProvi
 
             vscode.env.openExternal(authUrl).then(opened => {
                 if (!opened) {
-                    clearTimeout(timeout);
-                    this.pendingAuths.delete(state);
-                    reject(new Error('Failed to open browser for authentication'));
+                    vscode.window.showInformationMessage(
+                        'Copy and paste the PostHog authentication URL into your browser to sign in',
+                        'Copy URL',
+                        'Cancel',
+                    ).then(choice => {
+                        if (choice === 'Copy URL') {
+                            vscode.env.clipboard.writeText(authUrlString);
+                        } else if (choice === 'Cancel') {
+                            clearTimeout(timeout);
+                            this.pendingAuths.delete(state);
+                            reject(new Error('User did not consent to login.'));
+                        }
+                    });
                 }
             });
         });

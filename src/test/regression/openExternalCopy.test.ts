@@ -101,63 +101,68 @@ suite('Regression: openExternal returns false (Copy/Cancel/dismiss)', function (
         provider.dispose();
     });
 
-    test('"Copy URL" clicked: copies the auth URL and keeps the flow alive', async () => {
-        const written: string[] = [];
+    interface Case {
+        name: string;
+        infoMessageChoice: string | undefined;
+        expectRejection?: RegExp;
+        expectedPendingSize: number;
+        expectClipboardWrite: boolean;
+        bugMessage: string;
+    }
 
-        await withOpenExternalFalseStubs(
-            { infoMessageChoice: 'Copy URL', onClipboardWrite: text => written.push(text) },
-            async () => {
-                const sessionPromise = provider.createSession(SCOPES);
-                sessionPromise.catch(() => { /* exercised via dispose() in teardown */ });
+    const cases: Case[] = [
+        {
+            name: '"Copy URL" clicked: copies the auth URL and keeps the flow alive',
+            infoMessageChoice: 'Copy URL',
+            expectedPendingSize: 1,
+            expectClipboardWrite: true,
+            bugMessage: 'Bug regressed: clicking "Copy URL" should copy the auth URL to the clipboard and keep the flow alive.',
+        },
+        {
+            name: '"Cancel" clicked: rejects with "User did not consent to login." and cleans up',
+            infoMessageChoice: 'Cancel',
+            expectRejection: /User did not consent to login\./,
+            expectedPendingSize: 0,
+            expectClipboardWrite: false,
+            bugMessage: 'Bug regressed: clicking "Cancel" should reject with "User did not consent to login." (the string authCommands.ts suppresses) and clean up pending state.',
+        },
+        {
+            name: 'Notification dismissed (no button clicked): flow stays alive, no premature rejection',
+            infoMessageChoice: undefined,
+            expectedPendingSize: 1,
+            expectClipboardWrite: false,
+            bugMessage: 'Bug regressed: dismissing the notification must NOT cancel the auth flow — the user may still paste the URL into a browser manually and complete sign-in.',
+        },
+    ];
 
-                await delay(300);
+    for (const tc of cases) {
+        test(tc.name, async () => {
+            const written: string[] = [];
 
-                assert.ok(
-                    written.length > 0,
-                    'Bug regressed: clicking "Copy URL" should write the auth URL to the clipboard.',
-                );
-                assert.ok(
-                    written[0].includes('client_id=') && written[0].includes('/authorize?'),
-                    `Copied text should be the full auth URL, got: ${written[0]}`,
-                );
+            await withOpenExternalFalseStubs(
+                { infoMessageChoice: tc.infoMessageChoice, onClipboardWrite: text => written.push(text) },
+                async () => {
+                    const sessionPromise = provider.createSession(SCOPES);
+                    sessionPromise.catch(() => { /* asserted via assert.rejects below, or settled by dispose() in teardown */ });
 
-                assert.strictEqual(
-                    getPendingAuths(provider).size, 1,
-                    'Bug regressed: clicking "Copy URL" must NOT cancel the pending auth flow.',
-                );
-            },
-        );
-    });
+                    if (tc.expectRejection) {
+                        await assert.rejects(sessionPromise, tc.expectRejection, tc.bugMessage);
+                    } else {
+                        await delay(300);
+                    }
 
-    test('"Cancel" clicked: rejects with "User did not consent to login." and cleans up', async () => {
-        await withOpenExternalFalseStubs({ infoMessageChoice: 'Cancel' }, async () => {
-            const sessionPromise = provider.createSession(SCOPES);
+                    assert.strictEqual(getPendingAuths(provider).size, tc.expectedPendingSize, tc.bugMessage);
 
-            await assert.rejects(
-                sessionPromise,
-                /User did not consent to login\./,
-                'Bug regressed: clicking "Cancel" should reject with "User did not consent to login." (the string authCommands.ts suppresses).',
-            );
-
-            assert.strictEqual(
-                getPendingAuths(provider).size, 0,
-                'Pending auth state should be cleaned up after an explicit Cancel.',
+                    if (tc.expectClipboardWrite) {
+                        assert.ok(
+                            written.length > 0 && written[0].includes('client_id=') && written[0].includes('/authorize?'),
+                            `${tc.bugMessage} (expected the full auth URL on the clipboard, got: ${JSON.stringify(written)})`,
+                        );
+                    } else {
+                        assert.strictEqual(written.length, 0, `Clipboard should not be written to in this scenario, got: ${JSON.stringify(written)}`);
+                    }
+                },
             );
         });
-    });
-
-    test('Notification dismissed (no button clicked): flow stays alive, no premature rejection', async () => {
-        await withOpenExternalFalseStubs({ infoMessageChoice: undefined }, async () => {
-            const sessionPromise = provider.createSession(SCOPES);
-            sessionPromise.catch(() => { /* exercised via dispose() in teardown */ });
-
-            await delay(300);
-
-            assert.strictEqual(
-                getPendingAuths(provider).size, 1,
-                'Bug regressed: dismissing the notification must NOT cancel the auth flow — ' +
-                'the user may still paste the URL into a browser manually and complete sign-in.',
-            );
-        });
-    });
+    }
 });

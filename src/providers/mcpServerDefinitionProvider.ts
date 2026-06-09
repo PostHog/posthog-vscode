@@ -4,7 +4,7 @@ import * as vscode from 'vscode';
 export const MCP_PROVIDER_ID = 'posthog.mcp';
 export const MCP_SERVER_LABEL = 'PostHog';
 export const MCP_SERVER_URL = 'https://mcp.posthog.com/mcp';
-export const MCP_DEV_SERVER_URL = 'http://localhost:6767/mcp';
+export const MCP_DEV_SERVER_URL = 'http://localhost:8787/mcp';
 
 /**
  * Contributes the PostHog remote MCP server to VS Code's MCP integration,

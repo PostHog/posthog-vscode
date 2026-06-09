@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.1
+
+### Patch Changes
+
+- 0798461: feat: Update colors and explain more what the automagic setup does
+
 ## 0.8.0
 
 ### Minor Changes

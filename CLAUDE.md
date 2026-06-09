@@ -155,7 +155,7 @@ All providers are constructed in `activate()`, passed their dependencies, and pu
 - **Types**: all PostHog API response shapes in `models/types.ts`
 - **FLAG_METHODS**: duplicated across files (each provider defines its own Set) — this is intentional, not a DRY violation to fix. Parity is enforced by `src/test/regression/methodSetParity.test.ts` — when adding a new flag method, you MUST update every provider AND `staleFlagService.FLAG_METHODS` AND `staleFlagService.POSTHOG_FLAG_METHODS` (the array used by cleanup edits — easy to miss).
 - **Colors**: `#4CBB17` green (active), `#F9BD2B` yellow (warning), `#1D4AFF` PostHog blue, `#E53E3E` red (error), `#F54E00` orange
-- **CSS variables**: `--ph-blue`, `--ph-yellow`, `--ph-orange`, `--ph-green`, `--ph-red`
+- **CSS variables**: `--ph-blue`, `--ph-blue-light`, `--ph-yellow`, `--ph-orange`, `--ph-green`, `--ph-red`, `--ph-red-light`, plus product colors `--ph-product-analytics`, `--ph-product-feature-flags`, `--ph-product-experiments`. Defined in `:root` of both `sidebar/sidebar.css` and `detail/detail.css` (separate webview documents — keep in sync). Never hardcode brand hex values in rules; for alpha tints use `color-mix(in srgb, var(--ph-x) N%, transparent)`
 - **Debounce**: 200ms on all decoration/highlight updates
 - **Error handling**: `.catch(() => {})` on startup cache loads; `try/catch` with `console.warn` in services
 - **Build**: `pnpm`, webpack → `dist/extension.js`, WASM files in `wasm/`

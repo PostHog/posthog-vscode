@@ -1,9 +1,16 @@
 :root {
+    /* PostHog brand palette — keep in sync with detail/detail.css */
     --ph-blue: #1D4AFF;
+    --ph-blue-light: #5B8AFF;   /* readable blue text on tinted backgrounds */
     --ph-yellow: #F9BD2B;
     --ph-orange: #F54E00;
     --ph-green: #4CBB17;
     --ph-red: #F44336;
+    --ph-red-light: #FF4444;    /* readable red text on tinted backgrounds */
+    /* Official product colors (frontend/src/scenes/welcome/productBranding.ts in posthog/posthog) */
+    --ph-product-analytics: #2F80FA;
+    --ph-product-feature-flags: #30ABC6;
+    --ph-product-experiments: #B62AD9;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -309,25 +316,24 @@ html { height: 100vh; overflow: hidden; }
     align-items: center;
     justify-content: center;
     border-radius: 6px;
-    background: rgba(29, 74, 255, 0.1);
+    background: color-mix(in srgb, var(--ph-blue) 10%, transparent);
     flex-shrink: 0;
 }
 .welcome-feature-icon svg {
     width: 16px;
     height: 16px;
 }
-/* Official product brand colors (frontend/src/scenes/welcome/productBranding.ts in posthog/posthog) */
 .welcome-feature-icon--flags {
-    color: #30ABC6;
-    background: rgba(48, 171, 198, 0.12);
+    color: var(--ph-product-feature-flags);
+    background: color-mix(in srgb, var(--ph-product-feature-flags) 12%, transparent);
 }
 .welcome-feature-icon--experiments {
-    color: #B62AD9;
-    background: rgba(182, 42, 217, 0.12);
+    color: var(--ph-product-experiments);
+    background: color-mix(in srgb, var(--ph-product-experiments) 12%, transparent);
 }
 .welcome-feature-icon--analytics {
-    color: #2F80FA;
-    background: rgba(47, 128, 250, 0.12);
+    color: var(--ph-product-analytics);
+    background: color-mix(in srgb, var(--ph-product-analytics) 12%, transparent);
 }
 .welcome-feature-text {
     display: flex;
@@ -397,7 +403,7 @@ html { height: 100vh; overflow: hidden; }
     cursor: pointer;
     transition: transform 0.15s, box-shadow 0.15s;
     letter-spacing: 0.2px;
-    background: linear-gradient(135deg, rgba(29, 74, 255, 0.12), rgba(245, 78, 0, 0.12), rgba(249, 189, 43, 0.12));
+    background: linear-gradient(135deg, color-mix(in srgb, var(--ph-blue) 12%, transparent), color-mix(in srgb, var(--ph-orange) 12%, transparent), color-mix(in srgb, var(--ph-yellow) 12%, transparent));
     color: var(--vscode-foreground);
     display: flex;
     align-items: center;
@@ -407,8 +413,8 @@ html { height: 100vh; overflow: hidden; }
 }
 .wizard-cta-btn:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 16px rgba(29, 74, 255, 0.15), 0 2px 8px rgba(245, 78, 0, 0.1);
-    background: linear-gradient(135deg, rgba(29, 74, 255, 0.2), rgba(245, 78, 0, 0.18), rgba(249, 189, 43, 0.18));
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--ph-blue) 15%, transparent), 0 2px 8px color-mix(in srgb, var(--ph-orange) 10%, transparent);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--ph-blue) 20%, transparent), color-mix(in srgb, var(--ph-orange) 18%, transparent), color-mix(in srgb, var(--ph-yellow) 18%, transparent));
 }
 .wizard-cta-sparkle {
     font-size: 15px;
@@ -436,16 +442,16 @@ html { height: 100vh; overflow: hidden; }
 .wizard-cta-magic span:nth-child(12) { animation-delay: 1.65s; }
 .wizard-cta-magic span:nth-child(13) { animation-delay: 1.8s; }
 @keyframes wizardColorCycle {
-    0%, 100% { color: #1D4AFF; }
-    33%      { color: #F54E00; }
-    66%      { color: #F9BD2B; }
+    0%, 100% { color: var(--ph-blue); }
+    33%      { color: var(--ph-orange); }
+    66%      { color: var(--ph-yellow); }
 }
 .vscode-light .wizard-cta-btn {
     border-color: rgba(0, 0, 0, 0.1);
-    background: linear-gradient(135deg, rgba(29, 74, 255, 0.08), rgba(245, 78, 0, 0.08), rgba(249, 189, 43, 0.08));
+    background: linear-gradient(135deg, color-mix(in srgb, var(--ph-blue) 8%, transparent), color-mix(in srgb, var(--ph-orange) 8%, transparent), color-mix(in srgb, var(--ph-yellow) 8%, transparent));
 }
 .vscode-light .wizard-cta-btn:hover {
-    background: linear-gradient(135deg, rgba(29, 74, 255, 0.14), rgba(245, 78, 0, 0.12), rgba(249, 189, 43, 0.12));
+    background: linear-gradient(135deg, color-mix(in srgb, var(--ph-blue) 14%, transparent), color-mix(in srgb, var(--ph-orange) 12%, transparent), color-mix(in srgb, var(--ph-yellow) 12%, transparent));
 }
 .wizard-cta-desc {
     font-size: 11px;
@@ -499,7 +505,7 @@ html { height: 100vh; overflow: hidden; }
     align-items: center;
     justify-content: center;
     border-radius: 6px;
-    background: rgba(245, 78, 0, 0.1);
+    background: color-mix(in srgb, var(--ph-orange) 10%, transparent);
     flex-shrink: 0;
 }
 .wizard-feature-text {
@@ -653,7 +659,7 @@ html { height: 100vh; overflow: hidden; }
     padding: 0;
     flex-shrink: 0;
 }
-.flag-toggle.active { background: #4CBB17; }
+.flag-toggle.active { background: var(--ph-green); }
 .flag-toggle-knob {
     display: block;
     width: 14px;
@@ -731,7 +737,7 @@ html { height: 100vh; overflow: hidden; }
 .flag-variant-remove {
     background: none;
     border: none;
-    color: var(--vscode-errorForeground, #f44);
+    color: var(--vscode-errorForeground, var(--ph-red-light));
     cursor: pointer;
     font-size: 16px;
     padding: 0 4px;
@@ -786,8 +792,8 @@ html { height: 100vh; overflow: hidden; }
     font-size: 11px;
     opacity: 0.7;
 }
-.flag-save-status.success { color: #4CBB17; opacity: 1; }
-.flag-save-status.error { color: var(--vscode-errorForeground, #f44); opacity: 1; }
+.flag-save-status.success { color: var(--ph-green); opacity: 1; }
+.flag-save-status.error { color: var(--vscode-errorForeground, var(--ph-red-light)); opacity: 1; }
 
 /* ── Experiment results ── */
 .exp-conclusion {
@@ -796,8 +802,8 @@ html { height: 100vh; overflow: hidden; }
     margin-bottom: 14px;
     font-size: 12px;
 }
-.exp-conclusion.won { background: rgba(76, 187, 23, 0.1); }
-.exp-conclusion.lost { background: rgba(244, 68, 68, 0.1); }
+.exp-conclusion.won { background: color-mix(in srgb, var(--ph-green) 10%, transparent); }
+.exp-conclusion.lost { background: color-mix(in srgb, var(--ph-red-light) 10%, transparent); }
 .exp-conclusion-comment {
     margin-top: 4px;
     opacity: 0.7;
@@ -846,23 +852,23 @@ html { height: 100vh; overflow: hidden; }
     border-top: 1px solid var(--vscode-panel-border);
     border-bottom: none;
 }
-.exp-table tr.winner td { color: #4CBB17; }
+.exp-table tr.winner td { color: var(--ph-green); }
 .exp-table tr.loser td { }
 .exp-sub {
     font-size: 9px;
     opacity: 0.5;
 }
 .exp-delta { font-weight: 500; }
-.exp-delta.positive { color: #4CBB17; }
-.exp-delta.negative { color: #f44; }
+.exp-delta.positive { color: var(--ph-green); }
+.exp-delta.negative { color: var(--ph-red-light); }
 .exp-win-pct {
     font-weight: 600;
     padding: 1px 5px;
     border-radius: 3px;
     font-size: 10px;
 }
-.exp-win-pct.winner { background: rgba(76, 187, 23, 0.15); color: #4CBB17; }
-.exp-win-pct.loser { background: rgba(244, 68, 68, 0.1); color: #f44; }
+.exp-win-pct.winner { background: color-mix(in srgb, var(--ph-green) 15%, transparent); color: var(--ph-green); }
+.exp-win-pct.loser { background: color-mix(in srgb, var(--ph-red-light) 10%, transparent); color: var(--ph-red-light); }
 
 .exp-metric-block {
     background: var(--vscode-textCodeBlock-background, rgba(255,255,255,0.04));
@@ -931,8 +937,8 @@ html { height: 100vh; overflow: hidden; }
     border-radius: 3px;
     opacity: 0.7;
 }
-.exp-ci-bar.positive { background: #4CBB17; }
-.exp-ci-bar.negative { background: #f44; }
+.exp-ci-bar.positive { background: var(--ph-green); }
+.exp-ci-bar.negative { background: var(--ph-red-light); }
 .exp-ci-bar.neutral { background: var(--vscode-foreground); opacity: 0.3; }
 .exp-ci-range {
     font-family: var(--vscode-editor-font-family);
@@ -974,7 +980,7 @@ html { height: 100vh; overflow: hidden; }
     align-items: center;
     justify-content: center;
     border-radius: 4px;
-    background: rgba(29, 74, 255, 0.12);
+    background: color-mix(in srgb, var(--ph-blue) 12%, transparent);
     flex-shrink: 0;
 }
 .insight-card-title {
@@ -1171,7 +1177,7 @@ html { height: 100vh; overflow: hidden; }
 /* ── Experiment progress bar ── */
 .exp-progress { margin: 8px 0; }
 .exp-progress-bar { height: 6px; background: var(--vscode-editorWidget-border); border-radius: 3px; overflow: hidden; }
-.exp-progress-fill { height: 100%; background: var(--ph-blue, #1D4AFF); border-radius: 3px; transition: width 0.3s; }
+.exp-progress-fill { height: 100%; background: var(--ph-blue); border-radius: 3px; transition: width 0.3s; }
 .exp-progress-text { font-size: 11px; color: var(--vscode-descriptionForeground); margin-top: 4px; }
 
 /* ── Experiment summary counts ── */
@@ -1219,8 +1225,8 @@ html { height: 100vh; overflow: hidden; }
 
 /* ── Confirmation bar ── */
 .confirm-bar {
-    background: rgba(249, 189, 43, 0.15);
-    border: 1px solid var(--ph-yellow, #F9BD2B);
+    background: color-mix(in srgb, var(--ph-yellow) 15%, transparent);
+    border: 1px solid var(--ph-yellow);
     border-radius: 6px;
     padding: 8px 12px;
     margin: 8px 0;
@@ -1240,7 +1246,7 @@ html { height: 100vh; overflow: hidden; }
     flex-shrink: 0;
 }
 .confirm-bar .btn-confirm {
-    background: var(--ph-yellow, #F9BD2B);
+    background: var(--ph-yellow);
     color: #000;
     border: none;
     padding: 4px 12px;
@@ -1267,12 +1273,12 @@ html { height: 100vh; overflow: hidden; }
     align-items: center;
     gap: 8px;
     padding: 12px;
-    background: rgba(229, 62, 62, 0.1);
-    border: 1px solid var(--ph-red, #E53E3E);
+    background: color-mix(in srgb, var(--ph-red) 10%, transparent);
+    border: 1px solid var(--ph-red);
     border-radius: 6px;
     margin: 8px 12px;
 }
-.error-icon { color: var(--ph-red, #E53E3E); font-size: 16px; }
+.error-icon { color: var(--ph-red); font-size: 16px; }
 .error-message { flex: 1; font-size: 12px; color: var(--vscode-foreground); }
 .error-retry {
     background: transparent;
@@ -1289,7 +1295,7 @@ html { height: 100vh; overflow: hidden; }
 /* ── Help link ── */
 .help-link {
     font-size: 11px;
-    color: var(--ph-blue, #1D4AFF);
+    color: var(--ph-blue);
     cursor: pointer;
     opacity: 0.8;
     text-decoration: none;
@@ -1311,9 +1317,9 @@ html { height: 100vh; overflow: hidden; }
 }
 .filter-btn:hover { opacity: 1; }
 .filter-btn.active {
-    background: var(--ph-blue, #1D4AFF);
+    background: var(--ph-blue);
     color: #fff;
-    border-color: var(--ph-blue, #1D4AFF);
+    border-color: var(--ph-blue);
     opacity: 1;
 }
 
@@ -1387,7 +1393,7 @@ html { height: 100vh; overflow: hidden; }
 }
 .feedback-emoji.selected {
     border-color: var(--ph-blue);
-    background: rgba(29, 74, 255, 0.1);
+    background: color-mix(in srgb, var(--ph-blue) 10%, transparent);
 }
 .feedback-emoji-icon {
     font-size: 26px;
@@ -1449,7 +1455,7 @@ html { height: 100vh; overflow: hidden; }
     justify-content: center;
     gap: 6px;
     padding: 10px 16px;
-    background: rgba(76, 187, 23, 0.12);
+    background: color-mix(in srgb, var(--ph-green) 12%, transparent);
     border: 1px solid var(--ph-green);
     border-radius: 6px;
     font-size: 13px;

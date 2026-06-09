@@ -42,7 +42,7 @@ suite('PostHogMcpServerDefinitionProvider', () => {
         assert.strictEqual(def.uri.toString(), MCP_DEV_SERVER_URL);
         const url = new URL(MCP_DEV_SERVER_URL);
         assert.strictEqual(url.hostname, 'localhost');
-        assert.strictEqual(url.port, '6767');
+        assert.strictEqual(url.port, '8787');
     });
 
     test('Test and Production modes use the official MCP server', () => {

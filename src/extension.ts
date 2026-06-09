@@ -35,6 +35,7 @@ import { VariantDiagnosticProvider } from './providers/variantDiagnosticProvider
 import { InitDecorationProvider } from './providers/initDecorationProvider';
 import { FeedbackViewProvider } from './views/FeedbackViewProvider';
 import { PostHogAuthenticationProvider, AUTH_PROVIDER_ID, AUTH_PROVIDER_LABEL } from './services/postHogAuthProvider';
+import { PostHogMcpServerDefinitionProvider, MCP_PROVIDER_ID } from './providers/mcpServerDefinitionProvider';
 import { FeatureFlag } from './models/types';
 import { Views, Commands, ContextKeys } from './constants';
 
@@ -59,6 +60,18 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Extension self-telemetry
     telemetry.capture('extension_activated');
+
+    // Auto-register the PostHog MCP server (mcp.posthog.com) so it's available
+    // in chat as soon as the extension is installed. Auth is handled by VS Code's
+    // MCP client via the server's own OAuth flow — the extension's session scopes
+    // are too narrow for the MCP tools. The MCP API needs VS Code 1.101+ —
+    // feature-detect so older hosts and forks without it keep working.
+    const lmApi = vscode.lm as Partial<typeof vscode.lm> | undefined;
+    if (lmApi && typeof lmApi.registerMcpServerDefinitionProvider === 'function') {
+        context.subscriptions.push(
+            lmApi.registerMcpServerDefinitionProvider(MCP_PROVIDER_ID, new PostHogMcpServerDefinitionProvider()),
+        );
+    }
 
     // Tree-sitter powered code intelligence
     const treeSitter = new TreeSitterService();

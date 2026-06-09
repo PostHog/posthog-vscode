@@ -98,6 +98,13 @@ Connect code to real user sessions.
 - **Session count CodeLens** — see session and user counts above capture and flag calls
 - **Embedded replay** — watch session recordings in detail panels without leaving VS Code
 
+### MCP Server
+
+PostHog tools in your AI chat, automatically.
+
+- **Zero-setup MCP** — the extension registers the [PostHog MCP server](https://posthog.com/docs/model-context-protocol) (`mcp.posthog.com`) with VS Code, so chat agents like Copilot can query flags, insights, and more — no `mcp.json` editing required
+- **Own sign-in flow** — the first time the server starts, VS Code walks you through PostHog's OAuth flow with the scopes the MCP tools need (separate from the extension's sign-in)
+
 ### Team Configuration
 
 Share PostHog settings across your team and manage multi-project workspaces.

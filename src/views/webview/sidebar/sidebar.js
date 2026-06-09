@@ -1294,8 +1294,10 @@ window.addEventListener('message', e => {
             var wizardVisible = msg.wizardEnabled || msg.isDev;
             var wizardDivider = document.getElementById('wizard-divider');
             var wizardBtn = document.getElementById('btn-show-wizard');
+            var wizardDesc = document.getElementById('wizard-cta-desc');
             if (wizardDivider) { wizardDivider.style.display = wizardVisible ? '' : 'none'; }
             if (wizardBtn) { wizardBtn.style.display = wizardVisible ? '' : 'none'; }
+            if (wizardDesc) { wizardDesc.style.display = wizardVisible ? '' : 'none'; }
             // Update project name + host in header
             var projNameEl = document.getElementById('project-name');
             if (projNameEl) {

@@ -303,7 +303,6 @@ html { height: 100vh; overflow: hidden; }
     gap: 10px;
 }
 .welcome-feature-icon {
-    font-size: 16px;
     width: 28px;
     height: 28px;
     display: flex;
@@ -312,6 +311,23 @@ html { height: 100vh; overflow: hidden; }
     border-radius: 6px;
     background: rgba(29, 74, 255, 0.1);
     flex-shrink: 0;
+}
+.welcome-feature-icon svg {
+    width: 16px;
+    height: 16px;
+}
+/* Official product brand colors (frontend/src/scenes/welcome/productBranding.ts in posthog/posthog) */
+.welcome-feature-icon--flags {
+    color: #30ABC6;
+    background: rgba(48, 171, 198, 0.12);
+}
+.welcome-feature-icon--experiments {
+    color: #B62AD9;
+    background: rgba(182, 42, 217, 0.12);
+}
+.welcome-feature-icon--analytics {
+    color: #2F80FA;
+    background: rgba(47, 128, 250, 0.12);
 }
 .welcome-feature-text {
     display: flex;
@@ -430,6 +446,14 @@ html { height: 100vh; overflow: hidden; }
 }
 .vscode-light .wizard-cta-btn:hover {
     background: linear-gradient(135deg, rgba(29, 74, 255, 0.14), rgba(245, 78, 0, 0.12), rgba(249, 189, 43, 0.12));
+}
+.wizard-cta-desc {
+    font-size: 11px;
+    opacity: 0.5;
+    line-height: 1.4;
+    max-width: 260px;
+    margin-top: 8px;
+    text-align: center;
 }
 
 /* ── Welcome divider ── */

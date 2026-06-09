@@ -1,8 +1,16 @@
 :root {
+    /* PostHog brand palette — keep in sync with sidebar/sidebar.css */
     --ph-blue: #1D4AFF;
-    --ph-green: #4CBB17;
-    --ph-red: #F44;
+    --ph-blue-light: #5B8AFF;   /* readable blue text on tinted backgrounds */
     --ph-yellow: #F9BD2B;
+    --ph-orange: #F54E00;
+    --ph-green: #4CBB17;
+    --ph-red: #F44336;
+    --ph-red-light: #FF4444;    /* readable red text on tinted backgrounds */
+    /* Official product colors (frontend/src/scenes/welcome/productBranding.ts in posthog/posthog) */
+    --ph-product-analytics: #2F80FA;
+    --ph-product-feature-flags: #30ABC6;
+    --ph-product-experiments: #B62AD9;
     --radius: 8px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -44,13 +52,13 @@ body {
     font-size: 11px;
     font-weight: 600;
 }
-.badge.active { background: rgba(76, 187, 23, 0.15); color: #4CBB17; }
+.badge.active { background: color-mix(in srgb, var(--ph-green) 15%, transparent); color: var(--ph-green); }
 .badge.inactive { background: rgba(255,255,255,0.08); opacity: 0.6; }
-.badge.running { background: rgba(29, 74, 255, 0.15); color: #5B8AFF; }
-.badge.complete { background: rgba(76, 187, 23, 0.15); color: #4CBB17; }
+.badge.running { background: color-mix(in srgb, var(--ph-blue) 15%, transparent); color: var(--ph-blue-light); }
+.badge.complete { background: color-mix(in srgb, var(--ph-green) 15%, transparent); color: var(--ph-green); }
 .badge.draft { background: rgba(255,255,255,0.08); opacity: 0.6; }
-.badge.error { background: rgba(244, 68, 68, 0.15); color: #f66; }
-.badge.resolved { background: rgba(76, 187, 23, 0.15); color: #4CBB17; }
+.badge.error { background: color-mix(in srgb, var(--ph-red-light) 15%, transparent); color: var(--ph-red-light); }
+.badge.resolved { background: color-mix(in srgb, var(--ph-green) 15%, transparent); color: var(--ph-green); }
 
 .hero-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .btn {
@@ -176,7 +184,7 @@ body {
     border-radius: 4px; padding: 6px 8px; font-size: 12px; text-align: right;
 }
 .variant-remove {
-    background: none; border: none; color: var(--ph-red); cursor: pointer;
+    background: none; border: none; color: var(--ph-red-light); cursor: pointer;
     font-size: 18px; padding: 0 4px; opacity: 0.5; line-height: 1;
 }
 .variant-remove:hover { opacity: 1; }
@@ -208,7 +216,7 @@ body {
 }
 .save-status { font-size: 12px; }
 .save-status.ok { color: var(--ph-green); }
-.save-status.err { color: var(--ph-red); }
+.save-status.err { color: var(--ph-red-light); }
 
 /* ── Tables ── */
 .data-table { width: 100%; border-collapse: collapse; }
@@ -227,13 +235,13 @@ body {
 .sub { font-size: 10px; opacity: 0.45; }
 .delta { font-weight: 500; }
 .delta.up { color: var(--ph-green); }
-.delta.down { color: var(--ph-red); }
+.delta.down { color: var(--ph-red-light); }
 .win-badge {
     font-weight: 600; padding: 2px 8px; border-radius: 4px; font-size: 11px;
     display: inline-block;
 }
-.win-badge.sig-win { background: rgba(76,187,23,0.12); color: #4CBB17; }
-.win-badge.sig-lose { background: rgba(244,68,68,0.08); color: #f66; }
+.win-badge.sig-win { background: color-mix(in srgb, var(--ph-green) 12%, transparent); color: var(--ph-green); }
+.win-badge.sig-lose { background: color-mix(in srgb, var(--ph-red-light) 8%, transparent); color: var(--ph-red-light); }
 
 /* ── CI bars ── */
 .ci-section { margin-top: 10px; }
@@ -243,7 +251,7 @@ body {
 .ci-zero { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--vscode-foreground); opacity: 0.15; }
 .ci-bar { position: absolute; top: 2px; height: 6px; border-radius: 3px; opacity: 0.7; }
 .ci-bar.pos { background: var(--ph-green); }
-.ci-bar.neg { background: var(--ph-red); }
+.ci-bar.neg { background: var(--ph-red-light); }
 .ci-bar.neu { background: var(--vscode-foreground); opacity: 0.25; }
 .ci-range { font-family: var(--vscode-editor-font-family); opacity: 0.4; white-space: nowrap; flex-shrink: 0; }
 
@@ -356,8 +364,8 @@ body {
 .conclusion {
     padding: 12px 16px; border-radius: var(--radius); margin-bottom: 16px; font-size: 13px;
 }
-.conclusion.won { background: rgba(76,187,23,0.08); }
-.conclusion.lost { background: rgba(244,68,68,0.08); }
+.conclusion.won { background: color-mix(in srgb, var(--ph-green) 8%, transparent); }
+.conclusion.lost { background: color-mix(in srgb, var(--ph-red-light) 8%, transparent); }
 .conclusion-comment { margin-top: 4px; opacity: 0.6; font-size: 12px; font-style: italic; }
 
 /* ── Meta ── */
@@ -387,7 +395,7 @@ body {
 }
 .session-card:hover {
     border-color: var(--ph-blue);
-    background: rgba(29, 74, 255, 0.04);
+    background: color-mix(in srgb, var(--ph-blue) 4%, transparent);
 }
 .session-header {
     display: flex;
@@ -457,7 +465,7 @@ body {
 /* ── Experiment card ── */
 .experiment-card {
     border-color: var(--ph-blue);
-    background: rgba(29, 74, 255, 0.04);
+    background: color-mix(in srgb, var(--ph-blue) 4%, transparent);
 }
 .experiment-info { display: flex; flex-direction: column; gap: 8px; }
 .experiment-header {

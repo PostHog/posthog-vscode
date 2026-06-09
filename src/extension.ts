@@ -69,7 +69,7 @@ export function activate(context: vscode.ExtensionContext) {
     const lmApi = vscode.lm as Partial<typeof vscode.lm> | undefined;
     if (lmApi && typeof lmApi.registerMcpServerDefinitionProvider === 'function') {
         context.subscriptions.push(
-            lmApi.registerMcpServerDefinitionProvider(MCP_PROVIDER_ID, new PostHogMcpServerDefinitionProvider()),
+            lmApi.registerMcpServerDefinitionProvider(MCP_PROVIDER_ID, new PostHogMcpServerDefinitionProvider(context.extensionMode)),
         );
     }
 

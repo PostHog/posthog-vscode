@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 export const MCP_PROVIDER_ID = 'posthog.mcp';
 export const MCP_SERVER_LABEL = 'PostHog';
 export const MCP_SERVER_URL = 'https://mcp.posthog.com/mcp';
+export const MCP_DEV_SERVER_URL = 'http://localhost:6767/mcp';
 
 /**
  * Contributes the PostHog remote MCP server to VS Code's MCP integration,
@@ -18,7 +19,10 @@ export const MCP_SERVER_URL = 'https://mcp.posthog.com/mcp';
  * server asks for.
  */
 export class PostHogMcpServerDefinitionProvider implements vscode.McpServerDefinitionProvider<vscode.McpHttpServerDefinition> {
+    constructor(private readonly extensionMode: vscode.ExtensionMode = vscode.ExtensionMode.Production) {}
+
     provideMcpServerDefinitions(): vscode.McpHttpServerDefinition[] {
-        return [new vscode.McpHttpServerDefinition(MCP_SERVER_LABEL, vscode.Uri.parse(MCP_SERVER_URL))];
+        const url = this.extensionMode === vscode.ExtensionMode.Development ? MCP_DEV_SERVER_URL : MCP_SERVER_URL;
+        return [new vscode.McpHttpServerDefinition(MCP_SERVER_LABEL, vscode.Uri.parse(url))];
     }
 }

@@ -4,6 +4,7 @@ import {
     PostHogMcpServerDefinitionProvider,
     MCP_SERVER_LABEL,
     MCP_SERVER_URL,
+    MCP_DEV_SERVER_URL,
     MCP_PROVIDER_ID,
 } from '../../providers/mcpServerDefinitionProvider';
 
@@ -32,6 +33,25 @@ suite('PostHogMcpServerDefinitionProvider', () => {
     test('server URL points at the official PostHog MCP host', () => {
         const hostname = new URL(MCP_SERVER_URL).hostname;
         assert.strictEqual(hostname, 'mcp.posthog.com');
+    });
+
+    test('Development mode (F5) uses the local MCP server', () => {
+        const [def] = new PostHogMcpServerDefinitionProvider(
+            vscode.ExtensionMode.Development
+        ).provideMcpServerDefinitions();
+        assert.strictEqual(def.uri.toString(), MCP_DEV_SERVER_URL);
+        const url = new URL(MCP_DEV_SERVER_URL);
+        assert.strictEqual(url.hostname, 'localhost');
+        assert.strictEqual(url.port, '6767');
+    });
+
+    test('Test and Production modes use the official MCP server', () => {
+        // Only Development (F5) gets localhost — Test must NOT, or CI extension
+        // host runs would silently point at a server that isn't there.
+        for (const mode of [vscode.ExtensionMode.Test, vscode.ExtensionMode.Production]) {
+            const [def] = new PostHogMcpServerDefinitionProvider(mode).provideMcpServerDefinitions();
+            assert.strictEqual(def.uri.toString(), MCP_SERVER_URL, `mode ${mode} must use the production URL`);
+        }
     });
 
     test('definition carries no extension credentials', () => {

@@ -249,4 +249,36 @@ suite('Regression: openExternal returns false (Copy/Cancel/dismiss)', function (
             },
         );
     });
+
+    test('createSession() called again while one is pending: supersedes the old attempt', async function () {
+        this.timeout(2000);
+
+        await withOpenExternalFalseStubs(
+            { infoMessageChoice: 'Copy URL' },
+            async () => {
+                const firstSessionPromise = provider.createSession(SCOPES);
+                await delay(300);
+
+                assert.strictEqual(
+                    getPendingAuths(provider).size, 1,
+                    'First attempt should remain pending after "Copy URL" is chosen.',
+                );
+
+                const secondSessionPromise = provider.createSession(SCOPES);
+                secondSessionPromise.catch(() => { /* settled by dispose() in teardown */ });
+                await delay(300);
+
+                await assert.rejects(
+                    firstSessionPromise,
+                    /Superseded by a new sign-in attempt\./,
+                    'Bug regressed: starting a new sign-in attempt should reject any in-flight attempt with "Superseded by a new sign-in attempt."',
+                );
+
+                assert.strictEqual(
+                    getPendingAuths(provider).size, 1,
+                    'Bug regressed: the second sign-in attempt should still be tracked as pending.',
+                );
+            },
+        );
+    });
 });

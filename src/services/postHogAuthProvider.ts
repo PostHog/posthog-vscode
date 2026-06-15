@@ -58,12 +58,17 @@ export class PostHogAuthenticationProvider implements vscode.AuthenticationProvi
     }
 
     dispose(): void {
+        this.cancelPendingAuths(new Error('Auth provider disposed'));
+        this._onDidChangeSessions.dispose();
+    }
+
+    /** Reject and clear any in-flight sign-in attempts. */
+    private cancelPendingAuths(error: Error): void {
         for (const pending of this.pendingAuths.values()) {
             clearTimeout(pending.timeout);
-            pending.reject(new Error('Auth provider disposed'));
+            pending.reject(error);
         }
         this.pendingAuths.clear();
-        this._onDidChangeSessions.dispose();
     }
 
     // ── AuthenticationProvider interface ──
@@ -83,6 +88,10 @@ export class PostHogAuthenticationProvider implements vscode.AuthenticationProvi
     }
 
     async createSession(scopes: readonly string[]): Promise<vscode.AuthenticationSession> {
+        // A new sign-in attempt replaces any in-flight ones — e.g. a dismissed
+        // notification can leave a stale flow (with a ticking timeout) alive.
+        this.cancelPendingAuths(new Error('Superseded by a new sign-in attempt.'));
+
         const { codeVerifier, codeChallenge } = this.generatePKCE();
         const state = crypto.randomBytes(16).toString('hex');
 

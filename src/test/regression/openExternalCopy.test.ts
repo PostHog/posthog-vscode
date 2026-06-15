@@ -54,6 +54,8 @@ function delay(ms: number): Promise<void> {
 interface StubConfig {
     infoMessageChoice: string | undefined;
     onClipboardWrite?: (text: string) => void;
+    clipboardWriteError?: Error;
+    onShowInputBox?: (options: vscode.InputBoxOptions | undefined) => void;
 }
 
 async function withOpenExternalFalseStubs<T>(config: StubConfig, fn: () => Promise<T>): Promise<T> {
@@ -69,15 +71,27 @@ async function withOpenExternalFalseStubs<T>(config: StubConfig, fn: () => Promi
     const fakeClipboard: vscode.Clipboard = {
         readText: () => Promise.resolve(''),
         writeText: (text: string) => {
+            if (config.clipboardWriteError) {
+                return Promise.reject(config.clipboardWriteError);
+            }
             config.onClipboardWrite?.(text);
             return Promise.resolve();
         },
     };
     const restoreClipboard = stubProperty(vscode.env, 'clipboard', fakeClipboard);
+    const restoreShowInputBox = stubProperty(
+        vscode.window,
+        'showInputBox',
+        (options?: vscode.InputBoxOptions) => {
+            config.onShowInputBox?.(options);
+            return Promise.resolve(undefined);
+        },
+    );
 
     try {
         return await fn();
     } finally {
+        restoreShowInputBox();
         restoreClipboard();
         restoreShowInfo();
         restoreOpenExternal();
@@ -166,4 +180,39 @@ suite('Regression: openExternal returns false (Copy/Cancel/dismiss)', function (
             );
         });
     }
+
+    test('"Copy URL" clicked but clipboard.writeText fails: falls back to showInputBox with the URL', async () => {
+        let inputBoxOptions: vscode.InputBoxOptions | undefined;
+
+        await withOpenExternalFalseStubs(
+            {
+                infoMessageChoice: 'Copy URL',
+                clipboardWriteError: new Error('clipboard unavailable'),
+                onShowInputBox: options => { inputBoxOptions = options; },
+            },
+            async () => {
+                const sessionPromise = provider.createSession(SCOPES);
+                sessionPromise.catch(() => { /* settled by dispose() in teardown */ });
+
+                await delay(300);
+
+                assert.ok(
+                    inputBoxOptions !== undefined,
+                    'Bug regressed: when clipboard.writeText fails, showInputBox must be shown as a manual-copy fallback.',
+                );
+                assert.ok(
+                    !!inputBoxOptions?.value
+                        && inputBoxOptions.value.includes('client_id=')
+                        && inputBoxOptions.value.includes('/authorize?'),
+                    `Fallback input box should be pre-filled with the full auth URL, got: ${inputBoxOptions?.value}`,
+                );
+
+                assert.strictEqual(
+                    getPendingAuths(provider).size, 1,
+                    'Bug regressed: a clipboard write failure must NOT cancel the pending auth flow — ' +
+                    'the user can still copy the URL manually from the fallback input box.',
+                );
+            },
+        );
+    });
 });

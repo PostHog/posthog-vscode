@@ -116,7 +116,18 @@ export class PostHogAuthenticationProvider implements vscode.AuthenticationProvi
                         'Cancel',
                     ).then(async (choice) => {
                         if (choice === 'Copy URL') {
-                            await vscode.env.clipboard.writeText(authUrlString);
+                            try {
+                                await vscode.env.clipboard.writeText(authUrlString);
+                                vscode.window.showInformationMessage('PostHog: Auth URL copied — paste it into your browser to finish signing in');
+                            } catch (error) {
+                                console.warn('[PostHog] Failed to copy auth URL to clipboard:', error);
+                                await vscode.window.showInputBox({
+                                    title: 'PostHog Authentication URL',
+                                    prompt: 'Could not copy automatically — copy this URL and open it in your browser to finish signing in',
+                                    value: authUrlString,
+                                    ignoreFocusOut: true,
+                                });
+                            }
                         } else {
                             // User clicked "Cancel" or dismissed the message
                             clearTimeout(timeout);

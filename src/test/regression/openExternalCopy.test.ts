@@ -56,10 +56,16 @@ interface StubConfig {
     onClipboardWrite?: (text: string) => void;
     clipboardWriteError?: Error;
     onShowInputBox?: (options: vscode.InputBoxOptions | undefined) => void;
+    openExternalError?: Error;
 }
 
 async function withOpenExternalFalseStubs<T>(config: StubConfig, fn: () => Promise<T>): Promise<T> {
-    const restoreOpenExternal = stubProperty(vscode.env, 'openExternal', () => Promise.resolve(false));
+    const restoreOpenExternal = stubProperty(vscode.env, 'openExternal', () => {
+        if (config.openExternalError) {
+            return Promise.reject(config.openExternalError);
+        }
+        return Promise.resolve(false);
+    });
     const restoreShowInfo = stubProperty(
         vscode.window,
         'showInformationMessage',
@@ -211,6 +217,34 @@ suite('Regression: openExternal returns false (Copy/Cancel/dismiss)', function (
                     getPendingAuths(provider).size, 1,
                     'Bug regressed: a clipboard write failure must NOT cancel the pending auth flow — ' +
                     'the user can still copy the URL manually from the fallback input box.',
+                );
+            },
+        );
+    });
+
+    test('openExternal() itself rejects: cleans up pending state and rejects the session with that error', async function () {
+        // override Mocha's default 20s timeout for this test if it regresses,
+        // since sessionPromise will never settle due to the unhandled promise
+        // rejection from openExternal(). This will allow the test to timeout
+        // after 2s rather than 20s and speed up the overall test run.
+        this.timeout(2000);
+
+        const openExternalError = new Error('openExternal exploded');
+
+        await withOpenExternalFalseStubs(
+            { infoMessageChoice: undefined, openExternalError },
+            async () => {
+                const sessionPromise = provider.createSession(SCOPES);
+
+                await assert.rejects(
+                    sessionPromise,
+                    (err: Error) => err === openExternalError,
+                    'Bug regressed: if openExternal() itself rejects, the session promise must reject with that same error.',
+                );
+
+                assert.strictEqual(
+                    getPendingAuths(provider).size, 0,
+                    'Bug regressed: if openExternal() itself rejects, pending auth state must be cleaned up.',
                 );
             },
         );

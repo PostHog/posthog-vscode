@@ -108,7 +108,7 @@ export class PostHogAuthenticationProvider implements vscode.AuthenticationProvi
 
             this.pendingAuths.set(state, { codeVerifier, resolve, reject, timeout });
 
-            vscode.env.openExternal(authUrl).then(opened => {
+            Promise.resolve(vscode.env.openExternal(authUrl)).then(opened => {
                 if (!opened) {
                     vscode.window.showInformationMessage(
                         'Copy and paste the PostHog authentication URL into your browser to sign in',
@@ -136,6 +136,11 @@ export class PostHogAuthenticationProvider implements vscode.AuthenticationProvi
                         }
                     });
                 }
+            })
+            .catch((error: Error) => {
+                clearTimeout(timeout);
+                this.pendingAuths.delete(state);
+                reject(error);
             });
         });
     }

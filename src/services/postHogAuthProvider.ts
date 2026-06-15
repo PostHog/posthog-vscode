@@ -120,14 +120,14 @@ export class PostHogAuthenticationProvider implements vscode.AuthenticationProvi
             Promise.resolve(vscode.env.openExternal(authUrl)).then(opened => {
                 if (!opened) {
                     vscode.window.showInformationMessage(
-                        'Copy and paste the PostHog authentication URL into your browser to sign in',
+                        "PostHog: Couldn't open your browser. Copy the PostHog sign-in URL and paste it into your browser's address bar to continue.",
                         'Copy URL',
                         'Cancel',
                     ).then(async (choice) => {
                         if (choice === 'Copy URL') {
                             try {
                                 await vscode.env.clipboard.writeText(authUrlString);
-                                vscode.window.showInformationMessage('PostHog: Auth URL copied — paste it into your browser to finish signing in');
+                                vscode.window.showInformationMessage("PostHog: Auth URL copied — paste it into your browser's address bar to finish signing in");
                             } catch (error) {
                                 console.warn('[PostHog] Failed to copy auth URL to clipboard:', error);
                                 await vscode.window.showInputBox({

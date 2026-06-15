@@ -117,7 +117,8 @@ export class PostHogAuthenticationProvider implements vscode.AuthenticationProvi
                     ).then(async (choice) => {
                         if (choice === 'Copy URL') {
                             await vscode.env.clipboard.writeText(authUrlString);
-                        } else if (choice === 'Cancel') {
+                        } else {
+                            // User clicked "Cancel" or dismissed the message
                             clearTimeout(timeout);
                             this.pendingAuths.delete(state);
                             reject(new Error('User did not consent to login.'));

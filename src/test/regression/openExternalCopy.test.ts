@@ -127,11 +127,12 @@ suite('Regression: openExternal returns false (Copy/Cancel/dismiss)', function (
             bugMessage: 'Bug regressed: clicking "Cancel" should reject with "User did not consent to login." (the string authCommands.ts suppresses) and clean up pending state.',
         },
         {
-            name: 'Notification dismissed (no button clicked): flow stays alive, no premature rejection',
+            name: 'Notification dismissed (no button clicked): rejects with "User did not consent to login." and cleans up',
             infoMessageChoice: undefined,
-            expectedPendingSize: 1,
+            expectRejection: /User did not consent to login\./,
+            expectedPendingSize: 0,
             expectClipboardWrite: false,
-            bugMessage: 'Bug regressed: dismissing the notification must NOT cancel the auth flow — the user may still paste the URL into a browser manually and complete sign-in.',
+            bugMessage: 'Bug regressed: dismissing the notification should reject with "User did not consent to login." (the string authCommands.ts suppresses) and clean up pending state.',
         },
     ];
 

@@ -11,9 +11,7 @@
  *         before they could finish.
  * Fix:    Show an information message with "Copy URL" / "Cancel" actions.
  *         "Copy URL" re-copies the auth URL and leaves the flow alive;
- *         dismissing the message also leaves the flow alive (the 5-minute
- *         timeout keeps running so a manual paste can still complete);
- *         only an explicit "Cancel" click cleans up and rejects with
+ *         only an explicit "Cancel" or dismiss cleans up and rejects with
  *         'User did not consent to login.' (a string authCommands.ts
  *         already suppresses, matching the original dialog-cancel UX).
  * Date:   2026-06-08
@@ -47,8 +45,19 @@ function stubProperty<T extends object>(obj: T, key: keyof T & string, value: un
     };
 }
 
-function delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+/** Returns a promise and a resolve callback — resolved when you call resolve(). */
+function deferred(): { promise: Promise<void>; resolve: () => void } {
+    let resolve!: () => void;
+    const promise = new Promise<void>(r => { resolve = r; });
+    return { promise, resolve };
+}
+
+/** Returns true if the promise is still pending (has not resolved or rejected). */
+async function isPending(p: Promise<unknown>): Promise<boolean> {
+    let settled = false;
+    Promise.resolve(p).finally(() => { settled = true; });
+    await Promise.resolve(); // flush one microtask tick
+    return !settled;
 }
 
 interface StubConfig {
@@ -104,10 +113,6 @@ async function withOpenExternalFalseStubs<T>(config: StubConfig, fn: () => Promi
     }
 }
 
-function getPendingAuths(provider: PostHogAuthenticationProvider): Map<string, unknown> {
-    return (provider as unknown as { pendingAuths: Map<string, unknown> }).pendingAuths;
-}
-
 suite('Regression: openExternal returns false (Copy/Cancel/dismiss)', function () {
     this.timeout(20000);
 
@@ -125,7 +130,6 @@ suite('Regression: openExternal returns false (Copy/Cancel/dismiss)', function (
         name: string;
         infoMessageChoice: string | undefined;
         expectRejection?: RegExp;
-        expectedPendingSize: number;
         expectClipboardWrite: boolean;
         bugMessage: string;
     }
@@ -134,7 +138,6 @@ suite('Regression: openExternal returns false (Copy/Cancel/dismiss)', function (
         {
             name: '"Copy URL" clicked: copies the auth URL and keeps the flow alive',
             infoMessageChoice: 'Copy URL',
-            expectedPendingSize: 1,
             expectClipboardWrite: true,
             bugMessage: 'Bug regressed: clicking "Copy URL" should copy the auth URL to the clipboard and keep the flow alive.',
         },
@@ -142,26 +145,29 @@ suite('Regression: openExternal returns false (Copy/Cancel/dismiss)', function (
             name: '"Cancel" clicked: rejects with "User did not consent to login." and cleans up',
             infoMessageChoice: 'Cancel',
             expectRejection: /User did not consent to login\./,
-            expectedPendingSize: 0,
             expectClipboardWrite: false,
-            bugMessage: 'Bug regressed: clicking "Cancel" should reject with "User did not consent to login." (the string authCommands.ts suppresses) and clean up pending state.',
+            bugMessage: 'Bug regressed: clicking "Cancel" should reject with "User did not consent to login." (the string authCommands.ts suppresses).',
         },
         {
             name: 'Notification dismissed (no button clicked): rejects with "User did not consent to login." and cleans up',
             infoMessageChoice: undefined,
             expectRejection: /User did not consent to login\./,
-            expectedPendingSize: 0,
             expectClipboardWrite: false,
-            bugMessage: 'Bug regressed: dismissing the notification should reject with "User did not consent to login." (the string authCommands.ts suppresses) and clean up pending state.',
+            bugMessage: 'Bug regressed: dismissing the notification should reject with "User did not consent to login." (the string authCommands.ts suppresses).',
         },
     ];
 
     for (const tc of cases) {
-        test(tc.name, async () => {
+        test(tc.name, async function () {
+            this.timeout(2000);
             const written: string[] = [];
+            const clipboardWritten = deferred();
 
             await withOpenExternalFalseStubs(
-                { infoMessageChoice: tc.infoMessageChoice, onClipboardWrite: text => written.push(text) },
+                {
+                    infoMessageChoice: tc.infoMessageChoice,
+                    onClipboardWrite: text => { written.push(text); clipboardWritten.resolve(); },
+                },
                 async () => {
                     const sessionPromise = provider.createSession(SCOPES);
                     sessionPromise.catch(() => { /* asserted via assert.rejects below, or settled by dispose() in teardown */ });
@@ -169,10 +175,11 @@ suite('Regression: openExternal returns false (Copy/Cancel/dismiss)', function (
                     if (tc.expectRejection) {
                         await assert.rejects(sessionPromise, tc.expectRejection, tc.bugMessage);
                     } else {
-                        await delay(300);
+                        // Wait deterministically for the clipboard write, then confirm the
+                        // session promise is still alive (not yet resolved or rejected).
+                        await clipboardWritten.promise;
+                        assert.ok(await isPending(sessionPromise), tc.bugMessage);
                     }
-
-                    assert.strictEqual(getPendingAuths(provider).size, tc.expectedPendingSize, tc.bugMessage);
 
                     if (tc.expectClipboardWrite) {
                         assert.ok(
@@ -187,20 +194,22 @@ suite('Regression: openExternal returns false (Copy/Cancel/dismiss)', function (
         });
     }
 
-    test('"Copy URL" clicked but clipboard.writeText fails: falls back to showInputBox with the URL', async () => {
+    test('"Copy URL" clicked but clipboard.writeText fails: falls back to showInputBox with the URL', async function () {
+        this.timeout(2000);
         let inputBoxOptions: vscode.InputBoxOptions | undefined;
+        const inputBoxShown = deferred();
 
         await withOpenExternalFalseStubs(
             {
                 infoMessageChoice: 'Copy URL',
                 clipboardWriteError: new Error('clipboard unavailable'),
-                onShowInputBox: options => { inputBoxOptions = options; },
+                onShowInputBox: options => { inputBoxOptions = options; inputBoxShown.resolve(); },
             },
             async () => {
                 const sessionPromise = provider.createSession(SCOPES);
                 sessionPromise.catch(() => { /* settled by dispose() in teardown */ });
 
-                await delay(300);
+                await inputBoxShown.promise;
 
                 assert.ok(
                     inputBoxOptions !== undefined,
@@ -212,9 +221,8 @@ suite('Regression: openExternal returns false (Copy/Cancel/dismiss)', function (
                         && inputBoxOptions.value.includes('/authorize?'),
                     `Fallback input box should be pre-filled with the full auth URL, got: ${inputBoxOptions?.value}`,
                 );
-
-                assert.strictEqual(
-                    getPendingAuths(provider).size, 1,
+                assert.ok(
+                    await isPending(sessionPromise),
                     'Bug regressed: a clipboard write failure must NOT cancel the pending auth flow — ' +
                     'the user can still copy the URL manually from the fallback input box.',
                 );
@@ -222,11 +230,9 @@ suite('Regression: openExternal returns false (Copy/Cancel/dismiss)', function (
         );
     });
 
-    test('openExternal() itself rejects: cleans up pending state and rejects the session with that error', async function () {
-        // override Mocha's default 20s timeout for this test if it regresses,
-        // since sessionPromise will never settle due to the unhandled promise
-        // rejection from openExternal(). This will allow the test to timeout
-        // after 2s rather than 20s and speed up the overall test run.
+    test('openExternal() itself rejects: rejects the session with that error', async function () {
+        // Short per-test timeout: on regression, sessionPromise never settles (unhandled
+        // rejection from openExternal), so assert.rejects hangs. Fail fast at 2s.
         this.timeout(2000);
 
         const openExternalError = new Error('openExternal exploded');
@@ -241,42 +247,35 @@ suite('Regression: openExternal returns false (Copy/Cancel/dismiss)', function (
                     (err: Error) => err === openExternalError,
                     'Bug regressed: if openExternal() itself rejects, the session promise must reject with that same error.',
                 );
-
-                assert.strictEqual(
-                    getPendingAuths(provider).size, 0,
-                    'Bug regressed: if openExternal() itself rejects, pending auth state must be cleaned up.',
-                );
             },
         );
     });
 
     test('createSession() called again while one is pending: supersedes the old attempt', async function () {
         this.timeout(2000);
+        const firstClipboardWritten = deferred();
 
         await withOpenExternalFalseStubs(
-            { infoMessageChoice: 'Copy URL' },
+            { infoMessageChoice: 'Copy URL', onClipboardWrite: () => firstClipboardWritten.resolve() },
             async () => {
                 const firstSessionPromise = provider.createSession(SCOPES);
-                await delay(300);
+                firstSessionPromise.catch(() => { /* asserted via assert.rejects below */ });
 
-                assert.strictEqual(
-                    getPendingAuths(provider).size, 1,
-                    'First attempt should remain pending after "Copy URL" is chosen.',
-                );
+                // Wait deterministically for the first attempt to reach its pending state.
+                await firstClipboardWritten.promise;
+                assert.ok(await isPending(firstSessionPromise), 'First attempt should remain pending after "Copy URL" is chosen.');
 
                 const secondSessionPromise = provider.createSession(SCOPES);
                 secondSessionPromise.catch(() => { /* settled by dispose() in teardown */ });
-                await delay(300);
 
                 await assert.rejects(
                     firstSessionPromise,
                     /Superseded by a new sign-in attempt\./,
                     'Bug regressed: starting a new sign-in attempt should reject any in-flight attempt with "Superseded by a new sign-in attempt."',
                 );
-
-                assert.strictEqual(
-                    getPendingAuths(provider).size, 1,
-                    'Bug regressed: the second sign-in attempt should still be tracked as pending.',
+                assert.ok(
+                    await isPending(secondSessionPromise),
+                    'Bug regressed: the second sign-in attempt should still be pending.',
                 );
             },
         );

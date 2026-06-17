@@ -102,6 +102,17 @@ const RB_ALL_METHODS = new Set([...RB_CAPTURE_METHODS, ...RB_FLAG_METHODS]);
 
 const CLIENT_NAMES = new Set(['posthog', 'client', 'ph']);
 
+// ── Parse guards ──
+// Tree-sitter parsing is synchronous and runs on the extension-host thread. Parsing a very
+// large or minified file can block the host for seconds and, with ~8 providers re-parsing the
+// active document on every edit, freeze VS Code hard enough to require a reboot. Skip parsing
+// of documents above these thresholds so large/minified files never block the host.
+// (Bytes catch minified single-line bundles; lines catch huge generated source files.)
+const MAX_PARSE_BYTES = 2 * 1024 * 1024; // 2 MB
+const MAX_PARSE_LINES = 50_000;
+// Above this single-line length a file is almost certainly minified/generated; bail early.
+const MAX_PARSE_LINE_LENGTH = 100_000;
+
 interface LangFamily {
     wasm: string;
     captureMethods: Set<string>;
@@ -605,8 +616,30 @@ export class TreeSitterService {
 
     private parse(text: string, lang: Parser.Language): Parser.Tree | null {
         if (!this.parser) { return null; }
+        if (this.exceedsParseLimit(text)) { return null; }
         this.parser.setLanguage(lang);
         return this.parser.parse(text);
+    }
+
+    /**
+     * True when a document is too large/minified to parse synchronously without risking an
+     * extension-host freeze. Cheap O(n) scan that short-circuits on the byte cap first, so the
+     * common minified-bundle case (huge single line) bails before any line counting.
+     */
+    private exceedsParseLimit(text: string): boolean {
+        if (text.length > MAX_PARSE_BYTES) { return true; }
+
+        let lines = 1;
+        let lineLength = 0;
+        for (let i = 0; i < text.length; i++) {
+            if (text.charCodeAt(i) === 10 /* \n */) {
+                if (++lines > MAX_PARSE_LINES) { return true; }
+                lineLength = 0;
+            } else if (++lineLength > MAX_PARSE_LINE_LENGTH) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private getQuery(lang: Parser.Language, queryStr: string): Parser.Query | null {

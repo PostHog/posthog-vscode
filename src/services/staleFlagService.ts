@@ -3,6 +3,7 @@ import { FlagCacheService } from './flagCacheService';
 import { ExperimentCacheService } from './experimentCacheService';
 import { TreeSitterService } from './treeSitterService';
 import { FeatureFlag } from '../models/types';
+import { mapWithConcurrency } from '../utils/concurrency';
 
 export type StalenessReason = 'fully_rolled_out' | 'inactive' | 'not_in_posthog' | 'experiment_complete';
 
@@ -30,6 +31,12 @@ const FLAG_METHODS = new Set([
     'GetFeatureFlag', 'IsFeatureEnabled', 'GetFeatureFlagPayload',
 ]);
 
+// Bound the workspace scan so a large monorepo can't freeze the extension host: open and parse
+// at most MAX_SCAN_CONCURRENCY files at a time (instead of an unbounded Promise.all over every
+// source file), and cap the total number of files scanned, logging a truncation notice.
+const MAX_SCAN_CONCURRENCY = 12;
+const MAX_SCAN_FILES = 5_000;
+
 export class StaleFlagService {
     private _staleFlags: StaleFlag[] = [];
     private _onDidChange = new vscode.EventEmitter<void>();
@@ -51,14 +58,24 @@ export class StaleFlagService {
         const excludeParts = ['**/node_modules/**', '**/dist/**', '**/build/**', '.git/**', ...extraExcludes];
         const excludePattern = `{${excludeParts.join(',')}}`;
 
-        const files = await vscode.workspace.findFiles(
+        const allFiles = await vscode.workspace.findFiles(
             '**/*.{ts,tsx,js,jsx,py,go,rb}',
             excludePattern,
+            MAX_SCAN_FILES + 1,
         );
+
+        let files = allFiles;
+        if (allFiles.length > MAX_SCAN_FILES) {
+            files = allFiles.slice(0, MAX_SCAN_FILES);
+            console.warn(
+                `[PostHog] Stale flag scan: workspace has more than ${MAX_SCAN_FILES} source files; ` +
+                `scanning the first ${MAX_SCAN_FILES} only. Use posthog.staleFlagExcludePatterns to narrow the scan.`,
+            );
+        }
 
         const refsByKey = new Map<string, StaleFlagReference[]>();
 
-        await Promise.all(files.map(async (uri) => {
+        const scanFile = async (uri: vscode.Uri): Promise<void> => {
             try {
                 const doc = await vscode.workspace.openTextDocument(uri);
                 if (!this.treeSitter.isSupported(doc.languageId)) { return; }
@@ -83,7 +100,11 @@ export class StaleFlagService {
             } catch {
                 // skip unreadable files
             }
-        }));
+        };
+
+        // Keep at most MAX_SCAN_CONCURRENCY files open/parsing at once instead of an
+        // unbounded Promise.all over every source file.
+        await mapWithConcurrency(files, MAX_SCAN_CONCURRENCY, scanFile);
 
         const staleFlags: StaleFlag[] = [];
 

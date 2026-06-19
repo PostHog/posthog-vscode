@@ -36,7 +36,8 @@ const FLAG_METHODS = new Set([
 //   1. a file-count ceiling on findFiles (maxResults),
 //   2. broad default excludes for vendored/generated/minified trees, and
 //   3. a fixed-concurrency worker pool instead of Promise.all over everything.
-const MAX_SCAN_FILES = 5000;
+// The ceiling is configurable via `posthog.staleFlagMaxFiles`; this is its default.
+const DEFAULT_MAX_SCAN_FILES = 5000;
 const SCAN_CONCURRENCY = 8;
 
 // Vendored, generated, and build-output trees never contain hand-written flag
@@ -46,7 +47,7 @@ const DEFAULT_EXCLUDE_GLOBS = [
     '**/node_modules/**', '**/dist/**', '**/build/**', '**/out/**', '**/.git/**',
     '**/vendor/**', '**/.next/**', '**/.nuxt/**', '**/.svelte-kit/**',
     '**/__pycache__/**', '**/.venv/**', '**/venv/**', '**/coverage/**',
-    '**/*.min.js',
+    '**/*.min.js', '**/*.bundle.js',
 ];
 
 /** Run an async mapper over items with a fixed concurrency ceiling. */
@@ -86,10 +87,12 @@ export class StaleFlagService {
         const excludeParts = [...DEFAULT_EXCLUDE_GLOBS, ...extraExcludes];
         const excludePattern = `{${excludeParts.join(',')}}`;
 
+        const maxFiles = config.get<number>('staleFlagMaxFiles', DEFAULT_MAX_SCAN_FILES);
+
         const files = await vscode.workspace.findFiles(
             '**/*.{ts,tsx,js,jsx,py,go,rb}',
             excludePattern,
-            MAX_SCAN_FILES,
+            maxFiles,
         );
 
         const refsByKey = new Map<string, StaleFlagReference[]>();

@@ -70,7 +70,7 @@ suite('Stale flag scan is bounded (regression #1801)', () => {
             typeof capturedMaxResults === 'number' && capturedMaxResults > 0,
             'findFiles must receive a positive maxResults ceiling so a huge repo cannot enumerate unbounded files',
         );
-        for (const glob of ['**/node_modules/**', '**/vendor/**', '**/.next/**', '**/__pycache__/**', '**/coverage/**', '**/*.min.js']) {
+        for (const glob of ['**/node_modules/**', '**/vendor/**', '**/.next/**', '**/__pycache__/**', '**/coverage/**', '**/*.min.js', '**/*.bundle.js']) {
             assert.ok(
                 capturedExclude?.includes(glob),
                 `default exclude pattern must contain ${glob} so vendored/generated/minified trees are not parsed`,

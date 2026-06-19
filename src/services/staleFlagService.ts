@@ -30,6 +30,42 @@ const FLAG_METHODS = new Set([
     'GetFeatureFlag', 'IsFeatureEnabled', 'GetFeatureFlagPayload',
 ]);
 
+// The scan opens and tree-sitter-parses every matched file on the single
+// extension-host thread. On large workspaces an unbounded scan saturated CPU
+// and froze the editor (ticket #1801), so it is bounded on three axes:
+//   1. a file-count ceiling on findFiles (maxResults),
+//   2. broad default excludes for vendored/generated/minified trees, and
+//   3. a fixed-concurrency worker pool instead of Promise.all over everything.
+// The ceiling is configurable via `posthog.staleFlagMaxFiles`; this is its default.
+const DEFAULT_MAX_SCAN_FILES = 5000;
+const SCAN_CONCURRENCY = 8;
+
+// Vendored, generated, and build-output trees never contain hand-written flag
+// references worth surfacing, but they hold the bulk of the files (and the
+// heaviest minified ones). Excluding them up front is what keeps the scan cheap.
+const DEFAULT_EXCLUDE_GLOBS = [
+    '**/node_modules/**', '**/dist/**', '**/build/**', '**/out/**', '**/.git/**',
+    '**/vendor/**', '**/.next/**', '**/.nuxt/**', '**/.svelte-kit/**',
+    '**/__pycache__/**', '**/.venv/**', '**/venv/**', '**/coverage/**',
+    '**/*.min.js', '**/*.bundle.js',
+];
+
+/** Run an async mapper over items with a fixed concurrency ceiling. */
+async function mapWithConcurrency<T>(
+    items: readonly T[],
+    concurrency: number,
+    worker: (item: T) => Promise<void>,
+): Promise<void> {
+    let next = 0;
+    const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+        while (next < items.length) {
+            const index = next++;
+            await worker(items[index]);
+        }
+    });
+    await Promise.all(runners);
+}
+
 export class StaleFlagService {
     private _staleFlags: StaleFlag[] = [];
     private _onDidChange = new vscode.EventEmitter<void>();
@@ -48,17 +84,20 @@ export class StaleFlagService {
     async scan(): Promise<StaleFlag[]> {
         const config = vscode.workspace.getConfiguration('posthog');
         const extraExcludes = config.get<string[]>('staleFlagExcludePatterns', []);
-        const excludeParts = ['**/node_modules/**', '**/dist/**', '**/build/**', '.git/**', ...extraExcludes];
+        const excludeParts = [...DEFAULT_EXCLUDE_GLOBS, ...extraExcludes];
         const excludePattern = `{${excludeParts.join(',')}}`;
+
+        const maxFiles = config.get<number>('staleFlagMaxFiles', DEFAULT_MAX_SCAN_FILES);
 
         const files = await vscode.workspace.findFiles(
             '**/*.{ts,tsx,js,jsx,py,go,rb}',
             excludePattern,
+            maxFiles,
         );
 
         const refsByKey = new Map<string, StaleFlagReference[]>();
 
-        await Promise.all(files.map(async (uri) => {
+        await mapWithConcurrency(files, SCAN_CONCURRENCY, async (uri) => {
             try {
                 const doc = await vscode.workspace.openTextDocument(uri);
                 if (!this.treeSitter.isSupported(doc.languageId)) { return; }
@@ -83,7 +122,7 @@ export class StaleFlagService {
             } catch {
                 // skip unreadable files
             }
-        }));
+        });
 
         const staleFlags: StaleFlag[] = [];
 

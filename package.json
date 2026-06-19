@@ -250,6 +250,11 @@
           },
           "default": [],
           "markdownDescription": "Additional glob patterns to exclude from stale flag scanning (e.g. `**/tests/**`, `**/fixtures/**`)."
+        },
+        "posthog.staleFlagMaxFiles": {
+          "type": "number",
+          "default": 5000,
+          "markdownDescription": "Maximum number of files the stale flag scan will open. Caps memory and CPU on very large workspaces so the editor stays responsive."
         }
       }
     }

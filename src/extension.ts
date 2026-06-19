@@ -347,10 +347,7 @@ export function activate(context: vscode.ExtensionContext) {
                     loadFlags(projectId),
                     loadEvents(projectId),
                     loadExperiments(projectId),
-                ]).then(() => {
-                    // Auto-scan for stale flags after caches are loaded
-                    staleFlagService.scan().catch(() => {});
-                }).catch(err => {
+                ]).catch(err => {
                     const msg = err instanceof Error ? err.message : 'Connection failed';
                     vscode.window.showWarningMessage(`PostHog: ${msg}`);
                     updateStatusBar(true);

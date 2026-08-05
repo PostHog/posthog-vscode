@@ -58,12 +58,17 @@ export class PostHogAuthenticationProvider implements vscode.AuthenticationProvi
     }
 
     dispose(): void {
+        this.cancelPendingAuths(new Error('Auth provider disposed'));
+        this._onDidChangeSessions.dispose();
+    }
+
+    /** Reject and clear any in-flight sign-in attempts. */
+    private cancelPendingAuths(error: Error): void {
         for (const pending of this.pendingAuths.values()) {
             clearTimeout(pending.timeout);
-            pending.reject(new Error('Auth provider disposed'));
+            pending.reject(error);
         }
         this.pendingAuths.clear();
-        this._onDidChangeSessions.dispose();
     }
 
     // ── AuthenticationProvider interface ──
@@ -83,6 +88,10 @@ export class PostHogAuthenticationProvider implements vscode.AuthenticationProvi
     }
 
     async createSession(scopes: readonly string[]): Promise<vscode.AuthenticationSession> {
+        // A new sign-in attempt replaces any in-flight ones — e.g. a dismissed
+        // notification can leave a stale flow (with a ticking timeout) alive.
+        this.cancelPendingAuths(new Error('Superseded by a new sign-in attempt.'));
+
         const { codeVerifier, codeChallenge } = this.generatePKCE();
         const state = crypto.randomBytes(16).toString('hex');
 
@@ -97,7 +106,8 @@ export class PostHogAuthenticationProvider implements vscode.AuthenticationProvi
             scope: scopes.join(' '),
         });
 
-        const authUrl = vscode.Uri.parse(`${this.oauthAuthority}/authorize?${params.toString()}`);
+        const authUrlString = `${this.oauthAuthority}/authorize?${params.toString()}`;
+        const authUrl = vscode.Uri.parse(authUrlString);
 
         return new Promise<vscode.AuthenticationSession>((resolve, reject) => {
             const timeout = setTimeout(() => {
@@ -107,12 +117,39 @@ export class PostHogAuthenticationProvider implements vscode.AuthenticationProvi
 
             this.pendingAuths.set(state, { codeVerifier, resolve, reject, timeout });
 
-            vscode.env.openExternal(authUrl).then(opened => {
+            Promise.resolve(vscode.env.openExternal(authUrl)).then(opened => {
                 if (!opened) {
-                    clearTimeout(timeout);
-                    this.pendingAuths.delete(state);
-                    reject(new Error('Failed to open browser for authentication'));
+                    vscode.window.showInformationMessage(
+                        "PostHog: Couldn't open your browser. Copy the PostHog sign-in URL and paste it into your browser's address bar to continue.",
+                        'Copy URL',
+                        'Cancel',
+                    ).then(async (choice) => {
+                        if (choice === 'Copy URL') {
+                            try {
+                                await vscode.env.clipboard.writeText(authUrlString);
+                                vscode.window.showInformationMessage("PostHog: Auth URL copied — paste it into your browser's address bar to finish signing in");
+                            } catch (error) {
+                                console.warn('[PostHog] Failed to copy auth URL to clipboard:', error);
+                                await vscode.window.showInputBox({
+                                    title: 'PostHog Authentication URL',
+                                    prompt: 'Could not copy automatically — copy this URL and open it in your browser to finish signing in',
+                                    value: authUrlString,
+                                    ignoreFocusOut: true,
+                                });
+                            }
+                        } else {
+                            // User clicked "Cancel" or dismissed the message
+                            clearTimeout(timeout);
+                            this.pendingAuths.delete(state);
+                            reject(new Error('User did not consent to login.'));
+                        }
+                    });
                 }
+            })
+            .catch((error: Error) => {
+                clearTimeout(timeout);
+                this.pendingAuths.delete(state);
+                reject(error);
             });
         });
     }

@@ -11,3 +11,4 @@ grammars/
 .DS_Store
 .planning/
 .claude/worktrees/
+.pnpm-store

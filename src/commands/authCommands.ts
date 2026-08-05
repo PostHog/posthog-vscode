@@ -71,7 +71,7 @@ export function registerAuthCommands(
         } catch (err) {
             telemetry.capture('sign_in_failed');
             const detail = err instanceof Error ? err.message : 'Unknown error';
-            if (detail !== 'User did not consent to login.' && detail !== 'Authentication timed out') {
+            if (detail !== 'User did not consent to login.' && detail !== 'Authentication timed out' && detail !== 'Superseded by a new sign-in attempt.') {
                 vscode.window.showErrorMessage(`PostHog: Failed to sign in — ${detail}`);
             }
             await authService.setAuthenticated(false);

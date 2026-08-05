@@ -98,17 +98,33 @@ jobs:
                   echo "new-version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
                   echo "was-released=true" >> "$GITHUB_OUTPUT"
 
+            # Commits through the GitHub API so it carries GitHub's signature, which
+            # the org-wide signed-commits ruleset requires. A plain `git push` is
+            # rejected.
             - name: Commit version bump
+              id: commit-version-bump
               if: steps.version.outputs.was-released == 'true'
+              uses: planetscale/ghcommit-action@a6b150b81dca5dd027baa898604418eec9e11465 # v0.2.22
+              with:
+                  commit_message: 'chore: release v${{ steps.version.outputs.new-version }}'
+                  repo: ${{ github.repository }}
+                  branch: ${{ github.ref_name }}
               env:
-                  VERSION: ${{ steps.version.outputs.new-version }}
+                  GITHUB_TOKEN: ${{ steps.releaser.outputs.token }}
+
+            # ghcommit-action creates the commit on the remote without moving the
+            # local checkout, so the tag below would otherwise point at the
+            # pre-bump commit.
+            - name: Sync checkout to release commit
+              if: steps.commit-version-bump.outputs.commit-hash != ''
+              env:
+                  COMMIT_HASH: ${{ steps.commit-version-bump.outputs.commit-hash }}
               run: |
-                  git add -A
-                  git commit -m "chore: release v$VERSION"
-                  git push
+                  git fetch origin "$GITHUB_REF_NAME"
+                  git reset --hard "$COMMIT_HASH"
 
             - name: Create Git tag
-              if: steps.version.outputs.was-released == 'true'
+              if: steps.commit-version-bump.outputs.commit-hash != ''
               env:
                   GH_TOKEN: ${{ steps.releaser.outputs.token }}
                   VERSION: ${{ steps.version.outputs.new-version }}

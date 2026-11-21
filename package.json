@@ -297,7 +297,7 @@
     "webpack-cli": "^6.0.1"
   },
   "dependencies": {
-    "posthog-node": "^5.28.9",
+    "posthog-node": "^6.0.5",
     "web-tree-sitter": "^0.24.7"
   },
   "pnpm": {
